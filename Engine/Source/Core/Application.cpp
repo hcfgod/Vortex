@@ -1,0 +1,443 @@
+#include "vxpch.h"
+#include "Application.h"
+#include "Core/Debug/Log.h"
+#include "Core/EngineConfig.h"
+#include "Core/Window.h"
+#include "Engine/Engine.h"
+#include "Engine/Systems/RenderSystem.h"
+#include "Engine/Time/Time.h"
+#include "Events/EventSystem.h"
+#include "Events/ApplicationEvent.h"
+#include "Events/WindowEvent.h"
+#include "Events/InputEvent.h"
+
+#ifdef VX_USE_SDL
+	#include "Platform/SDL/SDL3Manager.h"
+#endif
+
+namespace Vortex
+{
+	Application::Application()
+	{
+		VX_CORE_INFO("Application Created");
+
+		// Initialize engine configuration if not already done by EntryPoint
+		if (!EngineConfig::Get().IsInitialized())
+		{
+			auto configResult = EngineConfig::Get().Initialize(EngineConfig::FindConfigDirectory());
+			if (!configResult)
+			{
+				VX_CORE_WARN("Failed to initialize engine configuration: {0}", configResult.GetErrorMessage());
+				VX_CORE_WARN("Continuing with default settings...");
+			}
+		}
+
+		#ifdef VX_USE_SDL
+			// Initialize SDL3 with all necessary subsystems for input events
+			if (!SDL3Manager::Initialize(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD))
+			{
+				VX_CORE_CRITICAL("Failed to initialize SDL3Manager!");
+				return;
+			}
+		#endif
+
+		// Create the main window using configuration
+		auto windowProps = EngineConfig::Get().CreateWindowProperties();
+		
+		m_Window = Vortex::CreatePlatformWindow(windowProps);
+		if (m_Window && !m_Window->IsValid())
+		{
+			VX_CORE_CRITICAL("Failed to create main window!");
+			return;
+		}
+	}
+
+	Application::~Application()
+	{
+		// Clean up event subscriptions first
+		CleanupEventSubscriptions();
+		
+		// Ensure the renderer is shut down BEFORE destroying the window to avoid GL/SDL teardown issues
+		if (m_Engine)
+		{
+			if (auto* renderSystem = m_Engine->GetSystemManager().GetSystem<RenderSystem>())
+			{
+				VX_CORE_INFO("Shutting down RenderSystem prior to window destruction");
+				renderSystem->Shutdown();
+			}
+		}
+		
+		#ifdef VX_USE_SDL
+			// Stop SDL text input if active
+			if (m_Window && m_Window->IsValid())
+			{
+				if (SDL_TextInputActive(static_cast<SDL_Window*>(m_Window->GetNativeHandle())))
+				{
+					SDL_StopTextInput(static_cast<SDL_Window*>(m_Window->GetNativeHandle()));
+				}
+			}
+		#endif
+		
+		// Destroy window after renderer shutdown
+		m_Window.reset();
+		
+		#ifdef VX_USE_SDL
+			// Shutdown SDL3
+			SDL3Manager::Shutdown();
+		#endif // VX_USE_SDL
+		
+		VX_CORE_INFO("Application Destroyed");
+	}
+
+	void Application::Run(Engine* engine)
+	{	
+		SetupWithEngine(engine);
+
+		// Dispatch application initialize event
+		VX_DISPATCH_EVENT(ApplicationStartedEvent());
+
+		Initialize();
+
+		VX_CORE_INFO("Starting application main loop...");
+
+		// Main loop
+		#ifdef VX_USE_SDL
+			SDL_Event event;
+		#endif
+
+		while (m_Engine->IsRunning())
+		{
+			#ifdef VX_USE_SDL
+				// Handle SDL events
+				while (SDL_PollEvent(&event))
+				{
+					// Convert SDL events to Vortex events and dispatch them
+					ConvertSDLEventToVortexEvent(event);
+
+					// Let the window process its events
+					if (m_Window && m_Window->ProcessEvent(event))
+					{
+						// Window handled the event
+						if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
+						{
+							// Dispatch window close event
+							VX_DISPATCH_EVENT(WindowCloseEvent());
+							m_Engine->Stop();
+						}
+					}
+				}
+			#endif
+
+			// Handle application-level events
+			ProcessEvent(event);
+
+			// Update engine systems first (Time system will manage deltaTime globally)
+			auto updateResult = m_Engine->Update();
+			if (updateResult.IsError())
+			{
+				VX_CORE_ERROR("Engine update failed: {0}", updateResult.GetErrorMessage());
+			}
+
+			// Dispatch application update event
+			VX_DISPATCH_EVENT(ApplicationUpdateEvent(Time::GetDeltaTime()));
+
+			// Then update application
+			Update();
+
+			// Render engine systems first
+			auto renderResult = m_Engine->Render();
+			if (renderResult.IsError())
+			{
+				VX_CORE_ERROR("Engine render failed: {0}", renderResult.GetErrorMessage());
+			}
+
+			// Dispatch application render event
+			VX_DISPATCH_EVENT(ApplicationRenderEvent(Time::GetDeltaTime()));
+
+			// Then render application
+			Render();
+		}
+
+		// Dispatch application shutdown event
+		VX_DISPATCH_EVENT(ApplicationShutdownEvent());
+		
+		Shutdown();
+
+		VX_CORE_INFO("Application main loop finished");
+	}
+	
+	void Application::SetupWithEngine(Engine* engine)
+	{
+		m_Engine = engine;
+		
+		// Setup event subscriptions now that EventSystem is available
+		SetupEventSubscriptions();
+
+		// Attach window to the RenderSystem so it can create the graphics context
+		if (auto* renderSystem = m_Engine->GetSystemManager().GetSystem<RenderSystem>())
+		{
+			auto rs = renderSystem->AttachWindow(m_Window.get());
+			VX_LOG_ERROR(rs);
+		}
+		else
+		{
+			VX_CORE_WARN("RenderSystem not found; rendering will be disabled");
+		}
+
+		if (!m_Window || !m_Window->IsValid())
+		{
+			VX_CORE_CRITICAL("No valid window available for application!");
+			return;
+		}
+		
+		#ifdef VX_USE_SDL
+			// Enable SDL text input for keyboard text events
+			SDL_StartTextInput(static_cast<SDL_Window*>(m_Window->GetNativeHandle()));
+		#endif
+		
+		VX_CORE_INFO("Application setup with engine completed");
+	}
+	
+	void Application::SetupEventSubscriptions()
+	{
+		// Subscribe to application lifecycle events
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(ApplicationStartedEvent, this, &Application::OnAppInitialize)
+		);
+		
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(ApplicationUpdateEvent, this, &Application::OnAppUpdate)
+		);
+		
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(ApplicationRenderEvent, this, &Application::OnAppRender)
+		);
+		
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(ApplicationShutdownEvent, this, &Application::OnAppShutdown)
+		);
+		
+		// Subscribe to window events
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(WindowCloseEvent, this, &Application::OnWindowClose)
+		);
+		
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(WindowResizeEvent, this, &Application::OnWindowResize)
+		);
+		
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(WindowFocusEvent, this, &Application::OnWindowFocus)
+		);
+		
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(WindowLostFocusEvent, this, &Application::OnWindowLostFocus)
+		);
+		
+		// Subscribe to input events (keyboard)
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(KeyPressedEvent, this, &Application::OnKeyPressed)
+		);
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(KeyReleasedEvent, this, &Application::OnKeyReleased)
+		);
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(KeyTypedEvent, this, &Application::OnKeyTyped)
+		);
+		
+		// Subscribe to input events (mouse)
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(MouseButtonPressedEvent, this, &Application::OnMouseButtonPressed)
+		);
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(MouseButtonReleasedEvent, this, &Application::OnMouseButtonReleased)
+		);
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(MouseMovedEvent, this, &Application::OnMouseMoved)
+		);
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(MouseScrolledEvent, this, &Application::OnMouseScrolled)
+		);
+		
+		// Subscribe to input events (gamepad)
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(GamepadConnectedEvent, this, &Application::OnGamepadConnected)
+		);
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(GamepadDisconnectedEvent, this, &Application::OnGamepadDisconnected)
+		);
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(GamepadButtonPressedEvent, this, &Application::OnGamepadButtonPressed)
+		);
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(GamepadButtonReleasedEvent, this, &Application::OnGamepadButtonReleased)
+		);
+		m_EventSubscriptions.push_back(
+			VX_SUBSCRIBE_EVENT_METHOD(GamepadAxisEvent, this, &Application::OnGamepadAxis)
+		);
+		
+		VX_CORE_INFO("Application event subscriptions ready ({} handlers)", m_EventSubscriptions.size());
+	}
+	
+	void Application::CleanupEventSubscriptions()
+	{
+		// Unsubscribe from all events
+		for (SubscriptionID id : m_EventSubscriptions)
+		{
+			VX_UNSUBSCRIBE_EVENT(id);
+		}
+		
+		m_EventSubscriptions.clear();
+		VX_CORE_INFO("Application event subscriptions cleanup complete");
+	}
+	
+	#ifdef VX_USE_SDL
+		void Application::ConvertSDLEventToVortexEvent(const SDL_Event& sdlEvent)
+	{
+		// Convert SDL events to Vortex events and dispatch them
+		switch (sdlEvent.type)
+		{
+			// =============================================================================
+			// WINDOW EVENTS
+			// =============================================================================
+			case SDL_EVENT_WINDOW_RESIZED:
+			{
+				uint32_t newW = static_cast<uint32_t>(sdlEvent.window.data1);
+				uint32_t newH = static_cast<uint32_t>(sdlEvent.window.data2);
+				VX_DISPATCH_EVENT(WindowResizeEvent(newW, newH));
+				// Inform the RenderSystem so it can update viewport/context
+				if (auto* rs = m_Engine->GetSystemManager().GetSystem<RenderSystem>())
+				{
+					rs->OnWindowResized(newW, newH);
+				}
+				break;
+			}
+			
+			case SDL_EVENT_WINDOW_FOCUS_GAINED:
+			{
+				VX_DISPATCH_EVENT(WindowFocusEvent());
+				break;
+			}
+			
+			case SDL_EVENT_WINDOW_FOCUS_LOST:
+			{
+				VX_DISPATCH_EVENT(WindowLostFocusEvent());
+				break;
+			}
+			
+			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+			{
+				// WindowCloseEvent is already dispatched in the main loop
+				break;
+			}
+			
+			// =============================================================================
+			// KEYBOARD EVENTS
+			// =============================================================================
+			case SDL_EVENT_KEY_DOWN:
+			{
+				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
+				bool isRepeat = sdlEvent.key.repeat != 0;
+				VX_DISPATCH_EVENT(KeyPressedEvent(keyCode, isRepeat));
+				break;
+			}
+			
+			case SDL_EVENT_KEY_UP:
+			{
+				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
+				VX_DISPATCH_EVENT(KeyReleasedEvent(keyCode));
+				break;
+			}
+			
+			case SDL_EVENT_TEXT_INPUT:
+			{
+				// SDL provides text as UTF-8 string, we'll use the first character
+				if (sdlEvent.text.text[0] != '\0')
+				{
+					uint32_t character = static_cast<uint32_t>(sdlEvent.text.text[0]);
+					VX_DISPATCH_EVENT(KeyTypedEvent(character));
+				}
+				break;
+			}
+			
+			// =============================================================================
+			// MOUSE EVENTS
+			// =============================================================================
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+			{
+				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
+				VX_DISPATCH_EVENT(MouseButtonPressedEvent(button));
+				break;
+			}
+			
+			case SDL_EVENT_MOUSE_BUTTON_UP:
+			{
+				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
+				VX_DISPATCH_EVENT(MouseButtonReleasedEvent(button));
+				break;
+			}
+			
+			case SDL_EVENT_MOUSE_MOTION:
+			{
+				float x = static_cast<float>(sdlEvent.motion.x);
+				float y = static_cast<float>(sdlEvent.motion.y);
+				VX_DISPATCH_EVENT(MouseMovedEvent(x, y));
+				break;
+			}
+			
+			case SDL_EVENT_MOUSE_WHEEL:
+			{
+				float xOffset = sdlEvent.wheel.x;
+				float yOffset = sdlEvent.wheel.y;
+				VX_DISPATCH_EVENT(MouseScrolledEvent(xOffset, yOffset));
+				break;
+			}
+			
+			// =============================================================================
+			// GAMEPAD EVENTS
+			// =============================================================================
+			case SDL_EVENT_GAMEPAD_ADDED:
+			{
+				int gamepadId = sdlEvent.gdevice.which;
+				VX_DISPATCH_EVENT(GamepadConnectedEvent(gamepadId));
+				break;
+			}
+			
+			case SDL_EVENT_GAMEPAD_REMOVED:
+			{
+				int gamepadId = sdlEvent.gdevice.which;
+				VX_DISPATCH_EVENT(GamepadDisconnectedEvent(gamepadId));
+				break;
+			}
+			
+			case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+			{
+				int gamepadId = sdlEvent.gbutton.which;
+				int button = sdlEvent.gbutton.button;
+				VX_DISPATCH_EVENT(GamepadButtonPressedEvent(gamepadId, button));
+				break;
+			}
+			
+			case SDL_EVENT_GAMEPAD_BUTTON_UP:
+			{
+				int gamepadId = sdlEvent.gbutton.which;
+				int button = sdlEvent.gbutton.button;
+				VX_DISPATCH_EVENT(GamepadButtonReleasedEvent(gamepadId, button));
+				break;
+			}
+			
+			case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+			{
+				int gamepadId = sdlEvent.gaxis.which;
+				int axis = sdlEvent.gaxis.axis;
+				float value = static_cast<float>(sdlEvent.gaxis.value) / 32767.0f; // Normalize to -1.0 to 1.0
+				VX_DISPATCH_EVENT(GamepadAxisEvent(gamepadId, axis, value));
+				break;
+			}
+			
+			default:
+				break;
+		}
+	}
+	#endif // VX_USE_SDL
+}

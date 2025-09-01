@@ -1,0 +1,25 @@
+#pragma once
+
+#include <iostream>
+#include <memory>
+#include <utility>
+#include <algorithm>
+#include <functional>
+#include <exception>
+#include <stdexcept>
+
+#include <string>
+#include <sstream>
+#include <array>
+#include <vector>
+#include <unordered_map>
+#include <unordered_set>
+
+// spdlog
+#include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
+#ifdef VX_PLATFORM_WINDOWS
+	#include <Windows.h>
+#endif
