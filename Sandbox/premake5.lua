@@ -35,7 +35,8 @@ project "Sandbox"
         "Engine"
     }
 
-    buildoptions { "/utf-8" }
+    filter "system:windows"
+        buildoptions { "/utf-8" }
 
     filter "system:windows"
         -- Copy the Config directory next to the executable after build

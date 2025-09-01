@@ -223,6 +223,9 @@ if [ ! -d "Engine/Vendor/spdlog" ]; then
 else
     echo "Updating spdlog..."
     cd "Engine/Vendor/spdlog"
+    # Reset any local changes and pull latest
+    git reset --hard HEAD
+    git clean -fd
     git pull origin v1.x
     cd "$PROJECT_ROOT"
     echo "spdlog updated successfully!"
@@ -340,6 +343,9 @@ if [ ! -d "Engine/Vendor/glm" ]; then
 else
     echo "Updating GLM..."
     cd "Engine/Vendor/glm"
+    # Reset any local changes and pull latest
+    git reset --hard HEAD
+    git clean -fd
     git pull origin master
     cd "$PROJECT_ROOT"
     echo "GLM updated successfully!"
@@ -360,6 +366,9 @@ if [ ! -d "Engine/Vendor/nlohmann_json" ]; then
 else
     echo "Updating nlohmann/json..."
     cd "Engine/Vendor/nlohmann_json"
+    # Reset any local changes and pull latest
+    git reset --hard HEAD
+    git clean -fd
     git pull origin develop
     cd "$PROJECT_ROOT"
     echo "nlohmann/json updated successfully!"
@@ -380,7 +389,10 @@ if [ ! -d "Engine/Vendor/GLAD" ]; then
 else
     echo "Updating GLAD..."
     cd "Engine/Vendor/GLAD"
-    git pull origin master
+    # Completely reset and force update to handle divergent branches
+    git fetch origin
+    git reset --hard origin/glad2
+    git clean -fd
     cd "$PROJECT_ROOT"
     echo "GLAD updated successfully!"
 fi
@@ -444,10 +456,10 @@ fi
 
 # Verify GLAD generation
 echo "Verifying GLAD generation..."
-if [ -f "generated/include/glad/glad.h" ] && [ -f "generated/src/glad.c" ]; then
+if [ -f "generated/include/glad/gl.h" ] && [ -f "generated/src/gl.c" ]; then
     echo "GLAD files generated successfully!"
-    echo "  - Header: generated/include/glad/glad.h"
-    echo "  - Source: generated/src/glad.c"
+    echo "  - Header: generated/include/glad/gl.h"
+    echo "  - Source: generated/src/gl.c"
 else
     echo "ERROR: GLAD files not found after generation!"
     exit 1
@@ -484,7 +496,7 @@ else
 fi
 
 # Check GLAD
-if [ -f "Engine/Vendor/GLAD/generated/include/glad/glad.h" ] && [ -f "Engine/Vendor/GLAD/generated/src/glad.c" ]; then
+if [ -f "Engine/Vendor/GLAD/generated/include/glad/gl.h" ] && [ -f "Engine/Vendor/GLAD/generated/src/gl.c" ]; then
     echo "✅ GLAD files found"
 else
     echo "❌ GLAD files missing"
