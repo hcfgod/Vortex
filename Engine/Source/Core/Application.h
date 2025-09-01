@@ -24,6 +24,13 @@ class Application
 		virtual ~Application();
 
 		void Run(Engine* engine);
+		
+		// Static access for layers and other systems
+		static Application* Get() { return s_Instance; }
+		
+		// Public accessors for layers
+		Engine* GetEngine() const { return m_Engine; }
+		Window* GetWindow() const { return m_Window.get(); }
 
 		// ===== Layer API (integrates with LayerStack) =====
 		LayerStack& GetLayerStack() { return m_LayerStack; }
@@ -84,11 +91,10 @@ class Application
 		virtual bool OnGamepadAxis(const GamepadAxisEvent& event) { return false; }
 		#pragma endregion
 
-	protected:
-		Engine* GetEngine() { return m_Engine; }
-		Window* GetWindow() { return m_Window.get(); }
-
 private:
+		// Static instance for global access
+		static Application* s_Instance;
+
 		// Core members
 		Engine* m_Engine = nullptr;
 		std::unique_ptr<Window> m_Window;

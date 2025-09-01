@@ -5,12 +5,12 @@
 using namespace Vortex;
 
 /**
- * @brief Example game layer that demonstrates basic game functionality
+ * @brief Example game layer that demonstrates the new Input system
  * 
  * This layer shows how to:
- * - Handle game-specific events
+ * - Use the Input polling API (Input::GetKey, Input::GetMouseButton, etc.)
+ * - Set up InputActions with callbacks
  * - Update game logic
- * - Render game content
  * - Work with the Time system
  */
 class ExampleGameLayer : public Layer
@@ -29,9 +29,13 @@ public:
     virtual bool OnEvent(Event& event) override;
 
 private:
-    // Event handlers
-    bool OnKeyPressed(KeyPressedEvent& e);
-    bool OnMouseButtonPressed(MouseButtonPressedEvent& e);
+    // Input setup
+    void SetupInputActions();
+    
+    // Action callbacks
+    void OnPauseAction(InputActionPhase phase);
+    void OnResetAction(InputActionPhase phase);
+    void OnFireAction(InputActionPhase phase);
 
 private:
     // Game state
@@ -42,4 +46,7 @@ private:
     // Simple animation
     float m_AnimationTime = 0.0f;
     float m_RotationAngle = 0.0f;
+    
+    // Input action map
+    std::shared_ptr<InputActionMap> m_GameplayActions;
 };

@@ -8,6 +8,7 @@
 #include "Time/TimeSystem.h"
 #include "Core/Events/EventSystem.h"
 #include "Systems/RenderSystem.h"
+#include "Engine/Input/InputSystem.h"
 
 namespace Vortex 
 {
@@ -137,8 +138,17 @@ namespace Vortex
 			}
 		}
 
+		// Register InputSystem (High priority)
+		{
+			auto* inputSystem = m_SystemManager.RegisterSystem<class InputSystem>();
+			if (!inputSystem)
+			{
+				VX_CORE_ERROR("Failed to register InputSystem");
+				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register InputSystem");
+			}
+		}
+
 		// TODO: Register other core systems here as they are implemented:
-		// - Input System (High priority)
 		// - Audio System (High priority)
 		// - Physics System (Normal priority)
 		// etc.

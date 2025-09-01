@@ -17,8 +17,14 @@
 
 namespace Vortex
 {
+	// Static instance definition
+	Application* Application::s_Instance = nullptr;
+
 	Application::Application()
 	{
+		VX_CORE_ASSERT(!s_Instance, "Application already exists!");
+		s_Instance = this;
+		
 		VX_CORE_INFO("Application Created");
 
 		#ifdef VX_USE_SDL
@@ -43,6 +49,10 @@ namespace Vortex
 
 Application::~Application()
 {
+	// Clear static instance
+	if (s_Instance == this)
+		s_Instance = nullptr;
+	
 	// Clean up event subscriptions first
 	CleanupEventSubscriptions();
 

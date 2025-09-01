@@ -26,6 +26,9 @@
 // Input
 #include "Engine/Input/KeyCodes.h"
 #include "Engine/Input/MouseCodes.h"
+#include "Engine/Input/Input.h"
+#include "Engine/Input/InputActions.h"
+#include "Engine/Input/InputSystem.h"
 
 // Layer System
 #include "Core/Layer/Layer.h"
