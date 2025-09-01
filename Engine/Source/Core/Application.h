@@ -5,6 +5,7 @@
 #include "Events/ApplicationEvent.h"
 #include "Events/WindowEvent.h"
 #include "Events/InputEvent.h"
+#include "Core/Layer/LayerStack.h"
 #include <memory>
 
 #ifdef VX_USE_SDL
@@ -16,13 +17,24 @@ namespace Vortex
 	class Engine;
 	class Window;
 
-	class Application
+class Application
 	{
 	public:
 		Application();
 		virtual ~Application();
 
 		void Run(Engine* engine);
+
+		// ===== Layer API (integrates with LayerStack) =====
+		LayerStack& GetLayerStack() { return m_LayerStack; }
+		const LayerStack& GetLayerStack() const { return m_LayerStack; }
+
+		Layer* PushLayer(std::unique_ptr<Layer> layer) { return m_LayerStack.PushLayer(std::move(layer)); }
+		template<typename T, typename... Args>
+		T* PushLayer(Args&&... args) { return m_LayerStack.PushLayer<T>(std::forward<Args>(args)...); }
+		bool PopLayer(Layer* layer) { return m_LayerStack.PopLayer(layer); }
+		bool PopLayer(const std::string& name) { return m_LayerStack.PopLayer(name); }
+		size_t PopLayersByType(LayerType type) { return m_LayerStack.PopLayersByType(type); }
 
 		virtual void Initialize() {}
 		virtual void Update() {}
@@ -76,10 +88,13 @@ namespace Vortex
 		Engine* GetEngine() { return m_Engine; }
 		Window* GetWindow() { return m_Window.get(); }
 
-	private:
+private:
 		// Core members
 		Engine* m_Engine = nullptr;
 		std::unique_ptr<Window> m_Window;
+
+		// Layer management
+		LayerStack m_LayerStack;
 		
 		// Event subscription management
 		std::vector<SubscriptionID> m_EventSubscriptions;

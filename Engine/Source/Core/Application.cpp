@@ -21,17 +21,6 @@ namespace Vortex
 	{
 		VX_CORE_INFO("Application Created");
 
-		// Initialize engine configuration if not already done by EntryPoint
-		if (!EngineConfig::Get().IsInitialized())
-		{
-			auto configResult = EngineConfig::Get().Initialize(EngineConfig::FindConfigDirectory());
-			if (!configResult)
-			{
-				VX_CORE_WARN("Failed to initialize engine configuration: {0}", configResult.GetErrorMessage());
-				VX_CORE_WARN("Continuing with default settings...");
-			}
-		}
-
 		#ifdef VX_USE_SDL
 			// Initialize SDL3 with all necessary subsystems for input events
 			if (!SDL3Manager::Initialize(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD))
@@ -52,20 +41,23 @@ namespace Vortex
 		}
 	}
 
-	Application::~Application()
+Application::~Application()
+{
+	// Clean up event subscriptions first
+	CleanupEventSubscriptions();
+
+	// Detach and clear layers before renderer/window shutdown
+	m_LayerStack.Clear();
+	
+	// Ensure the renderer is shut down BEFORE destroying the window to avoid GL/SDL teardown issues
+	if (m_Engine)
 	{
-		// Clean up event subscriptions first
-		CleanupEventSubscriptions();
-		
-		// Ensure the renderer is shut down BEFORE destroying the window to avoid GL/SDL teardown issues
-		if (m_Engine)
+		if (auto* renderSystem = m_Engine->GetSystemManager().GetSystem<RenderSystem>())
 		{
-			if (auto* renderSystem = m_Engine->GetSystemManager().GetSystem<RenderSystem>())
-			{
-				VX_CORE_INFO("Shutting down RenderSystem prior to window destruction");
-				renderSystem->Shutdown();
-			}
+			VX_CORE_INFO("Shutting down RenderSystem prior to window destruction");
+			renderSystem->Shutdown();
 		}
+	}
 		
 		#ifdef VX_USE_SDL
 			// Stop SDL text input if active
@@ -111,7 +103,7 @@ namespace Vortex
 				// Handle SDL events
 				while (SDL_PollEvent(&event))
 				{
-					// Convert SDL events to Vortex events and dispatch them
+					// Convert SDL events to Vortex events and dispatch/forward to layers
 					ConvertSDLEventToVortexEvent(event);
 
 					// Let the window process its events
@@ -120,15 +112,21 @@ namespace Vortex
 						// Window handled the event
 						if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
 						{
-							// Dispatch window close event
-							VX_DISPATCH_EVENT(WindowCloseEvent());
+							// Forward to layers first; if not consumed, dispatch globally
+							{
+								WindowCloseEvent e;
+								if (!m_LayerStack.OnEvent(e))
+								{
+									VX_DISPATCH_EVENT(e);
+								}
+							}
 							m_Engine->Stop();
 						}
 					}
 				}
 			#endif
 
-			// Handle application-level events
+			// Handle application-level SDL events (client override)
 			ProcessEvent(event);
 
 			// Update engine systems first (Time system will manage deltaTime globally)
@@ -139,7 +137,14 @@ namespace Vortex
 			}
 
 			// Dispatch application update event
-			VX_DISPATCH_EVENT(ApplicationUpdateEvent(Time::GetDeltaTime()));
+			{
+				ApplicationUpdateEvent e(Time::GetDeltaTime());
+				// Let layers see update tick via OnUpdate() call below; we still dispatch the app event
+				VX_DISPATCH_EVENT(e);
+			}
+
+			// Update layers (Game -> UI -> Debug -> Overlay)
+			m_LayerStack.OnUpdate();
 
 			// Then update application
 			Update();
@@ -152,7 +157,13 @@ namespace Vortex
 			}
 
 			// Dispatch application render event
-			VX_DISPATCH_EVENT(ApplicationRenderEvent(Time::GetDeltaTime()));
+			{
+				ApplicationRenderEvent e(Time::GetDeltaTime());
+				VX_DISPATCH_EVENT(e);
+			}
+
+			// Render layers (Game -> UI -> Debug -> Overlay)
+			m_LayerStack.OnRender();
 
 			// Then render application
 			Render();
@@ -198,9 +209,9 @@ namespace Vortex
 		VX_CORE_INFO("Application setup with engine completed");
 	}
 	
-	void Application::SetupEventSubscriptions()
-	{
-		// Subscribe to application lifecycle events
+void Application::SetupEventSubscriptions()
+{
+	// Subscribe to application lifecycle events
 		m_EventSubscriptions.push_back(
 			VX_SUBSCRIBE_EVENT_METHOD(ApplicationStartedEvent, this, &Application::OnAppInitialize)
 		);
@@ -304,8 +315,14 @@ namespace Vortex
 			{
 				uint32_t newW = static_cast<uint32_t>(sdlEvent.window.data1);
 				uint32_t newH = static_cast<uint32_t>(sdlEvent.window.data2);
-				VX_DISPATCH_EVENT(WindowResizeEvent(newW, newH));
-				// Inform the RenderSystem so it can update viewport/context
+				{
+					WindowResizeEvent e(newW, newH);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
+				// Inform the RenderSystem so it can update viewport/context (always)
 				if (auto* rs = m_Engine->GetSystemManager().GetSystem<RenderSystem>())
 				{
 					rs->OnWindowResized(newW, newH);
@@ -315,13 +332,21 @@ namespace Vortex
 			
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
 			{
-				VX_DISPATCH_EVENT(WindowFocusEvent());
+				WindowFocusEvent e;
+				if (!m_LayerStack.OnEvent(e))
+				{
+					VX_DISPATCH_EVENT(e);
+				}
 				break;
 			}
 			
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
 			{
-				VX_DISPATCH_EVENT(WindowLostFocusEvent());
+				WindowLostFocusEvent e;
+				if (!m_LayerStack.OnEvent(e))
+				{
+					VX_DISPATCH_EVENT(e);
+				}
 				break;
 			}
 			
@@ -338,14 +363,26 @@ namespace Vortex
 			{
 				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
 				bool isRepeat = sdlEvent.key.repeat != 0;
-				VX_DISPATCH_EVENT(KeyPressedEvent(keyCode, isRepeat));
+				{
+					KeyPressedEvent e(keyCode, isRepeat);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			
 			case SDL_EVENT_KEY_UP:
 			{
 				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
-				VX_DISPATCH_EVENT(KeyReleasedEvent(keyCode));
+				{
+					KeyReleasedEvent e(keyCode);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			
@@ -355,7 +392,11 @@ namespace Vortex
 				if (sdlEvent.text.text[0] != '\0')
 				{
 					uint32_t character = static_cast<uint32_t>(sdlEvent.text.text[0]);
-					VX_DISPATCH_EVENT(KeyTypedEvent(character));
+					KeyTypedEvent e(character);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
 				}
 				break;
 			}
@@ -366,14 +407,26 @@ namespace Vortex
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
 			{
 				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
-				VX_DISPATCH_EVENT(MouseButtonPressedEvent(button));
+				{
+					MouseButtonPressedEvent e(button);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			
 			case SDL_EVENT_MOUSE_BUTTON_UP:
 			{
 				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
-				VX_DISPATCH_EVENT(MouseButtonReleasedEvent(button));
+				{
+					MouseButtonReleasedEvent e(button);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			
@@ -381,7 +434,13 @@ namespace Vortex
 			{
 				float x = static_cast<float>(sdlEvent.motion.x);
 				float y = static_cast<float>(sdlEvent.motion.y);
-				VX_DISPATCH_EVENT(MouseMovedEvent(x, y));
+				{
+					MouseMovedEvent e(x, y);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			
@@ -389,7 +448,13 @@ namespace Vortex
 			{
 				float xOffset = sdlEvent.wheel.x;
 				float yOffset = sdlEvent.wheel.y;
-				VX_DISPATCH_EVENT(MouseScrolledEvent(xOffset, yOffset));
+				{
+					MouseScrolledEvent e(xOffset, yOffset);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			
@@ -399,14 +464,26 @@ namespace Vortex
 			case SDL_EVENT_GAMEPAD_ADDED:
 			{
 				int gamepadId = sdlEvent.gdevice.which;
-				VX_DISPATCH_EVENT(GamepadConnectedEvent(gamepadId));
+				{
+					GamepadConnectedEvent e(gamepadId);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			
 			case SDL_EVENT_GAMEPAD_REMOVED:
 			{
 				int gamepadId = sdlEvent.gdevice.which;
-				VX_DISPATCH_EVENT(GamepadDisconnectedEvent(gamepadId));
+				{
+					GamepadDisconnectedEvent e(gamepadId);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			
@@ -414,7 +491,13 @@ namespace Vortex
 			{
 				int gamepadId = sdlEvent.gbutton.which;
 				int button = sdlEvent.gbutton.button;
-				VX_DISPATCH_EVENT(GamepadButtonPressedEvent(gamepadId, button));
+				{
+					GamepadButtonPressedEvent e(gamepadId, button);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			
@@ -422,7 +505,13 @@ namespace Vortex
 			{
 				int gamepadId = sdlEvent.gbutton.which;
 				int button = sdlEvent.gbutton.button;
-				VX_DISPATCH_EVENT(GamepadButtonReleasedEvent(gamepadId, button));
+				{
+					GamepadButtonReleasedEvent e(gamepadId, button);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			
@@ -431,7 +520,13 @@ namespace Vortex
 				int gamepadId = sdlEvent.gaxis.which;
 				int axis = sdlEvent.gaxis.axis;
 				float value = static_cast<float>(sdlEvent.gaxis.value) / 32767.0f; // Normalize to -1.0 to 1.0
-				VX_DISPATCH_EVENT(GamepadAxisEvent(gamepadId, axis, value));
+				{
+					GamepadAxisEvent e(gamepadId, axis, value);
+					if (!m_LayerStack.OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
+				}
 				break;
 			}
 			

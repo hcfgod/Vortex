@@ -27,6 +27,14 @@
 #include "Engine/Input/KeyCodes.h"
 #include "Engine/Input/MouseCodes.h"
 
+// Layer System
+#include "Core/Layer/Layer.h"
+#include "Core/Layer/LayerStack.h"
+
 // ---Entry Point---------------------
+// Only include EntryPoint when VX_IMPLEMENT_MAIN is defined
+// This prevents multiple main() function definitions
+#ifdef VX_IMPLEMENT_MAIN
 #include "Core/EntryPoint.h"
+#endif
 // -----------------------------------
