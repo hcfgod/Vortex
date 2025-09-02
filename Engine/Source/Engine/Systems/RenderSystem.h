@@ -29,7 +29,9 @@ namespace Vortex
         // EngineSystem interface
         Result<void> Initialize() override;
         Result<void> Update() override { return Result<void>(); }
+        Result<void> PreRender();
         Result<void> Render() override;
+		Result<void> PostRender();
         Result<void> Shutdown() override;
 
         // Attach the main window so we can create a graphics context

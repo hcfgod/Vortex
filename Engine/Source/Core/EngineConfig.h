@@ -112,27 +112,6 @@ namespace Vortex
         // Convert VSync string to enum
         VSyncMode GetVSyncModeEnum() const;
 
-        // Audio Settings
-        float GetMasterVolume() const;
-        float GetSFXVolume() const;
-        float GetMusicVolume() const;
-        bool GetEnableSpatialAudio() const;
-        std::string GetAudioDevice() const;
-        
-        void SetMasterVolume(float volume, bool saveToUserPrefs = true);
-        void SetSFXVolume(float volume, bool saveToUserPrefs = true);
-        void SetMusicVolume(float volume, bool saveToUserPrefs = true);
-
-        // Input Settings
-        float GetMouseSensitivity() const;
-        bool GetInvertMouseY() const;
-        bool GetEnableGamepad() const;
-        float GetGamepadDeadzone() const;
-        
-        void SetMouseSensitivity(float sensitivity, bool saveToUserPrefs = true);
-        void SetInvertMouseY(bool invert, bool saveToUserPrefs = true);
-        void SetEnableGamepad(bool enable, bool saveToUserPrefs = true);
-
         // Performance Settings
         bool GetEnableProfiling() const;
         bool GetEnableGPUDebug() const;

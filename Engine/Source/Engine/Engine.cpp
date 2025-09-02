@@ -9,6 +9,8 @@
 #include "Core/Events/EventSystem.h"
 #include "Systems/RenderSystem.h"
 #include "Engine/Input/InputSystem.h"
+#include "Core/Events/EngineEvent.h"
+#include "Engine/Time/Time.h"
 
 namespace Vortex 
 {
@@ -46,12 +48,15 @@ namespace Vortex
 		Debug::CrashHandler::Initialize();
 		
 		// Register core engine systems
-		auto registerResult = RegisterCoreSystems();
-		VX_RETURN_IF_ERROR(registerResult);
+		auto registerCoreSystemsResult = RegisterCoreSystems();
+		VX_RETURN_IF_ERROR(registerCoreSystemsResult);
 		
 		// Initialize all registered systems
-		auto initResult = m_SystemManager.InitializeAllSystems();
-		VX_RETURN_IF_ERROR(initResult);
+		auto systemManagerInitAllResult = m_SystemManager.InitializeAllSystems();
+		VX_RETURN_IF_ERROR(systemManagerInitAllResult);
+	
+		// Cache frequently used systems
+		m_RenderSystem = m_SystemManager.GetSystem<RenderSystem>();
 
 		m_Initialized = true;
 		m_Running = true;
@@ -71,6 +76,12 @@ namespace Vortex
 		}
 
 		VX_CORE_INFO("Shutting down Vortex Engine...");
+		
+		// Clear layers first before system shutdown
+		m_LayerStack.Clear();
+	
+		// Clear cached system pointers
+		m_RenderSystem = nullptr;
 		
 		// Shutdown all engine systems in reverse order
 		auto shutdownResult = m_SystemManager.ShutdownAllSystems();
@@ -96,7 +107,18 @@ namespace Vortex
 		if (!m_Initialized)
 			return Result<void>(ErrorCode::EngineNotInitialized, "Engine not initialized");
 
-		return m_SystemManager.UpdateAllSystems();
+		// Update engine systems first
+		auto systemResult = m_SystemManager.UpdateAllSystems();
+		if (systemResult.IsError())
+			return systemResult;
+		
+		// Update layers (Game -> UI -> Debug -> Overlay)
+		m_LayerStack.OnUpdate();
+		
+		// Dispatch engine update event
+		VX_DISPATCH_EVENT(EngineUpdateEvent(Time::GetDeltaTime()));
+		
+		return Result<void>();
 	}
 
 	Result<void> Engine::Render()
@@ -106,8 +128,30 @@ namespace Vortex
 		if (!m_Initialized)
 			return Result<void>(ErrorCode::EngineNotInitialized, "Engine not initialized");
 
-		// Render all engine systems
-		return m_SystemManager.RenderAllSystems();
+		// Pre-render setup (clear buffers, prepare frame)
+		if (m_RenderSystem)
+		{
+			m_RenderSystem->PreRender();
+		}
+		
+		// Render layers first (Game -> UI -> Debug -> Overlay) so they can queue commands
+		m_LayerStack.OnRender();
+		
+		// Render engine systems (processes queued commands)
+		auto systemsResult = m_SystemManager.RenderAllSystems();
+		if (systemsResult.IsError())
+			return systemsResult;
+		
+		// Post-render cleanup (present frame)
+		if (m_RenderSystem)
+		{
+			m_RenderSystem->PostRender();
+		}
+		
+		// Dispatch engine render event
+		VX_DISPATCH_EVENT(EngineRenderEvent(Time::GetDeltaTime()));
+		
+		return Result<void>();
 	}
 
 	Result<void> Engine::RegisterCoreSystems()

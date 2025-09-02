@@ -11,11 +11,15 @@ namespace Vortex
         std::string configPath = FileSystem::FindConfigDirectory("Config/Engine");
         
         // Log the result
-        if (configPath != "Config/Engine") {
+        if (configPath != "Config/Engine") 
+        {
             VX_CORE_INFO("Found config directory: {0}", configPath);
-        } else {
+        } 
+        else 
+        {
             VX_CORE_WARN("Could not find Config/Engine directory, using relative path");
-            if (auto exeDir = FileSystem::GetExecutableDirectory()) {
+            if (auto exeDir = FileSystem::GetExecutableDirectory()) 
+            {
                 VX_CORE_WARN("Executable directory: {0}", exeDir.value().string());
             }
         }

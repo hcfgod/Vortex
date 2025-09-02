@@ -22,6 +22,7 @@
 #include "SDL3/SDL.h"
 #include "SDL3/SDL_main.h"
 #include <Engine/Systems/RenderSystem.h>
+#include <memory>
 
 extern Vortex::Application* Vortex::CreateApplication();
 
@@ -29,8 +30,8 @@ namespace Vortex
 {
     namespace Internal
     {
-        static Engine* s_Engine = nullptr;
-        static Application* s_Application = nullptr;
+        static std::unique_ptr<Engine> s_Engine = nullptr;
+        static std::unique_ptr<Application> s_Application = nullptr;
     }
 }
 
@@ -58,7 +59,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     try
     {
         // Create and initialize engine
-        Vortex::Internal::s_Engine = new Vortex::Engine();
+        Vortex::Internal::s_Engine = std::make_unique<Vortex::Engine>();
         if (!Vortex::Internal::s_Engine)
         {
             VX_CORE_CRITICAL("Failed to create engine!");
@@ -69,19 +70,17 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         if (result.IsError())
         {
             VX_CORE_CRITICAL("Engine initialization failed: {0}", result.GetErrorMessage());
-            delete Vortex::Internal::s_Engine;
-            Vortex::Internal::s_Engine = nullptr;
+            Vortex::Internal::s_Engine.reset();
             return SDL_APP_FAILURE;
         }
 
         // Create the client application
-        Vortex::Internal::s_Application = Vortex::CreateApplication();
+        Vortex::Internal::s_Application = std::unique_ptr<Vortex::Application>(Vortex::CreateApplication());
         if (!Vortex::Internal::s_Application)
         {
             VX_CORE_CRITICAL("Failed to create application!");
             Vortex::Internal::s_Engine->Shutdown();
-            delete Vortex::Internal::s_Engine;
-            Vortex::Internal::s_Engine = nullptr;
+            Vortex::Internal::s_Engine.reset();
             return SDL_APP_FAILURE;
         }
 
@@ -90,7 +89,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         
         // CRITICAL: Perform the setup steps that Application::Run() normally does
         // This attaches the window to RenderSystem, sets up event subscriptions, etc.
-        Vortex::Internal::s_Application->SetupWithEngine(Vortex::Internal::s_Engine);
+        Vortex::Internal::s_Application->SetupWithEngine(Vortex::Internal::s_Engine.get());
         
         // Dispatch application started event manually (since we're not using Application::Run)
         VX_DISPATCH_EVENT(Vortex::ApplicationStartedEvent());
@@ -133,21 +132,15 @@ SDL_AppResult SDL_AppIterate(void* appstate)
             VX_CORE_ERROR("Engine update failed: {0}", updateResult.GetErrorMessage());
         }
 
-        // Dispatch application update event (Application::Run normally does this)
-        VX_DISPATCH_EVENT(Vortex::ApplicationUpdateEvent(Vortex::Time::GetDeltaTime()));
-        
         // Update application
         Vortex::Internal::s_Application->Update();
 
-        // Render engine systems first
+        // Render engine systems first (Engine dispatches its own events now)
         auto renderResult = Vortex::Internal::s_Engine->Render();
         if (renderResult.IsError())
         {
             VX_CORE_ERROR("Engine render failed: {0}", renderResult.GetErrorMessage());
         }
-
-        // Dispatch application render event (Application::Run normally does this)
-        VX_DISPATCH_EVENT(Vortex::ApplicationRenderEvent(Vortex::Time::GetDeltaTime()));
         
         // Render application
         Vortex::Internal::s_Application->Render();
@@ -178,12 +171,12 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
     {
         // Convert SDL events to Vortex events and dispatch them
         // (Application::Run normally does this in its main loop)
-        if (auto* app = static_cast<Vortex::Application*>(Vortex::Internal::s_Application))
+        if (Vortex::Internal::s_Application)
         {
             // Use Application's event conversion logic
             // Note: We need to access ConvertSDLEventToVortexEvent, but it's private
             // For now, let the application handle the raw SDL event
-            app->ProcessEvent(*event);
+            Vortex::Internal::s_Application->ProcessEvent(*event);
         }
         
         // Handle quit event
@@ -232,19 +225,17 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result)
         // Dispatch application shutdown event (Application::Run normally does this)
         VX_DISPATCH_EVENT(Vortex::ApplicationShutdownEvent());
         
-        // Clean up in reverse order
+        // Clean up in reverse order (automatic with smart pointers)
         if (Vortex::Internal::s_Application)
         {
             Vortex::Internal::s_Application->Shutdown();
-            delete Vortex::Internal::s_Application;
-            Vortex::Internal::s_Application = nullptr;
+            Vortex::Internal::s_Application.reset();
         }
 
         if (Vortex::Internal::s_Engine)
         {
             Vortex::Internal::s_Engine->Shutdown();
-            delete Vortex::Internal::s_Engine;
-            Vortex::Internal::s_Engine = nullptr;
+            Vortex::Internal::s_Engine.reset();
         }
         
         VX_CORE_INFO("SDL3 App Quit completed");

@@ -28,23 +28,6 @@ void Sandbox::Initialize()
 	});
 }
 
-void Sandbox::Update()
-{
-	// Game logic update
-	m_FrameCount++;
-
-	// Demonstrate event queuing every 60 frames (roughly 1 second at 60 FPS)
-	if (m_FrameCount % 60 == 0)
-	{
-		VX_QUEUE_EVENT(Vortex::ApplicationUpdateEvent(0.016f));
-	}
-}
-
-void Sandbox::Render()
-{
-	// Rendering code
-}
-
 void Sandbox::Shutdown()
 {
 	VX_INFO("Sandbox shutting down!");
@@ -56,6 +39,9 @@ void Sandbox::Shutdown()
 	}
 }
 
+// =============================================================================
+// APPLICATION & WINDOW EVENT HANDLERS
+// =============================================================================
 //// Override event handlers to demonstrate the system
 //bool OnAppInitialize(const Vortex::ApplicationStartedEvent& event) override
 //{
@@ -108,7 +94,6 @@ void Sandbox::Shutdown()
 // =============================================================================
 // INPUT EVENT HANDLERS
 // =============================================================================
-
 //bool OnKeyPressed(const Vortex::KeyPressedEvent& event) override
 //{
 //	VX_INFO("[Event] Key Pressed: {} {} (repeat: {})", 

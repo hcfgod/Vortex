@@ -11,10 +11,6 @@ public:
 
 	void Initialize() override;
 
-	void Update() override;
-
-	void Render() override;
-
 	void Shutdown() override;
 
 	//// Override event handlers to demonstrate the system

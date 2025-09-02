@@ -44,7 +44,7 @@ namespace Vortex
         std::string err;
         bool success = true;
 
-        // 1. Load engine defaults (critical)
+        // Load engine defaults (critical)
         auto defaultsPath = std::filesystem::path(configDir) / "EngineDefaults.json";
         if (!cfg.LoadLayerFromFile(defaultsPath, "EngineDefaults", 100, &err, true))
         {
@@ -52,10 +52,8 @@ namespace Vortex
             success = false;
         }
 
-        // 2. Load engine overrides (optional)
+        // Load engine overrides (optional)
         auto enginePath = std::filesystem::path(configDir) / "Engine.json";
-        auto devPath = std::filesystem::path(configDir) / "Development.json";
-        
         if (std::filesystem::exists(enginePath))
         {
             if (!cfg.LoadLayerFromFile(enginePath, "Engine", 200, &err, true))
@@ -63,15 +61,8 @@ namespace Vortex
                 std::cerr << "[CONFIG WARNING] Failed to load Engine.json: " << err << std::endl;
             }
         }
-        else if (std::filesystem::exists(devPath))
-        {
-            if (!cfg.LoadLayerFromFile(devPath, "Development", 200, &err, true))
-            {
-                std::cerr << "[CONFIG WARNING] Failed to load Development.json: " << err << std::endl;
-            }
-        }
 
-        // 3. Load user preferences (optional)
+        // Load user preferences (optional)
         auto userPrefsPath = std::filesystem::path(configDir) / "UserPreferences.json";
         if (std::filesystem::exists(userPrefsPath))
         {

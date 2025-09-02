@@ -49,4 +49,10 @@ private:
     
     // Input action map
     std::shared_ptr<InputActionMap> m_GameplayActions;
+
+    // GL resources for demo triangle
+    unsigned int m_VBO = 0;
+    unsigned int m_VAO = 0;
+    unsigned int m_EBO = 0;
+    unsigned int m_ShaderProgram = 0;
 };

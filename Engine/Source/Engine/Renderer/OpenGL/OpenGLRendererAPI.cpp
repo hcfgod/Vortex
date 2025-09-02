@@ -415,6 +415,24 @@ namespace Vortex
         return Result<void>();
     }
 
+    Result<void> OpenGLRendererAPI::BindVertexArray(uint32_t vao)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        glBindVertexArray(vao);
+
+        if (!CheckGLError("BindVertexArray"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to bind vertex array");
+        }
+
+        return Result<void>();
+    }
+
     // ============================================================================
     // Render State
     // ============================================================================

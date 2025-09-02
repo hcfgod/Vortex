@@ -44,6 +44,7 @@ namespace Vortex
         Result<void> BindIndexBuffer(uint32_t buffer, uint32_t indexType, uint64_t offset) override;
         Result<void> BindShader(uint32_t program) override;
         Result<void> BindTexture(uint32_t slot, uint32_t texture, uint32_t sampler) override;
+        Result<void> BindVertexArray(uint32_t vao) override;
 
         // Render state
         Result<void> SetDepthState(bool testEnabled, bool writeEnabled, uint32_t compareFunc) override;

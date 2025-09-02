@@ -47,7 +47,7 @@ namespace Vortex
 		}
 	}
 
-Application::~Application()
+	Application::~Application()
 {
 	// Clear static instance
 	if (s_Instance == this)
@@ -56,8 +56,7 @@ Application::~Application()
 	// Clean up event subscriptions first
 	CleanupEventSubscriptions();
 
-	// Detach and clear layers before renderer/window shutdown
-	m_LayerStack.Clear();
+	// Engine now manages layers
 	
 	// Ensure the renderer is shut down BEFORE destroying the window to avoid GL/SDL teardown issues
 	if (m_Engine)
@@ -69,7 +68,7 @@ Application::~Application()
 		}
 	}
 		
-		#ifdef VX_USE_SDL
+	#ifdef VX_USE_SDL
 			// Stop SDL text input if active
 			if (m_Window && m_Window->IsValid())
 			{
@@ -78,7 +77,7 @@ Application::~Application()
 					SDL_StopTextInput(static_cast<SDL_Window*>(m_Window->GetNativeHandle()));
 				}
 			}
-		#endif
+	#endif
 		
 		// Destroy window after renderer shutdown
 		m_Window.reset();
@@ -102,7 +101,7 @@ Application::~Application()
 
 		VX_CORE_INFO("Starting application main loop...");
 
-		// Main loop
+		// Main loop - simplified to delegate to Engine
 		#ifdef VX_USE_SDL
 			SDL_Event event;
 		#endif
@@ -125,7 +124,7 @@ Application::~Application()
 							// Forward to layers first; if not consumed, dispatch globally
 							{
 								WindowCloseEvent e;
-								if (!m_LayerStack.OnEvent(e))
+								if (!m_Engine->GetLayerStack().OnEvent(e))
 								{
 									VX_DISPATCH_EVENT(e);
 								}
@@ -139,44 +138,20 @@ Application::~Application()
 			// Handle application-level SDL events (client override)
 			ProcessEvent(event);
 
-			// Update engine systems first (Time system will manage deltaTime globally)
-			auto updateResult = m_Engine->Update();
-			if (updateResult.IsError())
+			// Engine handles systems and layers update
+			auto engineUpdateResult = m_Engine->Update();
+			if (engineUpdateResult.IsError())
 			{
-				VX_CORE_ERROR("Engine update failed: {0}", updateResult.GetErrorMessage());
+				VX_CORE_ERROR("Engine update failed: {0}", engineUpdateResult.GetErrorMessage());
 			}
 
-			// Dispatch application update event
+
+			// Engine handles layers and systems rendering
+			auto engineRenderResult = m_Engine->Render();
+			if (engineRenderResult.IsError())
 			{
-				ApplicationUpdateEvent e(Time::GetDeltaTime());
-				// Let layers see update tick via OnUpdate() call below; we still dispatch the app event
-				VX_DISPATCH_EVENT(e);
+				VX_CORE_ERROR("Engine render failed: {0}", engineRenderResult.GetErrorMessage());
 			}
-
-			// Update layers (Game -> UI -> Debug -> Overlay)
-			m_LayerStack.OnUpdate();
-
-			// Then update application
-			Update();
-
-			// Render engine systems first
-			auto renderResult = m_Engine->Render();
-			if (renderResult.IsError())
-			{
-				VX_CORE_ERROR("Engine render failed: {0}", renderResult.GetErrorMessage());
-			}
-
-			// Dispatch application render event
-			{
-				ApplicationRenderEvent e(Time::GetDeltaTime());
-				VX_DISPATCH_EVENT(e);
-			}
-
-			// Render layers (Game -> UI -> Debug -> Overlay)
-			m_LayerStack.OnRender();
-
-			// Then render application
-			Render();
 		}
 
 		// Dispatch application shutdown event
@@ -219,9 +194,9 @@ Application::~Application()
 		VX_CORE_INFO("Application setup with engine completed");
 	}
 	
-void Application::SetupEventSubscriptions()
-{
-	// Subscribe to application lifecycle events
+	void Application::SetupEventSubscriptions()
+	{
+		// Subscribe to application lifecycle events
 		m_EventSubscriptions.push_back(
 			VX_SUBSCRIBE_EVENT_METHOD(ApplicationStartedEvent, this, &Application::OnAppInitialize)
 		);
@@ -326,8 +301,8 @@ void Application::SetupEventSubscriptions()
 				uint32_t newW = static_cast<uint32_t>(sdlEvent.window.data1);
 				uint32_t newH = static_cast<uint32_t>(sdlEvent.window.data2);
 				{
-					WindowResizeEvent e(newW, newH);
-					if (!m_LayerStack.OnEvent(e))
+				WindowResizeEvent e(newW, newH);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -342,8 +317,8 @@ void Application::SetupEventSubscriptions()
 			
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
 			{
-				WindowFocusEvent e;
-				if (!m_LayerStack.OnEvent(e))
+			WindowFocusEvent e;
+			if (!m_Engine->GetLayerStack().OnEvent(e))
 				{
 					VX_DISPATCH_EVENT(e);
 				}
@@ -352,8 +327,8 @@ void Application::SetupEventSubscriptions()
 			
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
 			{
-				WindowLostFocusEvent e;
-				if (!m_LayerStack.OnEvent(e))
+			WindowLostFocusEvent e;
+			if (!m_Engine->GetLayerStack().OnEvent(e))
 				{
 					VX_DISPATCH_EVENT(e);
 				}
@@ -374,8 +349,8 @@ void Application::SetupEventSubscriptions()
 				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
 				bool isRepeat = sdlEvent.key.repeat != 0;
 				{
-					KeyPressedEvent e(keyCode, isRepeat);
-					if (!m_LayerStack.OnEvent(e))
+				KeyPressedEvent e(keyCode, isRepeat);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -387,8 +362,8 @@ void Application::SetupEventSubscriptions()
 			{
 				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
 				{
-					KeyReleasedEvent e(keyCode);
-					if (!m_LayerStack.OnEvent(e))
+				KeyReleasedEvent e(keyCode);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -402,8 +377,8 @@ void Application::SetupEventSubscriptions()
 				if (sdlEvent.text.text[0] != '\0')
 				{
 					uint32_t character = static_cast<uint32_t>(sdlEvent.text.text[0]);
-					KeyTypedEvent e(character);
-					if (!m_LayerStack.OnEvent(e))
+				KeyTypedEvent e(character);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -418,8 +393,8 @@ void Application::SetupEventSubscriptions()
 			{
 				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
 				{
-					MouseButtonPressedEvent e(button);
-					if (!m_LayerStack.OnEvent(e))
+				MouseButtonPressedEvent e(button);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -431,8 +406,8 @@ void Application::SetupEventSubscriptions()
 			{
 				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
 				{
-					MouseButtonReleasedEvent e(button);
-					if (!m_LayerStack.OnEvent(e))
+				MouseButtonReleasedEvent e(button);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -445,8 +420,8 @@ void Application::SetupEventSubscriptions()
 				float x = static_cast<float>(sdlEvent.motion.x);
 				float y = static_cast<float>(sdlEvent.motion.y);
 				{
-					MouseMovedEvent e(x, y);
-					if (!m_LayerStack.OnEvent(e))
+				MouseMovedEvent e(x, y);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -459,8 +434,8 @@ void Application::SetupEventSubscriptions()
 				float xOffset = sdlEvent.wheel.x;
 				float yOffset = sdlEvent.wheel.y;
 				{
-					MouseScrolledEvent e(xOffset, yOffset);
-					if (!m_LayerStack.OnEvent(e))
+				MouseScrolledEvent e(xOffset, yOffset);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -475,8 +450,8 @@ void Application::SetupEventSubscriptions()
 			{
 				int gamepadId = sdlEvent.gdevice.which;
 				{
-					GamepadConnectedEvent e(gamepadId);
-					if (!m_LayerStack.OnEvent(e))
+				GamepadConnectedEvent e(gamepadId);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -488,8 +463,8 @@ void Application::SetupEventSubscriptions()
 			{
 				int gamepadId = sdlEvent.gdevice.which;
 				{
-					GamepadDisconnectedEvent e(gamepadId);
-					if (!m_LayerStack.OnEvent(e))
+				GamepadDisconnectedEvent e(gamepadId);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -502,8 +477,8 @@ void Application::SetupEventSubscriptions()
 				int gamepadId = sdlEvent.gbutton.which;
 				int button = sdlEvent.gbutton.button;
 				{
-					GamepadButtonPressedEvent e(gamepadId, button);
-					if (!m_LayerStack.OnEvent(e))
+				GamepadButtonPressedEvent e(gamepadId, button);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -516,8 +491,8 @@ void Application::SetupEventSubscriptions()
 				int gamepadId = sdlEvent.gbutton.which;
 				int button = sdlEvent.gbutton.button;
 				{
-					GamepadButtonReleasedEvent e(gamepadId, button);
-					if (!m_LayerStack.OnEvent(e))
+				GamepadButtonReleasedEvent e(gamepadId, button);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -531,8 +506,8 @@ void Application::SetupEventSubscriptions()
 				int axis = sdlEvent.gaxis.axis;
 				float value = static_cast<float>(sdlEvent.gaxis.value) / 32767.0f; // Normalize to -1.0 to 1.0
 				{
-					GamepadAxisEvent e(gamepadId, axis, value);
-					if (!m_LayerStack.OnEvent(e))
+				GamepadAxisEvent e(gamepadId, axis, value);
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
@@ -545,4 +520,41 @@ void Application::SetupEventSubscriptions()
 		}
 	}
 	#endif // VX_USE_SDL
+	
+	// ===== Layer API delegates to the engine =====
+	LayerStack& Application::GetLayerStack()
+	{
+		VX_CORE_ASSERT(m_Engine, "Engine must be set before accessing LayerStack");
+		return m_Engine->GetLayerStack();
+	}
+	
+	const LayerStack& Application::GetLayerStack() const
+	{
+		VX_CORE_ASSERT(m_Engine, "Engine must be set before accessing LayerStack");
+		return m_Engine->GetLayerStack();
+	}
+	
+	Layer* Application::PushLayer(std::unique_ptr<Layer> layer)
+	{
+		VX_CORE_ASSERT(m_Engine, "Engine must be set before pushing layers");
+		return m_Engine->PushLayer(std::move(layer));
+	}
+	
+	bool Application::PopLayer(Layer* layer)
+	{
+		VX_CORE_ASSERT(m_Engine, "Engine must be set before popping layers");
+		return m_Engine->PopLayer(layer);
+	}
+	
+	bool Application::PopLayer(const std::string& name)
+	{
+		VX_CORE_ASSERT(m_Engine, "Engine must be set before popping layers");
+		return m_Engine->PopLayer(name);
+	}
+	
+	size_t Application::PopLayersByType(int type)
+	{
+		VX_CORE_ASSERT(m_Engine, "Engine must be set before popping layers");
+		return m_Engine->PopLayersByType(static_cast<LayerType>(type));
+	}	
 }

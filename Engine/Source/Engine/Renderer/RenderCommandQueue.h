@@ -219,6 +219,14 @@ namespace Vortex
         }
 
         /**
+         * @brief Bind a vertex array object (VAO)
+         */
+        bool BindVertexArray(uint32_t vao, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BindVertexArrayCommand>(vao), executeImmediate);
+        }
+
+        /**
          * @brief Push a debug group for profiling
          * @param name Debug group name
          * @param executeImmediate Whether to execute immediately

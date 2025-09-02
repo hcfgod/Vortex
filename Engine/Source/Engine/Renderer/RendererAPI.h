@@ -140,6 +140,13 @@ namespace Vortex
         virtual Result<void> BindIndexBuffer(uint32_t buffer, uint32_t indexType, uint64_t offset) = 0;
 
         /**
+         * @brief Bind a vertex array object
+         * @param vao Vertex array object ID
+         * @return Success/failure result
+         */
+        virtual Result<void> BindVertexArray(uint32_t vao) = 0;
+
+        /**
          * @brief Bind a shader program
          * @param program Program ID
          * @return Success/failure result

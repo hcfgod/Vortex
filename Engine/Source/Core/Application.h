@@ -5,8 +5,8 @@
 #include "Events/ApplicationEvent.h"
 #include "Events/WindowEvent.h"
 #include "Events/InputEvent.h"
-#include "Core/Layer/LayerStack.h"
 #include <memory>
+#include "Engine/Engine.h"
 
 #ifdef VX_USE_SDL
 	union SDL_Event;
@@ -32,20 +32,23 @@ class Application
 		Engine* GetEngine() const { return m_Engine; }
 		Window* GetWindow() const { return m_Window.get(); }
 
-		// ===== Layer API (integrates with LayerStack) =====
-		LayerStack& GetLayerStack() { return m_LayerStack; }
-		const LayerStack& GetLayerStack() const { return m_LayerStack; }
+		// ===== Layer API (delegates to Engine) =====
+		class LayerStack& GetLayerStack();
+		const class LayerStack& GetLayerStack() const;
 
-		Layer* PushLayer(std::unique_ptr<Layer> layer) { return m_LayerStack.PushLayer(std::move(layer)); }
+		class Layer* PushLayer(std::unique_ptr<class Layer> layer);
 		template<typename T, typename... Args>
-		T* PushLayer(Args&&... args) { return m_LayerStack.PushLayer<T>(std::forward<Args>(args)...); }
-		bool PopLayer(Layer* layer) { return m_LayerStack.PopLayer(layer); }
-		bool PopLayer(const std::string& name) { return m_LayerStack.PopLayer(name); }
-		size_t PopLayersByType(LayerType type) { return m_LayerStack.PopLayersByType(type); }
+		T* PushLayer(Args&&... args)
+		{
+			VX_CORE_ASSERT(m_Engine, "Engine must be set before pushing layers");
+			return m_Engine->template PushLayer<T>(std::forward<Args>(args)...);
+		}
+
+		bool PopLayer(class Layer* layer);
+		bool PopLayer(const std::string& name);
+		size_t PopLayersByType(int type);
 
 		virtual void Initialize() {}
-		virtual void Update() {}
-		virtual void Render() {}
 		virtual void Shutdown() {}
 	
 		/**
@@ -99,8 +102,7 @@ private:
 		Engine* m_Engine = nullptr;
 		std::unique_ptr<Window> m_Window;
 
-		// Layer management
-		LayerStack m_LayerStack;
+	// Engine manages layers now
 		
 		// Event subscription management
 		std::vector<SubscriptionID> m_EventSubscriptions;

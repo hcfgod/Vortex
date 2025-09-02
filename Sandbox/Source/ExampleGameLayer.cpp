@@ -1,4 +1,40 @@
 #include "ExampleGameLayer.h"
+#include <glad/gl.h>
+
+namespace {
+// Example Vertex Shader
+const char* kVertexShaderSource = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+void main()
+{
+    gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
+}
+)";
+
+// Example Fragment Shader - bright red for visibility
+const char* kFragmentShaderSource = R"(
+#version 330 core
+out vec4 FragColor;
+void main()
+{
+    FragColor = vec4(1.0f, 0.0f, 0.0f, 1.0f); // Bright red
+}
+)";
+
+// Make triangle bigger and more centered
+const float kVertices[] =
+{
+    -0.8f, -0.8f, 0.0f, // Bottom-left
+     0.8f, -0.8f, 0.0f, // Bottom-right
+     0.0f,  0.8f, 0.0f  // Top-center
+};
+
+const unsigned int kIndices[] =
+{
+    0, 1, 2 // Single triangle
+};
+}
 
 void ExampleGameLayer::OnAttach()
 {
@@ -11,11 +47,88 @@ void ExampleGameLayer::OnAttach()
     VX_INFO("  - Mouse: Look around (Polling)");
     
     SetupInputActions();
+
+    // Simple OpenGL setup for rendering a triangle
+    // Compile Vertex Shader
+    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &kVertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+    {
+        GLint status = 0; glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &status);
+        if (status == GL_FALSE)
+        {
+            GLint len = 0; glGetShaderiv(vertexShader, GL_INFO_LOG_LENGTH, &len);
+            std::string log(len, '\0');
+            if (len > 0) glGetShaderInfoLog(vertexShader, len, &len, log.data());
+            VX_ERROR("Vertex shader compile failed: {}", log);
+        }
+    }
+
+    // Compile Fragment Shader
+    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &kFragmentShaderSource, NULL);
+    glCompileShader(fragmentShader);
+    {
+        GLint status = 0; glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &status);
+        if (status == GL_FALSE)
+        {
+            GLint len = 0; glGetShaderiv(fragmentShader, GL_INFO_LOG_LENGTH, &len);
+            std::string log(len, '\0');
+            if (len > 0) glGetShaderInfoLog(fragmentShader, len, &len, log.data());
+            VX_ERROR("Fragment shader compile failed: {}", log);
+        }
+    }
+
+    // Link Shaders into a Program
+    m_ShaderProgram = glCreateProgram();
+    glAttachShader(m_ShaderProgram, vertexShader);
+    glAttachShader(m_ShaderProgram, fragmentShader);
+    glLinkProgram(m_ShaderProgram);
+    {
+        GLint status = 0; glGetProgramiv(m_ShaderProgram, GL_LINK_STATUS, &status);
+        if (status == GL_FALSE)
+        {
+            GLint len = 0; glGetProgramiv(m_ShaderProgram, GL_INFO_LOG_LENGTH, &len);
+            std::string log(len, '\0');
+            if (len > 0) glGetProgramInfoLog(m_ShaderProgram, len, &len, log.data());
+            VX_ERROR("Shader program link failed: {}", log);
+        }
+    }
+
+    // Cleanup shaders as they're linked now
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    // Generate buffers and arrays
+    glGenVertexArrays(1, &m_VAO);
+    glGenBuffers(1, &m_VBO);
+    glGenBuffers(1, &m_EBO);
+
+    // Bind and set up vertex and element buffers
+    glBindVertexArray(m_VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(kVertices), kVertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(kIndices), kIndices, GL_STATIC_DRAW);
+
+    // Vertex attributes
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Unbind for safety
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 }
 
 void ExampleGameLayer::OnDetach()
 {
     VX_INFO("ExampleGameLayer detached - Final Score: {}", m_Score);
+
+    // Cleanup GL resources
+    if (m_VAO) { glDeleteVertexArrays(1, &m_VAO); m_VAO = 0; }
+    if (m_VBO) { glDeleteBuffers(1, &m_VBO); m_VBO = 0; }
+    if (m_EBO) { glDeleteBuffers(1, &m_EBO); m_EBO = 0; }
+    if (m_ShaderProgram) { glDeleteProgram(m_ShaderProgram); m_ShaderProgram = 0; }
 }
 
 void ExampleGameLayer::OnUpdate()
@@ -83,17 +196,21 @@ void ExampleGameLayer::OnUpdate()
 
 void ExampleGameLayer::OnRender()
 {
-    // This would normally contain actual rendering code
-    // For now, we'll just demonstrate that the render cycle is working
-    
-    // Simulate some "rendering work" with a simple calculation
+    // Submit via the render command queue; with main loop ordering fixed,
+    // these will execute this frame inside RenderSystem::Render()
+    if (m_ShaderProgram != 0 && m_VAO != 0)
+    {
+        GetRenderCommandQueue().BindShader(m_ShaderProgram);
+        GetRenderCommandQueue().BindVertexArray(m_VAO);
+        GetRenderCommandQueue().DrawIndexed(3);
+    }
+
+    // Optional periodic log
     static int renderCallCount = 0;
     renderCallCount++;
-    
-    // Log render stats occasionally
-    if (renderCallCount % 600 == 0)
+    if (renderCallCount % 120 == 0)
     {
-        VX_TRACE("[Game] Render call #{} - Rotation: {:.1f}°", renderCallCount, m_RotationAngle);
+        //VX_INFO("[Render] Submitted triangle draw (frame #{}) - VAO={}, Shader={}", renderCallCount, m_VAO, m_ShaderProgram);
     }
 }
 

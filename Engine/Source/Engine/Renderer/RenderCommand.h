@@ -210,6 +210,22 @@ namespace Vortex
     };
 
     /**
+     * @brief Command to bind a vertex array object (VAO)
+     */
+    class BindVertexArrayCommand : public RenderCommand
+    {
+    public:
+        explicit BindVertexArrayCommand(uint32_t vao) : m_VAO(vao) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "BindVertexArray"; }
+        float GetEstimatedCost() const override { return 0.01f; }
+
+    private:
+        uint32_t m_VAO;
+    };
+
+    /**
      * @brief Command to bind a shader program
      */
     class BindShaderCommand : public RenderCommand

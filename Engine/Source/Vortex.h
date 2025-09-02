@@ -34,6 +34,13 @@
 #include "Core/Layer/Layer.h"
 #include "Core/Layer/LayerStack.h"
 
+// Renderer
+#include "Engine/Renderer/GraphicsContext.h"
+#include "Engine/Renderer/RendererAPI.h"
+#include "Engine/Renderer/RenderCommand.h"
+#include "Engine/Renderer/RenderCommandQueue.h"
+#include "Engine/Systems/RenderSystem.h"
+
 // ---Entry Point---------------------
 // Only include EntryPoint when VX_IMPLEMENT_MAIN is defined
 // This prevents multiple main() function definitions

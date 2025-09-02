@@ -57,6 +57,13 @@ namespace Vortex
         return renderer->BindIndexBuffer(m_Buffer, type, m_Offset);
     }
 
+    // ----------------------- BindVertexArrayCommand ----------------------
+    Result<void> BindVertexArrayCommand::Execute(GraphicsContext* /*context*/) {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->BindVertexArray(m_VAO);
+    }
+
     // -------------------------- BindShaderCommand ------------------------
     Result<void> BindShaderCommand::Execute(GraphicsContext* /*context*/) {
         auto* renderer = GetRenderer();

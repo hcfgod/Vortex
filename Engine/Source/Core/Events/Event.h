@@ -77,6 +77,10 @@ namespace Vortex
         ApplicationUpdate,
         ApplicationRender,
         
+        // Engine events
+        EngineUpdate,
+        EngineRender,
+        
         // Window events
         WindowClose,
         WindowResize,

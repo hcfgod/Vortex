@@ -13,6 +13,7 @@
 #include "Engine/Engine.h"
 #include "Core/EngineConfig.h"
 #include "Core/Bootstrap.h"
+#include <memory>
 
 extern Vortex::Application* Vortex::CreateApplication();
 
@@ -39,39 +40,36 @@ int main(int argc, char** argv)
         }
 
         // Create and initialize engine
-        auto engine = new Vortex::Engine();
+        auto engine = std::make_unique<Vortex::Engine>();
         if (!engine)
         {
             VX_CORE_CRITICAL("Failed to create engine!");
             return 1;
         }
         
-        auto result = engine->Initialize();
-        if (result.IsError())
+        auto engineInitResult = engine->Initialize();
+        if (engineInitResult.IsError())
         {
-            VX_CORE_CRITICAL("Engine initialization failed: {0}", result.GetErrorMessage());
-            delete engine;
+            VX_CORE_CRITICAL("Engine initialization failed: {0}", engineInitResult.GetErrorMessage());
             return 1;
-        } 
+        }
 
         // Create the client application (engine is ready)
-        auto app = Vortex::CreateApplication();
+        auto app = std::unique_ptr<Vortex::Application>(Vortex::CreateApplication());
         if (!app)
         {
             VX_CORE_CRITICAL("Failed to create application!");
             engine->Shutdown();
-            delete engine;
             return 1;
         }
 
         // Run the application (handles main loop internally)
-        app->Run(engine);
+        app->Run(engine.get());
 
-        // Clean up in reverse order
-        delete app;
-
+        // Clean up in reverse order (automatic with smart pointers)
+        app.reset();
         engine->Shutdown();
-        delete engine;
+        engine.reset();
 
         VX_CORE_INFO("Vortex Engine shutdown complete");
         

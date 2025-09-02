@@ -6,12 +6,14 @@
 #include "Engine/Renderer/RendererAPI.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
 #include "Core/Window.h"
+#include <glad/gl.h>
 
 #ifdef VX_OPENGL_SUPPORT
     #ifdef VX_USE_SDL
         #include "Engine/Renderer/OpenGL/SDL/SDL_OpenGLGraphicsContext.h"
     #endif
 #endif
+
 
 namespace Vortex
 {
@@ -194,6 +196,7 @@ namespace Vortex
         #endif
 
         VX_CORE_ERROR("Unsupported or disabled GraphicsAPI: {}", GraphicsAPIToString(api));
+
         return Result<void>(ErrorCode::RendererInitFailed, "Unsupported GraphicsAPI");
     }
 
@@ -210,7 +213,7 @@ namespace Vortex
         return Result<void>();
     }
 
-    Result<void> RenderSystem::Render()
+    Result<void> RenderSystem::PreRender()
     {
         if (!m_Ready)
             return Result<void>();
@@ -224,21 +227,36 @@ namespace Vortex
 
         GetRenderCommandQueue().Clear(flags, m_Settings.ClearColor, m_Settings.ClearDepth, m_Settings.ClearStencil);
 
+        return Result<void>();
+    }
+
+    Result<void> RenderSystem::Render()
+    {
+        if (!m_Ready)
+            return Result<void>();
+
         // Process queued commands on the render thread
         auto proc = GetRenderCommandQueue().ProcessCommands();
         VX_LOG_ERROR(proc);
 
         // Present the frame
-        if (m_GraphicsContext)
+        if (!m_GraphicsContext)
         {
-            auto presentResult = m_GraphicsContext->Present();
-            if (presentResult.IsError())
-            {
-                VX_CORE_WARN("Failed to present frame: {}", presentResult.GetErrorMessage());
-                return presentResult;
-            }
+			return Result<void>(ErrorCode::InvalidState, "No graphics context available for presenting");
         }
-        
+
+        return Result<void>();
+    }
+
+    Result<void> RenderSystem::PostRender()
+    {
+        auto presentResult = m_GraphicsContext->Present();
+        if (presentResult.IsError())
+        {
+            VX_CORE_WARN("Failed to present frame: {}", presentResult.GetErrorMessage());
+            return presentResult;
+        }
+
         return Result<void>();
     }
 
