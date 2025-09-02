@@ -28,8 +28,7 @@ namespace Vortex
 		VX_CORE_INFO("Application Created");
 
 		#ifdef VX_USE_SDL
-			// Initialize SDL3 with all necessary subsystems for input events
-			if (!SDL3Manager::Initialize(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD))
+			if (!SDL3Manager::Initialize(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD | SDL_INIT_JOYSTICK))
 			{
 				VX_CORE_CRITICAL("Failed to initialize SDL3Manager!");
 				return;
@@ -288,7 +287,7 @@ namespace Vortex
 	}
 	
 	#ifdef VX_USE_SDL
-		void Application::ConvertSDLEventToVortexEvent(const SDL_Event& sdlEvent)
+	void Application::ConvertSDLEventToVortexEvent(const SDL_Event& sdlEvent)
 	{
 		// Convert SDL events to Vortex events and dispatch them
 		switch (sdlEvent.type)
@@ -519,7 +518,9 @@ namespace Vortex
 			{
 				int gamepadId = sdlEvent.gaxis.which;
 				int axis = sdlEvent.gaxis.axis;
-				float value = static_cast<float>(sdlEvent.gaxis.value) / 32767.0f; // Normalize to -1.0 to 1.0
+				// SDL3 may report axis values as floats [-1,1] or as int16 depending on backend
+				float raw = static_cast<float>(sdlEvent.gaxis.value);
+				float value = (std::abs(raw) > 1.1f) ? (raw / 32767.0f) : raw; // Robust normalization
 				{
 				GamepadAxisEvent e(gamepadId, axis, value);
 				if (!m_Engine->GetLayerStack().OnEvent(e))
@@ -530,6 +531,72 @@ namespace Vortex
 				break;
 			}
 			
+			// =============================================================================
+			// JOYSTICK EVENTS (fallback for controllers not recognized as gamepads)
+			// =============================================================================
+			case SDL_EVENT_JOYSTICK_ADDED:
+			{
+				SDL_JoystickID jid = sdlEvent.jdevice.which;
+				if (SDL_IsGamepad(jid))
+				{
+					if (SDL_Gamepad* pad = SDL_OpenGamepad(jid))
+					{
+						VX_CORE_INFO("Opened gamepad {} (from JOYSTICK_ADDED)", static_cast<int>(jid));
+					}
+				}
+				else if (SDL_Joystick* js = SDL_OpenJoystick(jid))
+				{
+					VX_CORE_INFO("Opened joystick {} for input events", static_cast<int>(jid));
+				}
+				{
+					GamepadConnectedEvent e(static_cast<int>(jid));
+					if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+				}
+				break;
+			}
+			case SDL_EVENT_JOYSTICK_REMOVED:
+			{
+				SDL_JoystickID jid = sdlEvent.jdevice.which;
+				if (SDL_Gamepad* pad = SDL_GetGamepadFromID(jid))
+				{
+					SDL_CloseGamepad(pad);
+				}
+				else if (SDL_Joystick* js = SDL_GetJoystickFromID(jid))
+				{
+					SDL_CloseJoystick(js);
+				}
+				{
+					GamepadDisconnectedEvent e(static_cast<int>(jid));
+					if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+				}
+				break;
+			}
+			case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
+			{
+				int jid = sdlEvent.jbutton.which;
+				int button = sdlEvent.jbutton.button;
+				GamepadButtonPressedEvent e(jid, button);
+				if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+				break;
+			}
+			case SDL_EVENT_JOYSTICK_BUTTON_UP:
+			{
+				int jid = sdlEvent.jbutton.which;
+				int button = sdlEvent.jbutton.button;
+				GamepadButtonReleasedEvent e(jid, button);
+				if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+				break;
+			}
+			case SDL_EVENT_JOYSTICK_AXIS_MOTION:
+			{
+				int jid = sdlEvent.jaxis.which;
+				int axis = sdlEvent.jaxis.axis;
+				float raw = static_cast<float>(sdlEvent.jaxis.value);
+				float value = (std::abs(raw) > 1.1f) ? (raw / 32767.0f) : raw;
+				GamepadAxisEvent e(jid, axis, value);
+				if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+				break;
+			}
 			default:
 				break;
 		}

@@ -103,6 +103,15 @@ namespace Vortex
         // Mouse and keyboard optimizations
         SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 
+        // Linux: ensure HIDAPI drivers are enabled for widespread gamepad support
+        #ifdef VX_PLATFORM_LINUX
+        SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI, "1");
+        SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS4, "1");
+        SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS5, "1");
+        SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_XBOX, "1");
+        SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+        #endif
+
         VX_CORE_INFO("SDL3 hints configured");
     }
 

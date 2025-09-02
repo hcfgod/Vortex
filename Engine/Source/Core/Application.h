@@ -111,9 +111,9 @@ private:
 		void SetupEventSubscriptions();
 		void CleanupEventSubscriptions();
 		
-		#ifdef VX_USE_SDL
+#ifdef VX_USE_SDL
 			void ConvertSDLEventToVortexEvent(const SDL_Event& sdlEvent);
-		#endif
+#endif
 	};
 
 	// To be defined in CLIENT
