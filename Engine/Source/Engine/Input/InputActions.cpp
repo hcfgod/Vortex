@@ -33,6 +33,10 @@ namespace Vortex
                 case BindingDevice::Gamepad:
                 {
                     int idx = b.gamepadIndex;
+                    if (idx < 0) {
+                        idx = input->GetFirstConnectedGamepadIndex();
+                        if (idx < 0) break; // no connected gamepad
+                    }
                     if (b.gamepadButton >= 0)
                     {
                         if (input->GetGamepadButtonDown(idx, b.gamepadButton)) { started = true; performed = true; }

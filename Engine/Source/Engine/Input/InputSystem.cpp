@@ -106,6 +106,16 @@ namespace Vortex
         outSX = m_Mouse.scrollX; outSY = m_Mouse.scrollY;
     }
 
+    int InputSystem::GetFirstConnectedGamepadIndex() const
+    {
+        for (size_t i = 0; i < m_Gamepads.size(); ++i)
+        {
+            if (m_Gamepads[i].connected)
+                return static_cast<int>(i);
+        }
+        return -1; // No connected gamepad found
+    }
+
     bool InputSystem::IsGamepadConnected(int index) const
     {
         return index >= 0 && static_cast<size_t>(index) < m_Gamepads.size() && m_Gamepads[index].connected;

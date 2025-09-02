@@ -91,6 +91,7 @@ namespace Vortex
 
         // Gamepad (basic)
         size_t GetGamepadCount() const { return m_Gamepads.size(); }
+        int GetFirstConnectedGamepadIndex() const; // Returns -1 if none connected
         bool IsGamepadConnected(int index) const;
         bool GetGamepadButton(int index, int button) const;
         bool GetGamepadButtonDown(int index, int button) const;

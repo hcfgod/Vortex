@@ -27,6 +27,7 @@ namespace Vortex
         static void GetMouseScroll(float& outSX, float& outSY);
 
         // Gamepad basic
+        static int GetFirstConnectedGamepadIndex(); // Returns -1 if none connected
         static bool IsGamepadConnected(int index);
         static bool GetGamepadButton(int index, int button);
         static bool GetGamepadButtonDown(int index, int button);

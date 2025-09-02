@@ -17,6 +17,7 @@ namespace Vortex
     void Input::GetMouseDelta(float& outDX, float& outDY) { if (S()) S()->GetMouseDelta(outDX, outDY); else { outDX = outDY = 0.0f; } }
     void Input::GetMouseScroll(float& outSX, float& outSY) { if (S()) S()->GetMouseScroll(outSX, outSY); else { outSX = outSY = 0.0f; } }
 
+    int Input::GetFirstConnectedGamepadIndex() { return S() ? S()->GetFirstConnectedGamepadIndex() : -1; }
     bool Input::IsGamepadConnected(int index) { return S() ? S()->IsGamepadConnected(index) : false; }
     bool Input::GetGamepadButton(int index, int button) { return S() ? S()->GetGamepadButton(index, button) : false; }
     bool Input::GetGamepadButtonDown(int index, int button) { return S() ? S()->GetGamepadButtonDown(index, button) : false; }

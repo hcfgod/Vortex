@@ -40,11 +40,12 @@ void ExampleGameLayer::OnAttach()
 {
     VX_INFO("ExampleGameLayer attached - Game layer ready!");
     VX_INFO("Controls:");
-    VX_INFO("  - SPACE: Pause/Unpause (Action System)");
-    VX_INFO("  - R: Reset game (Action System)");
-    VX_INFO("  - Left Click: Increase score (Action System)");
-    VX_INFO("  - WASD: Movement (Polling)");
-    VX_INFO("  - Mouse: Look around (Polling)");
+    VX_INFO("  - SPACE/Square: Pause/Unpause (Action System)");
+    VX_INFO("  - R/Triangle: Reset game (Action System)");
+    VX_INFO("  - Left Click/X: Increase score (Action System)");
+    VX_INFO("  - WASD/Left Stick: Movement (Polling)");
+    VX_INFO("  - Mouse/Right Stick: Look around (Polling)");
+    VX_INFO("  - PS5 Controller: Full support for buttons and sticks");
     
     SetupInputActions();
 
@@ -135,22 +136,60 @@ void ExampleGameLayer::OnUpdate()
 {
     // === Input Polling Demonstration ===
     
-    // WASD movement (polling)
+    // WASD + Gamepad Left Stick movement (polling)
     static float playerX = 0.0f, playerY = 0.0f;
     const float moveSpeed = 100.0f; // units per second
     float deltaTime = Time::GetDeltaTime();
     
+    // Keyboard input
     if (Input::GetKey(KeyCode::W)) playerY += moveSpeed * deltaTime;
     if (Input::GetKey(KeyCode::S)) playerY -= moveSpeed * deltaTime;
     if (Input::GetKey(KeyCode::A)) playerX -= moveSpeed * deltaTime;
     if (Input::GetKey(KeyCode::D)) playerX += moveSpeed * deltaTime;
     
-    // Mouse look (polling)
+    // Gamepad input (use first connected gamepad)
+    int gamepadIndex = Input::GetFirstConnectedGamepadIndex();
+    if (gamepadIndex >= 0)
+    {
+        // SDL Gamepad Axes: 0=LeftX, 1=LeftY, 2=RightX, 3=RightY
+        float leftStickX = Input::GetGamepadAxis(gamepadIndex, 0);  // Left stick horizontal
+        float leftStickY = Input::GetGamepadAxis(gamepadIndex, 1);  // Left stick vertical
+        
+        // Apply deadzone (PS5 typically needs ~0.1f deadzone)
+        const float deadzone = 0.15f;
+        if (std::abs(leftStickX) > deadzone)
+            playerX += leftStickX * moveSpeed * deltaTime;
+        if (std::abs(leftStickY) > deadzone)
+            playerY -= leftStickY * moveSpeed * deltaTime; // Invert Y for typical game movement
+    }
+    
+    // Mouse + Gamepad Right Stick look (polling)
     static float mouseX = 0.0f, mouseY = 0.0f;
+    static float lookX = 0.0f, lookY = 0.0f;
     Input::GetMousePosition(mouseX, mouseY);
     
     float mouseDX, mouseDY;
     Input::GetMouseDelta(mouseDX, mouseDY);
+    
+    // Gamepad right stick for look
+    if (gamepadIndex >= 0)
+    {
+        float rightStickX = Input::GetGamepadAxis(gamepadIndex, 2);  // Right stick horizontal
+        float rightStickY = Input::GetGamepadAxis(gamepadIndex, 3);  // Right stick vertical
+        
+        const float deadzone = 0.15f;
+        const float lookSensitivity = 90.0f; // degrees per second at full stick
+        
+        if (std::abs(rightStickX) > deadzone)
+            lookX += rightStickX * lookSensitivity * deltaTime;
+        if (std::abs(rightStickY) > deadzone)
+            lookY += rightStickY * lookSensitivity * deltaTime;
+        
+        // Clamp look values
+        while (lookX > 360.0f) lookX -= 360.0f;
+        while (lookX < 0.0f) lookX += 360.0f;
+        lookY = std::clamp(lookY, -90.0f, 90.0f);
+    }
     
     // Mouse scroll (polling)
     float scrollX, scrollY;
@@ -160,12 +199,71 @@ void ExampleGameLayer::OnUpdate()
         VX_INFO("[Input] Mouse scroll: {:.2f}", scrollY);
     }
     
+    // === Gamepad Status and Additional Controls ===
+    static bool lastGamepadConnected = false;
+    bool gamepadConnected = (gamepadIndex >= 0);
+    
+    // Log gamepad connection changes
+    if (gamepadConnected != lastGamepadConnected)
+    {
+        if (gamepadConnected)
+            VX_INFO("[Input] 🎮 PS5 Controller connected! Ready for testing.");
+        else
+            VX_INFO("[Input] 🎮 PS5 Controller disconnected.");
+        lastGamepadConnected = gamepadConnected;
+    }
+    
+    // Test additional gamepad inputs (triggers, D-pad)
+    if (gamepadConnected)
+    {
+        // Test triggers (SDL axes 4=LeftTrigger, 5=RightTrigger)
+        float leftTrigger = Input::GetGamepadAxis(gamepadIndex, 4);
+        float rightTrigger = Input::GetGamepadAxis(gamepadIndex, 5);
+        
+        if (leftTrigger > 0.1f || rightTrigger > 0.1f)
+        {
+            VX_INFO("[Input] 🎮 Triggers: L2={:.2f}, R2={:.2f}", leftTrigger, rightTrigger);
+        }
+        
+        // Test D-pad buttons
+        if (Input::GetGamepadButtonDown(gamepadIndex, 11)) VX_INFO("[Input] 🎮 D-Pad UP pressed");
+        if (Input::GetGamepadButtonDown(gamepadIndex, 12)) VX_INFO("[Input] 🎮 D-Pad DOWN pressed");
+        if (Input::GetGamepadButtonDown(gamepadIndex, 13)) VX_INFO("[Input] 🎮 D-Pad LEFT pressed");
+        if (Input::GetGamepadButtonDown(gamepadIndex, 14)) VX_INFO("[Input] 🎮 D-Pad RIGHT pressed");
+        
+        // Test shoulder buttons
+        if (Input::GetGamepadButtonDown(gamepadIndex, 9)) VX_INFO("[Input] 🎮 L1 pressed");
+        if (Input::GetGamepadButtonDown(gamepadIndex, 10)) VX_INFO("[Input] 🎮 R1 pressed");
+        
+        // Test menu buttons
+        if (Input::GetGamepadButtonDown(gamepadIndex, 4)) VX_INFO("[Input] 🎮 Share button pressed");
+        if (Input::GetGamepadButtonDown(gamepadIndex, 6)) VX_INFO("[Input] 🎮 Options button pressed");
+        if (Input::GetGamepadButtonDown(gamepadIndex, 5)) VX_INFO("[Input] 🎮 PS button pressed");
+        
+        // Test stick clicks
+        if (Input::GetGamepadButtonDown(gamepadIndex, 7)) VX_INFO("[Input] 🎮 Left stick clicked (L3)");
+        if (Input::GetGamepadButtonDown(gamepadIndex, 8)) VX_INFO("[Input] 🎮 Right stick clicked (R3)");
+    }
+    
     // Log movement periodically
     static float lastMoveLogTime = 0.0f;
     if (Time::GetTime() - lastMoveLogTime >= 3.0f)
     {
-        VX_INFO("[Input] Player pos: ({:.1f}, {:.1f}), Mouse: ({:.0f}, {:.0f})", 
-               playerX, playerY, mouseX, mouseY);
+        if (gamepadConnected)
+        {
+            float lx = Input::GetGamepadAxis(gamepadIndex, 0);
+            float ly = Input::GetGamepadAxis(gamepadIndex, 1);
+            float rx = Input::GetGamepadAxis(gamepadIndex, 2);
+            float ry = Input::GetGamepadAxis(gamepadIndex, 3);
+            
+            VX_INFO("[Input] Player: ({:.1f},{:.1f}) | L-Stick: ({:.2f},{:.2f}) | R-Stick: ({:.2f},{:.2f})", 
+                   playerX, playerY, lx, ly, rx, ry);
+        }
+        else
+        {
+            VX_INFO("[Input] Player pos: ({:.1f}, {:.1f}), Mouse: ({:.0f}, {:.0f})", 
+                   playerX, playerY, mouseX, mouseY);
+        }
         lastMoveLogTime = Time::GetTime();
     }
     
@@ -244,6 +342,7 @@ void ExampleGameLayer::SetupInputActions()
     // === Pause Action ===
     auto* pauseAction = m_GameplayActions->CreateAction("Pause", InputActionType::Button);
     pauseAction->AddBinding(InputBinding::KeyboardKey(KeyCode::Space, "Keyboard/Space"));
+    pauseAction->AddBinding(InputBinding::GamepadButton(-1, 0, "Gamepad/Square")); // PS5 Square button (SDL button 0, any gamepad)
     pauseAction->SetCallbacks(
         nullptr, // Started
         [this](InputActionPhase phase) { OnPauseAction(phase); }, // Performed
@@ -253,6 +352,7 @@ void ExampleGameLayer::SetupInputActions()
     // === Reset Action ===
     auto* resetAction = m_GameplayActions->CreateAction("Reset", InputActionType::Button);
     resetAction->AddBinding(InputBinding::KeyboardKey(KeyCode::R, "Keyboard/R"));
+    resetAction->AddBinding(InputBinding::GamepadButton(-1, 3, "Gamepad/Triangle")); // PS5 Triangle button (SDL button 3, any gamepad)
     resetAction->SetCallbacks(
         nullptr, // Started
         [this](InputActionPhase phase) { OnResetAction(phase); }, // Performed
@@ -262,6 +362,7 @@ void ExampleGameLayer::SetupInputActions()
     // === Fire Action ===
     auto* fireAction = m_GameplayActions->CreateAction("Fire", InputActionType::Button);
     fireAction->AddBinding(InputBinding::MouseButton(MouseCode::ButtonLeft, "Mouse/LeftButton"));
+    fireAction->AddBinding(InputBinding::GamepadButton(-1, 1, "Gamepad/X")); // PS5 X button (SDL button 1, any gamepad)
     fireAction->SetCallbacks(
         nullptr, // Started
         [this](InputActionPhase phase) { OnFireAction(phase); }, // Performed

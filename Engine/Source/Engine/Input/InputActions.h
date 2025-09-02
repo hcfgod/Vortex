@@ -50,6 +50,10 @@ namespace Vortex
         {
             InputBinding b{}; b.device = BindingDevice::Mouse; b.mouse = btn; b.path = pathHint; return b;
         }
+        static InputBinding GamepadButton(int gamepadIndex, int button, const std::string& pathHint = "")
+        {
+            InputBinding b{}; b.device = BindingDevice::Gamepad; b.gamepadIndex = gamepadIndex; b.gamepadButton = button; b.path = pathHint; return b;
+        }
     };
 
     class InputAction
