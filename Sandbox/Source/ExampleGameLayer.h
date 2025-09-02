@@ -36,6 +36,9 @@ private:
     void OnPauseAction(InputActionPhase phase);
     void OnResetAction(InputActionPhase phase);
     void OnFireAction(InputActionPhase phase);
+    
+    // Test functions
+    void TestShaderCompiler();
 
 private:
     // Game state

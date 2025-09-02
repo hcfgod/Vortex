@@ -60,7 +60,11 @@ install_dependencies() {
                 libudev-dev \
                 libusb-1.0-0-dev \
                 wget \
-                tar
+                tar \
+                vulkan-tools \
+                libvulkan-dev \
+                vulkan-validationlayers-dev \
+                spirv-tools
             ;;
         fedora|rhel|centos)
             echo "Installing dependencies for RHEL/Fedora/CentOS..."
@@ -94,7 +98,11 @@ install_dependencies() {
                 dbus-devel \
                 systemd-devel \
                 libusb1-devel \
-                wget
+                wget \
+                vulkan-tools \
+                vulkan-devel \
+                vulkan-validation-layers \
+                spirv-tools
             ;;
         arch|manjaro)
             echo "Installing dependencies for Arch Linux..."
@@ -374,6 +382,176 @@ else
     echo "nlohmann/json updated successfully!"
 fi
 
+# Setup SPIRV-Headers (dependency for shaderc)
+echo "Setting up SPIRV-Headers..."
+if [ ! -d "Engine/Vendor/SPIRV-Headers" ]; then
+    echo "Cloning SPIRV-Headers..."
+    git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git "Engine/Vendor/SPIRV-Headers"
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to clone SPIRV-Headers! Make sure git is installed."
+        exit 1
+    fi
+    
+    echo "SPIRV-Headers cloned successfully!"
+else
+    echo "Updating SPIRV-Headers..."
+    cd "Engine/Vendor/SPIRV-Headers"
+    # Reset any local changes and pull latest
+    git reset --hard HEAD
+    git clean -fd
+    git pull origin main
+    cd "$PROJECT_ROOT"
+    echo "SPIRV-Headers updated successfully!"
+fi
+
+# Setup SPIRV-Tools (dependency for shaderc)
+echo "Setting up SPIRV-Tools..."
+if [ ! -d "Engine/Vendor/SPIRV-Tools" ]; then
+    echo "Cloning SPIRV-Tools..."
+    git clone --recurse-submodules https://github.com/KhronosGroup/SPIRV-Tools.git "Engine/Vendor/SPIRV-Tools"
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to clone SPIRV-Tools! Make sure git is installed."
+        exit 1
+    fi
+    
+    echo "SPIRV-Tools cloned successfully!"
+else
+    echo "Updating SPIRV-Tools..."
+    cd "Engine/Vendor/SPIRV-Tools"
+    # Reset any local changes and pull latest
+    git reset --hard HEAD
+    git clean -fd
+    git pull origin main
+    git submodule update --init --recursive
+    cd "$PROJECT_ROOT"
+    echo "SPIRV-Tools updated successfully!"
+fi
+
+# Build SPIRV-Tools
+echo "Building SPIRV-Tools..."
+cd "Engine/Vendor/SPIRV-Tools"
+
+# Clean any previous build
+if [ -d "build" ]; then
+    echo "Cleaning previous SPIRV-Tools build..."
+    rm -rf build
+fi
+
+mkdir -p "build"
+cd "build"
+
+# Configure SPIRV-Tools build for Linux
+echo "Configuring SPIRV-Tools build for Linux..."
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DSPIRV_SKIP_TESTS=ON \
+    -DSPIRV_SKIP_EXECUTABLES=OFF \
+    -DCMAKE_INSTALL_PREFIX="../install"
+
+if [ $? -ne 0 ]; then
+    echo "Failed to configure SPIRV-Tools build!"
+    echo "This might be due to missing dependencies. Please ensure all required packages are installed."
+    exit 1
+fi
+
+# Build SPIRV-Tools
+echo "Building SPIRV-Tools..."
+make -j$(nproc)
+
+if [ $? -ne 0 ]; then
+    echo "Failed to build SPIRV-Tools!"
+    echo "This might be due to missing dependencies or build issues."
+    exit 1
+fi
+
+# Install SPIRV-Tools
+echo "Installing SPIRV-Tools..."
+make install
+
+if [ $? -ne 0 ]; then
+    echo "Failed to install SPIRV-Tools!"
+    exit 1
+fi
+
+cd "$PROJECT_ROOT"
+echo "SPIRV-Tools built and installed successfully!"
+
+# Setup shaderc (Google's shader compiler)
+echo "Setting up shaderc..."
+if [ ! -d "Engine/Vendor/shaderc" ]; then
+    echo "Cloning shaderc..."
+    git clone --recurse-submodules https://github.com/google/shaderc.git "Engine/Vendor/shaderc"
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to clone shaderc! Make sure git is installed."
+        exit 1
+    fi
+    
+    echo "shaderc cloned successfully!"
+else
+    echo "Updating shaderc..."
+    cd "Engine/Vendor/shaderc"
+    # Reset any local changes and pull latest
+    git reset --hard HEAD
+    git clean -fd
+    git pull origin main
+    git submodule update --init --recursive
+    cd "$PROJECT_ROOT"
+    echo "shaderc updated successfully!"
+fi
+
+# Build shaderc
+echo "Building shaderc..."
+cd "Engine/Vendor/shaderc"
+
+# Clean any previous build
+if [ -d "build" ]; then
+    echo "Cleaning previous shaderc build..."
+    rm -rf build
+fi
+
+mkdir -p "build"
+cd "build"
+
+# Configure shaderc build for Linux
+echo "Configuring shaderc build for Linux..."
+cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DSHADERC_SKIP_TESTS=ON \
+    -DSHADERC_SKIP_EXAMPLES=ON \
+    -DSHADERC_SKIP_COPYRIGHT_CHECK=ON \
+    -DCMAKE_INSTALL_PREFIX="../install"
+
+if [ $? -ne 0 ]; then
+    echo "Failed to configure shaderc build!"
+    echo "This might be due to missing dependencies. Please ensure all required packages are installed."
+    exit 1
+fi
+
+# Build shaderc
+echo "Building shaderc..."
+make -j$(nproc)
+
+if [ $? -ne 0 ]; then
+    echo "Failed to build shaderc!"
+    echo "This might be due to missing dependencies or build issues."
+    exit 1
+fi
+
+# Install shaderc
+echo "Installing shaderc..."
+make install
+
+if [ $? -ne 0 ]; then
+    echo "Failed to install shaderc!"
+    exit 1
+fi
+
+cd "$PROJECT_ROOT"
+echo "shaderc built and installed successfully!"
+
 # Setup GLAD
 echo "Setting up GLAD..."
 if [ ! -d "Engine/Vendor/GLAD" ]; then
@@ -522,6 +700,28 @@ if [ -d "Engine/Vendor/nlohmann_json" ]; then
     echo "✅ nlohmann/json found"
 else
     echo "❌ nlohmann/json missing"
+    exit 1
+fi
+
+# Check Vulkan, SPIRV, and shaderc dependencies
+if [ -d "Engine/Vendor/SPIRV-Headers" ]; then
+    echo "✅ SPIRV-Headers found"
+else
+    echo "❌ SPIRV-Headers missing"
+    exit 1
+fi
+
+if [ -f "Engine/Vendor/SPIRV-Tools/install/lib/libSPIRV-Tools.a" ] || [ -f "Engine/Vendor/SPIRV-Tools/install/lib/libSPIRV-Tools-static.a" ]; then
+    echo "✅ SPIRV-Tools built"
+else
+    echo "❌ SPIRV-Tools missing"
+    exit 1
+fi
+
+if [ -f "Engine/Vendor/shaderc/install/lib/libshaderc.a" ] || [ -f "Engine/Vendor/shaderc/install/lib/libshaderc_combined.a" ]; then
+    echo "✅ shaderc built"
+else
+    echo "❌ shaderc missing"
     exit 1
 fi
 

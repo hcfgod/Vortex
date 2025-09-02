@@ -6,7 +6,6 @@
 #include "Engine/Renderer/RendererAPI.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
 #include "Core/Window.h"
-#include <glad/gl.h>
 
 #ifdef VX_OPENGL_SUPPORT
     #ifdef VX_USE_SDL

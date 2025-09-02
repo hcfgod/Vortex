@@ -10,19 +10,19 @@ project "Engine"
     pchheader "vxpch.h"
     pchsource "Source/vxpch.cpp"
 
-    files
-    {
-        "Source/**.h",
-        "Source/**.cpp",
-        "Vendor/GLAD/generated/src/gl.c"
-    }
-
     -- Disable PCH and enforce C compilation for GLAD's generated C source
     filter "files:Vendor/GLAD/generated/src/gl.c"
         flags { "NoPCH" }
         compileas "C"
         disablewarnings { "4005" }
     filter {}
+
+    files
+    {
+        "Source/**.h",
+        "Source/**.cpp",
+        "Vendor/GLAD/generated/src/gl.c"
+    }
 
     defines
     {
@@ -33,11 +33,10 @@ project "Engine"
     {
         "Source",
         "Vendor/spdlog/include",
-        "Vendor/SDL3/install/%{cfg.buildcfg}/include",
-        "Vendor/SDL3/install/include",
         "Vendor/GLAD/generated/include",
         "Vendor/glm",
-        "Vendor/nlohmann_json/single_include"
+        "Vendor/nlohmann_json/single_include",
+        "Vendor/SPIRV-Headers/include"
     }
 
     filter "system:windows"
@@ -50,6 +49,15 @@ project "Engine"
             "VX_OPENGL_SUPPORT",
             "VX_USE_SDL"
         }
+        
+        filter { "system:windows", "configurations:*" }
+            local vulkanSDK = os.getenv("VULKAN_SDK")
+            if vulkanSDK then
+                includedirs { vulkanSDK .. "/Include" }
+            else
+                -- Fallback to local Vulkan SDK headers only
+                includedirs { "../Vendor/VulkanSDK/Include" }
+            end
 
     filter "system:linux"
         defines
@@ -90,11 +98,13 @@ project "Engine"
         runtime "Debug"
         symbols "on"
 
-        filter "system:windows"
-            libdirs
-            {
-                "Vendor/SDL3/install/Debug/lib"
-            }
+        includedirs
+        {
+            "Vendor/SDL3/install/Debug/include",
+            "Vendor/SDL3/install/include",
+            "Vendor/shaderc/install/Debug/include",
+            "Vendor/SPIRV-Tools/install/Debug/include"
+        }
 
         filter "system:linux"
             libdirs
@@ -107,11 +117,13 @@ project "Engine"
         runtime "Release"
         optimize "on"
 
-        filter "system:windows"
-            libdirs
-            {
-                "Vendor/SDL3/install/Release/lib"
-            }
+        includedirs
+        {
+            "Vendor/SDL3/install/Release/include",
+            "Vendor/SDL3/install/include",
+            "Vendor/shaderc/install/Release/include",
+            "Vendor/SPIRV-Tools/install/Release/include"
+        }
 
         filter "system:linux"
             libdirs
@@ -124,11 +136,13 @@ project "Engine"
         runtime "Release"
         optimize "on"
 
-        filter "system:windows"
-            libdirs
-            {
-                "Vendor/SDL3/install/Release/lib"
-            }
+        includedirs
+        {
+            "Vendor/SDL3/install/Release/include",
+            "Vendor/SDL3/install/include",
+            "Vendor/shaderc/install/Release/include",
+            "Vendor/SPIRV-Tools/install/Release/include"
+        }
 
         filter "system:linux"
             libdirs

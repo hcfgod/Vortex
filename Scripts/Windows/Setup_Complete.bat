@@ -199,36 +199,63 @@ if not exist "Engine\Vendor\nlohmann_json" (
     echo nlohmann/json updated successfully!
 )
 
-:: Setup GLAD
-echo Setting up GLAD...
-if not exist "Engine\Vendor\GLAD" (
-    echo Cloning GLAD...
-    git clone --depth 1 https://github.com/Dav1dde/glad.git "Engine\Vendor\GLAD"
-    
-    if %ERRORLEVEL% NEQ 0 (
-        echo Failed to clone GLAD! Make sure git is installed.
-        popd
-        pause
-        exit /b 1
+:: Setup Vulkan SDK
+echo Setting up Vulkan SDK...
+set VULKAN_SDK_VERSION=1.3.280.0
+
+:: Check if Vulkan SDK is already installed
+if defined VULKAN_SDK (
+    if exist "%VULKAN_SDK%\Bin\vulkaninfo.exe" (
+        echo Vulkan SDK found via system installation!
+        echo Using: %VULKAN_SDK%
+        goto :vulkan_found
     )
-    
-    echo GLAD cloned successfully!
-) else (
-    echo Updating GLAD...
-    cd "Engine\Vendor\GLAD"
-    git pull origin master
-    cd "..\..\.."
-    echo GLAD updated successfully!
 )
 
-:: Generate GLAD files for OpenGL 4.6 Core Profile
-echo Generating GLAD files for OpenGL 4.6 Core Profile...
-cd "Engine\Vendor\GLAD"
+:: Check for local Vulkan SDK installation
+if not exist "Vendor\VulkanSDK" (
+    echo Vulkan SDK not found. Setting up local installation...
+    mkdir "Vendor\VulkanSDK"
+    
+    echo Downloading Vulkan SDK %VULKAN_SDK_VERSION% for Windows...
+    powershell -Command "Invoke-WebRequest -Uri 'https://sdk.lunarg.com/sdk/download/1.3.280.0/windows/VulkanSDK-1.3.280.0-Installer.exe' -OutFile 'Vendor\VulkanSDK\VulkanSDK-Installer.exe'"
+    
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to download Vulkan SDK! Trying to use minimal setup...
+        echo Setting up minimal Vulkan headers and libraries...
+        
+        :: Download Vulkan headers
+        if not exist "Vendor\VulkanSDK\Include\vulkan" mkdir "Vendor\VulkanSDK\Include\vulkan"
+        echo Downloading Vulkan headers...
+        powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vulkan.h'"
+        powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vulkan_core.h'"
+        
+        goto :skip_vulkan_installer
+    )
+    
+    echo Please run the Vulkan SDK installer manually: Vendor\VulkanSDK\VulkanSDK-Installer.exe
+    echo After installation, re-run this setup script.
+    echo.
+    echo Note: You can also install Vulkan SDK system-wide and it will be detected automatically.
+    pause
+    popd
+    exit /b 1
+) else (
+    echo Local Vulkan SDK directory found.
+)
 
-:: Create generated directory if it doesn't exist
-if not exist "generated" mkdir "generated"
+:skip_vulkan_installer
 
-:: Check if Python is available
+:: Set local Vulkan SDK path for this session
+if exist "Vendor\VulkanSDK\Include" (
+    set "VULKAN_SDK=%CD%\Vendor\VulkanSDK"
+    echo Local Vulkan SDK path set: !VULKAN_SDK!
+)
+
+:vulkan_found
+echo Vulkan SDK setup complete.
+
+:: Check for Python early since it's needed for shaderc
 echo Checking for Python...
 echo Current PATH: %PATH%
 echo.
@@ -283,7 +310,7 @@ if %PYTHON_FOUND% EQU 0 (
                 set PYTHON_CMD="%%i\python.exe"
                 echo Python found at: %%i\python.exe
                 "%%i\python.exe" --version
-                goto :python_found
+                goto :python_found_early
             )
         )
     )
@@ -297,7 +324,7 @@ if %PYTHON_FOUND% EQU 0 (
                 set PYTHON_CMD="%%i\python.exe"
                 echo Python found at: %%i\python.exe
                 "%%i\python.exe" --version
-                goto :python_found
+                goto :python_found_early
             )
         )
     )
@@ -310,13 +337,13 @@ if %PYTHON_FOUND% EQU 0 (
                 set PYTHON_CMD="%%i\python.exe"
                 echo Python found at: %%i\python.exe
                 "%%i\python.exe" --version
-                goto :python_found
+                goto :python_found_early
             )
         )
     )
 )
 
-:python_found
+:python_found_early
 if %PYTHON_FOUND% EQU 0 (
     echo.
     echo Python not found! 
@@ -325,7 +352,6 @@ if %PYTHON_FOUND% EQU 0 (
     echo.
     echo You may need to restart your command prompt after installing Python.
     echo After installing Python, re-run this setup script.
-    cd "..\..\.."
     popd
     pause
     exit /b 1
@@ -335,6 +361,249 @@ if %PYTHON_FOUND% EQU 0 (
     echo Using: %PYTHON_CMD%
     echo.
 )
+
+:: Setup SPIRV-Headers (dependency for shaderc)
+echo Setting up SPIRV-Headers...
+if not exist "Engine\Vendor\SPIRV-Headers" (
+    echo Cloning SPIRV-Headers...
+    git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git "Engine\Vendor\SPIRV-Headers"
+    
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to clone SPIRV-Headers! Make sure git is installed.
+        popd
+        pause
+        exit /b 1
+    )
+    
+    echo SPIRV-Headers cloned successfully!
+) else (
+    echo Updating SPIRV-Headers...
+    cd "Engine\Vendor\SPIRV-Headers"
+    git pull origin main
+    cd "..\..\.."
+    echo SPIRV-Headers updated successfully!
+)
+
+:: Setup SPIRV-Tools (dependency for shaderc)
+echo Setting up SPIRV-Tools...
+if not exist "Engine\Vendor\SPIRV-Tools" (
+    echo Cloning SPIRV-Tools...
+    git clone --recurse-submodules https://github.com/KhronosGroup/SPIRV-Tools.git "Engine\Vendor\SPIRV-Tools"
+    
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to clone SPIRV-Tools! Make sure git is installed.
+        popd
+        pause
+        exit /b 1
+    )
+    
+    echo SPIRV-Tools cloned successfully!
+) else (
+    echo Updating SPIRV-Tools...
+    cd "Engine\Vendor\SPIRV-Tools"
+    git pull origin main
+    git submodule update --init --recursive
+    cd "..\..\.."
+    echo SPIRV-Tools updated successfully!
+)
+
+:: Build SPIRV-Tools
+echo Building SPIRV-Tools...
+cd "Engine\Vendor\SPIRV-Tools"
+
+:: Ensure SPIRV-Headers is available in external without requiring symlink privileges
+if not exist "external" mkdir "external"
+if exist "external\spirv-headers" (
+    echo Refreshing local copy of SPIRV-Headers for SPIRV-Tools...
+    rmdir /S /Q "external\spirv-headers"
+)
+
+echo Copying SPIRV-Headers into SPIRV-Tools/external...
+robocopy "..\SPIRV-Headers" "external\spirv-headers" /E /NFL /NDL /NJH /NJS /NP >nul
+if %ERRORLEVEL% GEQ 8 (
+    echo Failed to copy SPIRV-Headers!
+    cd "..\..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+if not exist "build" mkdir "build"
+cd "build"
+
+echo Configuring SPIRV-Tools build...
+cmake .. -G "Visual Studio 17 2022" -A x64 ^
+    -DSPIRV_SKIP_TESTS=ON ^
+    -DSPIRV_SKIP_EXECUTABLES=OFF ^
+    -DBUILD_SHARED_LIBS=OFF ^
+    -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>" ^
+    -DCMAKE_CXX_FLAGS_DEBUG="/MTd" ^
+    -DCMAKE_CXX_FLAGS_RELEASE="/MT" ^
+    -DCMAKE_C_FLAGS_DEBUG="/MTd" ^
+    -DCMAKE_C_FLAGS_RELEASE="/MT" ^
+    -DCMAKE_INSTALL_PREFIX="../install"
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to configure SPIRV-Tools build!
+    cd "..\..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+echo Building SPIRV-Tools Debug configuration...
+cmake --build . --config Debug
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to build SPIRV-Tools Debug!
+    cd "..\..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+echo Building SPIRV-Tools Release configuration...
+cmake --build . --config Release
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to build SPIRV-Tools Release!
+    cd "..\..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+echo Installing SPIRV-Tools...
+cmake --install . --config Debug --prefix "../install/Debug"
+cmake --install . --config Release --prefix "../install/Release"
+
+cd "..\..\..\.."
+echo SPIRV-Tools built and installed successfully!
+
+:: Setup shaderc (Google's shader compiler)
+echo Setting up shaderc...
+if not exist "Engine\Vendor\shaderc" (
+    echo Cloning shaderc...
+    git clone https://github.com/google/shaderc.git "Engine\Vendor\shaderc"
+    
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to clone shaderc! Make sure git is installed.
+        popd
+        pause
+        exit /b 1
+    )
+    
+    echo shaderc cloned successfully!
+) else (
+    echo Updating shaderc...
+    cd "Engine\Vendor\shaderc"
+    git pull origin main
+    cd "..\..\.."
+    echo shaderc updated successfully!
+)
+
+:: Setup shaderc dependencies using git-sync-deps
+echo Setting up shaderc dependencies...
+cd "Engine\Vendor\shaderc"
+
+:: Check if Python is available (we know it exists from GLAD setup)
+echo Running git-sync-deps to fetch shaderc dependencies...
+%PYTHON_CMD% utils/git-sync-deps
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to sync shaderc dependencies!
+    cd "..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+cd "..\..\.."
+echo shaderc dependencies synced successfully!
+
+:: Build shaderc
+echo Building shaderc...
+if not exist "Engine\Vendor\shaderc\build" mkdir "Engine\Vendor\shaderc\build"
+cd "Engine\Vendor\shaderc\build"
+
+echo Configuring shaderc build...
+cmake .. -G "Visual Studio 17 2022" -A x64 ^
+    -DSHADERC_SKIP_TESTS=ON ^
+    -DSHADERC_SKIP_EXAMPLES=ON ^
+    -DSHADERC_SKIP_COPYRIGHT_CHECK=ON ^
+    -DBUILD_SHARED_LIBS=OFF ^
+    -DSHADERC_ENABLE_SHARED_CRT=OFF ^
+    -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>" ^
+    -DCMAKE_CXX_FLAGS_DEBUG="/MTd" ^
+    -DCMAKE_CXX_FLAGS_RELEASE="/MT" ^
+    -DCMAKE_C_FLAGS_DEBUG="/MTd" ^
+    -DCMAKE_C_FLAGS_RELEASE="/MT" ^
+    -DCMAKE_INSTALL_PREFIX="../install"
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to configure shaderc build!
+    cd "..\..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+echo Building shaderc Debug configuration...
+cmake --build . --config Debug
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to build shaderc Debug!
+    cd "..\..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+echo Building shaderc Release configuration...
+cmake --build . --config Release
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to build shaderc Release!
+    cd "..\..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+echo Installing shaderc...
+cmake --install . --config Debug --prefix "../install/Debug"
+cmake --install . --config Release --prefix "../install/Release"
+
+cd "..\..\..\.."
+echo shaderc built and installed successfully!
+
+:: Setup GLAD
+if not exist "Engine\Vendor\GLAD" (
+    echo Cloning GLAD...
+    git clone --depth 1 https://github.com/Dav1dde/glad.git "Engine\Vendor\GLAD"
+    
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to clone GLAD! Make sure git is installed.
+        popd
+        pause
+        exit /b 1
+    )
+    
+    echo GLAD cloned successfully!
+) else (
+    echo Updating GLAD...
+    cd "Engine\Vendor\GLAD"
+    git pull origin master
+    cd "..\..\.."
+    echo GLAD updated successfully!
+)
+
+:: Generate GLAD files for OpenGL 4.6 Core Profile
+echo Generating GLAD files for OpenGL 4.6 Core Profile...
+cd "Engine\Vendor\GLAD"
+
+:: Create generated directory if it doesn't exist
+if not exist "generated" mkdir "generated"
 
 :: Generate OpenGL 4.6 Core Profile with extensions
 echo About to generate GLAD for OpenGL 4.6 Core...

@@ -1,5 +1,6 @@
 #include "ExampleGameLayer.h"
 #include <glad/gl.h>
+#include "Engine/Renderer/ShaderCompiler.h"
 
 namespace {
 // Example Vertex Shader
@@ -18,7 +19,7 @@ const char* kFragmentShaderSource = R"(
 out vec4 FragColor;
 void main()
 {
-    FragColor = vec4(1.0f, 0.0f, 0.0f, 1.0f); // Bright red
+    FragColor = vec4(0.5f, 0.5f, 0.2f, 1.0f);
 }
 )";
 
@@ -48,6 +49,9 @@ void ExampleGameLayer::OnAttach()
     VX_INFO("  - PS5 Controller: Full support for buttons and sticks");
     
     SetupInputActions();
+    
+    // Test ShaderCompiler integration
+    TestShaderCompiler();
 
     // Simple OpenGL setup for rendering a triangle
     // Compile Vertex Shader
@@ -400,4 +404,100 @@ void ExampleGameLayer::OnFireAction(InputActionPhase phase)
     {
         VX_INFO("[Action] Can't score while paused! (via Input Action)");
     }
+}
+
+void ExampleGameLayer::TestShaderCompiler()
+{
+    VX_INFO("[Shaderc] Testing ShaderCompiler integration...");
+    
+    ShaderCompiler compiler;
+    
+    // Test vertex shader compilation
+    const std::string vertexShaderSource = R"(
+#version 450 core
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aColor;
+
+layout(location = 0) out vec3 fragColor;
+
+void main()
+{
+    gl_Position = vec4(aPos, 1.0);
+    fragColor = aColor;
+}
+)";
+    
+    auto vertexResult = compiler.CompileGLSL(vertexShaderSource, ShaderStage::Vertex, "test_vertex.glsl");
+    
+    if (vertexResult.Success)
+    {
+        VX_INFO("[Shaderc] ✅ Vertex shader compiled successfully! SPIR-V size: {} bytes", 
+                vertexResult.SpirV.size() * sizeof(uint32_t));
+    }
+    else
+    {
+        VX_ERROR("[Shaderc] ❌ Vertex shader compilation failed: {}", vertexResult.ErrorMessage);
+    }
+    
+    // Test fragment shader compilation
+    const std::string fragmentShaderSource = R"(
+#version 450 core
+layout(location = 0) in vec3 fragColor;
+layout(location = 0) out vec4 outColor;
+
+void main()
+{
+    outColor = vec4(fragColor, 1.0);
+}
+)";
+    
+    auto fragmentResult = compiler.CompileGLSL(fragmentShaderSource, ShaderStage::Fragment, "test_fragment.glsl");
+    
+    if (fragmentResult.Success)
+    {
+        VX_INFO("[Shaderc] ✅ Fragment shader compiled successfully! SPIR-V size: {} bytes", 
+                fragmentResult.SpirV.size() * sizeof(uint32_t));
+    }
+    else
+    {
+        VX_ERROR("[Shaderc] ❌ Fragment shader compilation failed: {}", fragmentResult.ErrorMessage);
+    }
+    
+    // Test compute shader compilation
+    const std::string computeShaderSource = R"(
+#version 450 core
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, binding = 0) restrict readonly buffer InputBuffer
+{
+    float inputData[];
+};
+
+layout(std430, binding = 1) restrict writeonly buffer OutputBuffer
+{
+    float outputData[];
+};
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= inputData.length()) return;
+    
+    outputData[index] = inputData[index] * 2.0;
+}
+)";
+    
+    auto computeResult = compiler.CompileGLSL(computeShaderSource, ShaderStage::Compute, "test_compute.glsl");
+    
+    if (computeResult.Success)
+    {
+        VX_INFO("[Shaderc] ✅ Compute shader compiled successfully! SPIR-V size: {} bytes", 
+                computeResult.SpirV.size() * sizeof(uint32_t));
+    }
+    else
+    {
+        VX_ERROR("[Shaderc] ❌ Compute shader compilation failed: {}", computeResult.ErrorMessage);
+    }
+    
+    VX_INFO("[Shaderc] ShaderCompiler test complete!");
 }
