@@ -63,7 +63,7 @@ install_dependencies() {
                 tar \
                 vulkan-tools \
                 libvulkan-dev \
-                vulkan-validationlayers-dev \
+                vulkan-utility-libraries-dev \
                 spirv-tools
             ;;
         fedora|rhel|centos)
@@ -429,6 +429,30 @@ else
     echo "SPIRV-Tools updated successfully!"
 fi
 
+# Ensure SPIRV-Headers is in the correct location for SPIRV-Tools
+echo "Setting up SPIRV-Headers for SPIRV-Tools..."
+if [ ! -d "Engine/Vendor/SPIRV-Tools/external/spirv-headers" ]; then
+    echo "Cloning SPIRV-Headers into SPIRV-Tools external directory..."
+    mkdir -p "Engine/Vendor/SPIRV-Tools/external"
+    git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git "Engine/Vendor/SPIRV-Tools/external/spirv-headers"
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to clone SPIRV-Headers! Make sure git is installed."
+        exit 1
+    fi
+    
+    echo "SPIRV-Headers cloned successfully for SPIRV-Tools!"
+else
+    echo "Updating SPIRV-Headers for SPIRV-Tools..."
+    cd "Engine/Vendor/SPIRV-Tools/external/spirv-headers"
+    # Reset any local changes and pull latest
+    git reset --hard HEAD
+    git clean -fd
+    git pull origin main
+    cd "$PROJECT_ROOT"
+    echo "SPIRV-Headers updated successfully for SPIRV-Tools!"
+fi
+
 # Build SPIRV-Tools
 echo "Building SPIRV-Tools..."
 cd "Engine/Vendor/SPIRV-Tools"
@@ -500,6 +524,55 @@ else
     git submodule update --init --recursive
     cd "$PROJECT_ROOT"
     echo "shaderc updated successfully!"
+fi
+
+# Ensure SPIRV-Tools is in the correct location for shaderc
+echo "Setting up SPIRV-Tools for shaderc..."
+if [ ! -d "Engine/Vendor/shaderc/third_party/spirv-tools" ]; then
+    echo "Linking SPIRV-Tools into shaderc third_party directory..."
+    mkdir -p "Engine/Vendor/shaderc/third_party"
+    # Create symlink to our already built SPIRV-Tools
+    ln -sf "../../SPIRV-Tools" "Engine/Vendor/shaderc/third_party/spirv-tools"
+    echo "SPIRV-Tools linked successfully for shaderc!"
+else
+    echo "SPIRV-Tools already available for shaderc!"
+fi
+
+# Ensure SPIRV-Headers is in the correct location for shaderc
+echo "Setting up SPIRV-Headers for shaderc..."
+if [ ! -d "Engine/Vendor/shaderc/third_party/spirv-headers" ]; then
+    echo "Linking SPIRV-Headers into shaderc third_party directory..."
+    mkdir -p "Engine/Vendor/shaderc/third_party"
+    # Create symlink to our already cloned SPIRV-Headers
+    ln -sf "../../SPIRV-Headers" "Engine/Vendor/shaderc/third_party/spirv-headers"
+    echo "SPIRV-Headers linked successfully for shaderc!"
+else
+    echo "SPIRV-Headers already available for shaderc!"
+fi
+
+# Setup glslang (dependency for shaderc)
+echo "Setting up glslang for shaderc..."
+if [ ! -d "Engine/Vendor/shaderc/third_party/glslang" ]; then
+    echo "Cloning glslang into shaderc third_party directory..."
+    mkdir -p "Engine/Vendor/shaderc/third_party"
+    git clone --recurse-submodules https://github.com/KhronosGroup/glslang.git "Engine/Vendor/shaderc/third_party/glslang"
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to clone glslang! Make sure git is installed."
+        exit 1
+    fi
+    
+    echo "glslang cloned successfully for shaderc!"
+else
+    echo "Updating glslang for shaderc..."
+    cd "Engine/Vendor/shaderc/third_party/glslang"
+    # Reset any local changes and pull latest
+    git reset --hard HEAD
+    git clean -fd
+    git pull origin main
+    git submodule update --init --recursive
+    cd "$PROJECT_ROOT"
+    echo "glslang updated successfully for shaderc!"
 fi
 
 # Build shaderc

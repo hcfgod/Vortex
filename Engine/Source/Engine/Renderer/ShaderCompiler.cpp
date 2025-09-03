@@ -50,9 +50,7 @@ namespace Vortex {
 
     ShaderCompiler::~ShaderCompiler() = default;
 
-    CompiledShader ShaderCompiler::CompileGLSL(const std::string& source, 
-                                               ShaderStage stage,
-                                               const std::string& filename)
+    CompiledShader ShaderCompiler::CompileGLSL(const std::string& source, ShaderStage stage, const std::string& filename)
     {
         CompiledShader result;
 
@@ -73,10 +71,7 @@ namespace Vortex {
         return result;
     }
 
-    CompiledShader ShaderCompiler::CompileHLSL(const std::string& source, 
-                                               ShaderStage stage,
-                                               const std::string& entryPoint,
-                                               const std::string& filename)
+    CompiledShader ShaderCompiler::CompileHLSL(const std::string& source, ShaderStage stage, const std::string& entryPoint, const std::string& filename)
     {
         CompiledShader result;
 

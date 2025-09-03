@@ -36,7 +36,8 @@ project "Engine"
         "Vendor/GLAD/generated/include",
         "Vendor/glm",
         "Vendor/nlohmann_json/single_include",
-        "Vendor/SPIRV-Headers/include"
+        "Vendor/SPIRV-Headers/include",
+        "Vendor/shaderc/libshaderc/include"
     }
 
     filter "system:windows"
@@ -84,7 +85,8 @@ project "Engine"
         {
             "-Wall",
             "-Wextra",
-            "-Wpedantic"
+            "-Wpedantic",
+            "-Wno-dangling-reference"  -- Disable dangling reference warning for spdlog compatibility
         }
 
         links
