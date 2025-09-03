@@ -136,7 +136,8 @@ project "Sandbox"
             "dbus-1",
             "udev",
             "usb-1.0",
-            "pthread"
+            "pthread",
+            "shaderc_combined"
         }
 
         -- Copy the Config directory next to the executable after build
@@ -170,7 +171,8 @@ project "Sandbox"
         filter { "system:linux", "configurations:Debug" }
             libdirs
             {
-                "%{wks.location}/Engine/Vendor/SDL3/install/lib"
+                "%{wks.location}/Engine/Vendor/SDL3/install/lib",
+                "%{wks.location}/Engine/Vendor/shaderc/install/lib"
             }
             links
             {
@@ -201,7 +203,8 @@ project "Sandbox"
         filter { "system:linux", "configurations:Release" }
             libdirs
             {
-                "%{wks.location}/Engine/Vendor/SDL3/install/lib"
+                "%{wks.location}/Engine/Vendor/SDL3/install/lib",
+                "%{wks.location}/Engine/Vendor/shaderc/install/lib"
             }
             links
             {
@@ -232,7 +235,8 @@ project "Sandbox"
         filter { "system:linux", "configurations:Dist" }
             libdirs
             {
-                "%{wks.location}/Engine/Vendor/SDL3/install/lib"
+                "%{wks.location}/Engine/Vendor/SDL3/install/lib",
+                "%{wks.location}/Engine/Vendor/shaderc/install/lib"
             }
             links
             {
