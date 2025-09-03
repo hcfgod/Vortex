@@ -518,12 +518,18 @@ void ExampleGameLayer::SetupAdvancedShaders()
         shaderStages[ShaderStage::Fragment] = fsResult.GetValue().SpirV;
 
         // Get reflection data from compiled shaders
-        ShaderReflectionData reflection = vsResult.GetValue().Reflection;
-
-        // Merge fragment shader reflection (in a real implementation, we'd have a proper merge function)
+        const auto& vertReflection = vsResult.GetValue().Reflection;
         const auto& fragReflection = fsResult.GetValue().Reflection;
-        reflection.Uniforms.insert(reflection.Uniforms.end(), fragReflection.Uniforms.begin(), fragReflection.Uniforms.end());
-        reflection.Resources.insert(reflection.Resources.end(), fragReflection.Resources.begin(), fragReflection.Resources.end());
+
+        // Use our advanced reflection merge system with conflict resolution
+        std::vector<ShaderReflectionData> reflections = { vertReflection, fragReflection };
+        ShaderReflectionData reflection = ShaderReflection::CombineReflections(reflections);
+
+        // Validate the merged reflection for consistency
+        if (!ShaderReflection::ValidateMergedReflection(reflection))
+        {
+            VX_WARN("[ShaderSystem] Merged reflection validation failed - some conflicts were detected and resolved");
+        }
 
         // Create the GPU shader with reflection
         auto createResult = m_TriangleShader->Create(shaderStages, reflection);

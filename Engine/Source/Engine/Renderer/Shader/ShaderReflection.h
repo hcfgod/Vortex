@@ -51,21 +51,34 @@ namespace Vortex
          * @param fragmentReflection Fragment shader reflection
          * @return True if shaders are compatible for linking
          */
-        static bool ValidateShaderCompatibility(const ShaderReflectionData& vertexReflection, 
+        static bool ValidateShaderCompatibility(const ShaderReflectionData& vertexReflection,
                                                const ShaderReflectionData& fragmentReflection);
+
+        /**
+         * @brief Validate the integrity of merged shader reflection data
+         * @param reflection The merged reflection data to validate
+         * @return True if the reflection data is internally consistent
+         */
+        static bool ValidateMergedReflection(const ShaderReflectionData& reflection);
 
     private:
         // SPIRV-Cross helper methods
         ShaderDataType SPIRTypeToShaderDataType(const spirv_cross::SPIRType& type);
         ShaderResourceType DeduceResourceType(const spirv_cross::SPIRType& type);
-        
+
         // Reflection extraction methods
         void ExtractUniforms(spirv_cross::Compiler& compiler, ShaderReflectionData& reflection);
         void ExtractResources(spirv_cross::Compiler& compiler, ShaderReflectionData& reflection);
         void ExtractVertexInputs(spirv_cross::Compiler& compiler, ShaderReflectionData& reflection);
         void ExtractComputeInfo(spirv_cross::Compiler& compiler, ShaderReflectionData& reflection);
         void ExtractStatistics(spirv_cross::Compiler& compiler, ShaderReflectionData& reflection);
-        
+
+        // Merge validation helper methods
+        static bool AreUniformsCompatible(const ShaderUniform& a, const ShaderUniform& b);
+        static bool AreResourcesCompatible(const ShaderResource& a, const ShaderResource& b);
+        static bool AreVertexInputsCompatible(const ShaderVertexInput& a, const ShaderVertexInput& b);
+        static bool AreUniformBuffersCompatible(const std::vector<ShaderUniform>& a, const std::vector<ShaderUniform>& b);
+
         // Utility methods
         uint32_t CalculateStructSize(spirv_cross::Compiler& compiler, const spirv_cross::SPIRType& type);
         uint32_t CalculateAlignment(const spirv_cross::SPIRType& type);
