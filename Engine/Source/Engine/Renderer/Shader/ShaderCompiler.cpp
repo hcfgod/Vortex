@@ -11,7 +11,7 @@
 #include <sstream>
 #include <shared_mutex>
 
-namespace Vortex::Shader
+namespace Vortex
 {
     // ============================================================================
     // Utility Functions
@@ -190,10 +190,36 @@ namespace Vortex::Shader
 
         std::string GetCacheFilePath(uint64_t hash, ShaderStage stage) const
         {
-            return m_CacheDirectory + "/" + std::to_string(hash) + "_" + GetShaderStageString(stage) + ".cache";
+            return m_CacheDirectory + "/" + std::to_string(hash) + "_" + GetShaderStageString(stage) + ".spv";
+        }
+        
+        std::string GetCacheInfoPath(uint64_t hash, ShaderStage stage) const
+        {
+            return m_CacheDirectory + "/" + std::to_string(hash) + "_" + GetShaderStageString(stage) + ".info";
+        }
+        
+        bool IsSourceFileNewer(const std::string& sourceFile, const std::string& cacheFile) const
+        {
+            if (sourceFile.empty() || !std::filesystem::exists(sourceFile))
+                return false;
+                
+            if (!std::filesystem::exists(cacheFile))
+                return true;
+                
+            try
+            {
+                auto sourceTime = std::filesystem::last_write_time(sourceFile);
+                auto cacheTime = std::filesystem::last_write_time(cacheFile);
+                return sourceTime > cacheTime;
+            }
+            catch (const std::exception& e)
+            {
+                VX_CORE_WARN("Failed to compare file timestamps: {0}", e.what());
+                return true; // Assume source is newer on error
+            }
         }
 
-        bool LoadFromCache(uint64_t hash, ShaderStage stage, CompiledShader& outShader) const
+        bool LoadFromCache(uint64_t hash, ShaderStage stage, CompiledShader& outShader, const std::string& sourceFile = "") const
         {
             if (!m_CachingEnabled)
                 return false;
@@ -204,34 +230,75 @@ namespace Vortex::Shader
                 auto it = m_ShaderCache.find(hash);
                 if (it != m_ShaderCache.end())
                 {
-                    outShader = it->second;
-                    return true;
+                    // Check if source file is newer than cached version
+                    if (!sourceFile.empty() && IsSourceFileNewer(sourceFile, GetCacheFilePath(hash, stage)))
+                    {
+                        // Invalidate memory cache
+                        const_cast<std::unordered_map<uint64_t, CompiledShader>&>(m_ShaderCache).erase(hash);
+                    }
+                    else
+                    {
+                        outShader = it->second;
+                        return true;
+                    }
                 }
             }
 
             // Check disk cache
             std::string cacheFile = GetCacheFilePath(hash, stage);
-            if (!std::filesystem::exists(cacheFile))
+            std::string infoFile = GetCacheInfoPath(hash, stage);
+            
+            if (!std::filesystem::exists(cacheFile) || !std::filesystem::exists(infoFile))
                 return false;
+                
+            // Check if source file is newer than cache
+            if (!sourceFile.empty() && IsSourceFileNewer(sourceFile, cacheFile))
+            {
+                VX_CORE_TRACE("Source file is newer than cache, recompiling shader");
+                return false;
+            }
 
             try
             {
-                std::ifstream file(cacheFile, std::ios::binary);
-                if (!file.is_open())
+                // Load SPIR-V from .spv file
+                std::ifstream spirvFile(cacheFile, std::ios::binary);
+                if (!spirvFile.is_open())
                     return false;
 
-                // Read SPIR-V size
-                uint32_t spirvSize;
-                file.read(reinterpret_cast<char*>(&spirvSize), sizeof(spirvSize));
+                // Get file size
+                spirvFile.seekg(0, std::ios::end);
+                size_t fileSize = spirvFile.tellg();
+                spirvFile.seekg(0, std::ios::beg);
+                
+                // Read SPIR-V data directly
+                outShader.SpirV.resize(fileSize / sizeof(uint32_t));
+                spirvFile.read(reinterpret_cast<char*>(outShader.SpirV.data()), fileSize);
+                spirvFile.close();
 
-                // Read SPIR-V data
-                outShader.SpirV.resize(spirvSize);
-                file.read(reinterpret_cast<char*>(outShader.SpirV.data()), spirvSize * sizeof(uint32_t));
+                // Load reflection data from .info file
+                std::ifstream infoFileStream(infoFile, std::ios::binary);
+                if (infoFileStream.is_open())
+                {
+                    // Read reflection data size and content
+                    uint32_t reflectionSize;
+                    infoFileStream.read(reinterpret_cast<char*>(&reflectionSize), sizeof(reflectionSize));
+                    
+                    if (reflectionSize > 0)
+                    {
+                        std::string reflectionJson(reflectionSize, '\0');
+                        infoFileStream.read(&reflectionJson[0], reflectionSize);
+                        
+                        // Parse reflection data from JSON (simplified - in real implementation use proper JSON)
+                        // For now, just mark as valid but empty reflection
+                        outShader.Reflection = {};
+                    }
+                    infoFileStream.close();
+                }
 
                 outShader.Stage = stage;
                 outShader.Status = ShaderCompileStatus::Success;
-
-                // TODO: Load reflection data
+                outShader.SourceHash = hash;
+                outShader.SourceFile = sourceFile;
 
                 // Store in memory cache
                 {
@@ -239,6 +306,7 @@ namespace Vortex::Shader
                     m_ShaderCache[hash] = outShader;
                 }
 
+                VX_CORE_TRACE("Loaded SPIR-V shader from cache: {0}", cacheFile);
                 return true;
             }
             catch (const std::exception& e)
@@ -264,22 +332,36 @@ namespace Vortex::Shader
             {
                 std::filesystem::create_directories(m_CacheDirectory);
                 std::string cacheFile = GetCacheFilePath(hash, shader.Stage);
+                std::string infoFile = GetCacheInfoPath(hash, shader.Stage);
                 
-                std::ofstream file(cacheFile, std::ios::binary);
-                if (!file.is_open())
+                // Write SPIR-V data to .spv file
+                std::ofstream spirvFileStream(cacheFile, std::ios::binary);
+                if (!spirvFileStream.is_open())
                 {
-                    VX_CORE_ERROR("Failed to open cache file for writing: {0}", cacheFile);
+                    VX_CORE_ERROR("Failed to open SPIR-V cache file for writing: {0}", cacheFile);
                     return;
                 }
 
-                // Write SPIR-V size
-                uint32_t spirvSize = static_cast<uint32_t>(shader.SpirV.size());
-                file.write(reinterpret_cast<const char*>(&spirvSize), sizeof(spirvSize));
+                // Write raw SPIR-V data
+                spirvFileStream.write(reinterpret_cast<const char*>(shader.SpirV.data()), 
+                                    shader.SpirV.size() * sizeof(uint32_t));
+                spirvFileStream.close();
 
-                // Write SPIR-V data
-                file.write(reinterpret_cast<const char*>(shader.SpirV.data()), spirvSize * sizeof(uint32_t));
-
-                // TODO: Save reflection data
+                // Write reflection data to .info file
+                std::ofstream infoFileStream(infoFile, std::ios::binary);
+                if (infoFileStream.is_open())
+                {
+                    // For now, write a placeholder for reflection data
+                    // In a real implementation, serialize the reflection data to JSON or binary format
+                    std::string reflectionPlaceholder = "{}";
+                    uint32_t reflectionSize = static_cast<uint32_t>(reflectionPlaceholder.size());
+                    
+                    infoFileStream.write(reinterpret_cast<const char*>(&reflectionSize), sizeof(reflectionSize));
+                    infoFileStream.write(reflectionPlaceholder.c_str(), reflectionSize);
+                    infoFileStream.close();
+                }
+                
+                VX_CORE_TRACE("Saved SPIR-V shader to cache: {0}", cacheFile);
             }
             catch (const std::exception& e)
             {
@@ -316,9 +398,9 @@ namespace Vortex::Shader
         // Compute hash for caching
         uint64_t hash = m_Impl->ComputeShaderHash(source, stage, options);
 
-        // Try loading from cache first
+        // Try loading from cache first (pass filename for timestamp checking)
         CompiledShader cachedShader;
-        if (m_Impl->LoadFromCache(hash, stage, cachedShader))
+        if (m_Impl->LoadFromCache(hash, stage, cachedShader, filename))
         {
             std::lock_guard<std::mutex> lock(m_Impl->m_StatsMutex);
             m_Impl->m_Stats.CacheHits++;
@@ -463,7 +545,7 @@ return Result<CompiledShader>(ErrorCode::InvalidParameter, "Could not determine 
             {
                 for (const auto& entry : std::filesystem::directory_iterator(m_Impl->m_CacheDirectory))
                 {
-                    if (entry.path().extension() == ".cache")
+                    if (entry.path().extension() == ".spv" || entry.path().extension() == ".info")
                     {
                         std::filesystem::remove(entry.path());
                     }
@@ -593,4 +675,4 @@ return Result<CompiledShader>(ErrorCode::InvalidParameter, "Could not determine 
         return Result<uint32_t>(ErrorCode::NotImplemented, "PrecompileShaders not yet implemented");
     }
 
-} // namespace Vortex::Shader
+} // namespace Vortex

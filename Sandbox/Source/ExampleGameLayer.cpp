@@ -458,7 +458,7 @@ void ExampleGameLayer::SetupShaderSystem()
     try
     {
         // Create shader manager
-        m_ShaderManager = std::make_shared<Vortex::Shader::ShaderManager>();
+        m_ShaderManager = std::make_shared<ShaderManager>();
         
         // Try to load advanced shaders first, fallback to simple triangle shaders
         SetupAdvancedShaders();
@@ -480,8 +480,8 @@ void ExampleGameLayer::SetupAdvancedShaders()
     std::string fragShaderPath = "Assets/Shaders/AdvancedTriangle.frag";
     
     // Create shader compilation request
-    Vortex::Shader::ShaderCompileOptions options;
-    options.OptimizationLevel = Vortex::Shader::ShaderOptimizationLevel::None;
+    ShaderCompileOptions options;
+    options.OptimizationLevel = ShaderOptimizationLevel::None;
     options.GenerateDebugInfo = true;
     options.TargetProfile = "opengl";
     
@@ -489,48 +489,55 @@ void ExampleGameLayer::SetupAdvancedShaders()
     std::string vertSource, fragSource;
     if (LoadShaderFromFile(vertShaderPath, vertSource) && LoadShaderFromFile(fragShaderPath, fragSource))
     {
-        // Compile shaders to SPIR-V
-        Vortex::Shader::ShaderCompiler compiler;
+        // Compile shaders to SPIR-V with caching enabled
+        ShaderCompiler compiler;
         
-        auto vsResult = compiler.CompileFromSource(vertSource, Vortex::Shader::ShaderStage::Vertex, options, "AdvancedTriangle.vert");
-        auto fsResult = compiler.CompileFromSource(fragSource, Vortex::Shader::ShaderStage::Fragment, options, "AdvancedTriangle.frag");
+        // Enable shader caching for faster subsequent loads
+        compiler.SetCachingEnabled(true, "cache/shaders/");
         
-        if (vsResult.IsSuccess() && fsResult.IsSuccess())
+        auto vsResult = compiler.CompileFromSource(vertSource, ShaderStage::Vertex, options, "AdvancedTriangle.vert");
+        auto fsResult = compiler.CompileFromSource(fragSource, ShaderStage::Fragment, options, "AdvancedTriangle.frag");
+        
+        if(!vsResult.IsSuccess())
         {
-            // Create GPU shader
-            m_TriangleShader = GPUShader::Create("AdvancedTriangleShader");
-            
-            // Prepare shader stages
-            std::unordered_map<Vortex::Shader::ShaderStage, std::vector<uint32_t>> shaderStages;
-            shaderStages[Vortex::Shader::ShaderStage::Vertex] = vsResult.GetValue().SpirV;
-            shaderStages[Vortex::Shader::ShaderStage::Fragment] = fsResult.GetValue().SpirV;
-            
-            // Get reflection data from compiled shaders
-            Vortex::Shader::ShaderReflectionData reflection = vsResult.GetValue().Reflection;
-            // Merge fragment shader reflection (in a real implementation, we'd have a proper merge function)
-            const auto& fragReflection = fsResult.GetValue().Reflection;
-            reflection.Uniforms.insert(reflection.Uniforms.end(), fragReflection.Uniforms.begin(), fragReflection.Uniforms.end());
-            reflection.Resources.insert(reflection.Resources.end(), fragReflection.Resources.begin(), fragReflection.Resources.end());
-            
-            // Create the GPU shader with reflection
-            auto createResult = m_TriangleShader->Create(shaderStages, reflection);
-            if (createResult.IsSuccess())
-            {
-                VX_INFO("[ShaderSystem] Successfully created advanced PBR shader!");
-                VX_INFO("[ShaderSystem] Advanced shader debug info:\n{}", m_TriangleShader->GetDebugInfo());
-                m_UsingAdvancedShader = true;
-                return;
-            }
-            else
-            {
-                VX_ERROR("[ShaderSystem] Failed to create advanced GPU shader: {}", static_cast<int>(createResult.GetErrorCode()));
-                m_TriangleShader.reset();
-            }
+            VX_ERROR("[ShaderSystem] Vertex shader compilation error: {}", vsResult.GetErrorMessage());
+			return;
+		}
+        if (!fsResult.IsSuccess())
+        {
+            VX_ERROR("[ShaderSystem] Fragment shader compilation error: {}", fsResult.GetErrorMessage());
+            return;
+        }
+
+        // Create GPU shader
+        m_TriangleShader = GPUShader::Create("AdvancedTriangleShader");
+
+        // Prepare shader stages
+        std::unordered_map<ShaderStage, std::vector<uint32_t>> shaderStages;
+        shaderStages[ShaderStage::Vertex] = vsResult.GetValue().SpirV;
+        shaderStages[ShaderStage::Fragment] = fsResult.GetValue().SpirV;
+
+        // Get reflection data from compiled shaders
+        ShaderReflectionData reflection = vsResult.GetValue().Reflection;
+
+        // Merge fragment shader reflection (in a real implementation, we'd have a proper merge function)
+        const auto& fragReflection = fsResult.GetValue().Reflection;
+        reflection.Uniforms.insert(reflection.Uniforms.end(), fragReflection.Uniforms.begin(), fragReflection.Uniforms.end());
+        reflection.Resources.insert(reflection.Resources.end(), fragReflection.Resources.begin(), fragReflection.Resources.end());
+
+        // Create the GPU shader with reflection
+        auto createResult = m_TriangleShader->Create(shaderStages, reflection);
+        if (createResult.IsSuccess())
+        {
+            VX_INFO("[ShaderSystem] Successfully created advanced PBR shader!");
+            VX_INFO("[ShaderSystem] Advanced shader debug info:\n{}", m_TriangleShader->GetDebugInfo());
+            m_UsingAdvancedShader = true;
+            return;
         }
         else
         {
-            if (!vsResult.IsSuccess()) VX_ERROR("[ShaderSystem] Advanced vertex shader compilation failed: {}", vsResult.GetErrorMessage());
-            if (!fsResult.IsSuccess()) VX_ERROR("[ShaderSystem] Advanced fragment shader compilation failed: {}", fsResult.GetErrorMessage());
+            VX_ERROR("[ShaderSystem] Failed to create advanced GPU shader: {}", static_cast<int>(createResult.GetErrorCode()));
+            m_TriangleShader.reset();
         }
     }
 }

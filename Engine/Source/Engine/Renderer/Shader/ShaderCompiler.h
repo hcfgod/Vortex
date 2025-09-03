@@ -10,7 +10,7 @@
 #include <thread>
 #include <mutex>
 
-namespace Vortex::Shader
+namespace Vortex
 {
     /**
      * @brief AAA-grade shader compiler with advanced features
@@ -232,4 +232,4 @@ namespace Vortex::Shader
         static std::string MacrosToString(const ShaderMacros& macros);
     };
 
-} // namespace Vortex::Shader
+} // namespace Vortex

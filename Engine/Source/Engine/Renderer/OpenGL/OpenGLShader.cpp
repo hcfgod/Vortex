@@ -29,7 +29,7 @@ namespace Vortex
         // Set the shader name via the base class
         if (!name.empty())
         {
-            Vortex::Shader::ShaderReflectionData emptyReflection{};
+            ShaderReflectionData emptyReflection{};
             SetMetadata(name, emptyReflection, 0);
         }
     }
@@ -43,7 +43,7 @@ namespace Vortex
     // SHADER LIFECYCLE
     // ============================================================================
 
-    Result<void> OpenGLShader::Create(const std::unordered_map<Vortex::Shader::ShaderStage, std::vector<uint32_t>>& shaders, const Vortex::Shader::ShaderReflectionData& reflection)
+    Result<void> OpenGLShader::Create(const std::unordered_map<ShaderStage, std::vector<uint32_t>>& shaders, const ShaderReflectionData& reflection)
     {
         // Destroy existing shader if any
         Destroy();
@@ -119,7 +119,7 @@ namespace Vortex
         CacheUniformLocations();
 
         // Update shader metadata
-        Vortex::Shader::ShaderStageFlags stageFlags = 0;
+        ShaderStageFlags stageFlags = 0;
         for (const auto& [stage, _] : shaders)
         {
             stageFlags |= static_cast<uint32_t>(stage);
@@ -367,7 +367,7 @@ namespace Vortex
     // ============================================================================
 
     Result<std::string> OpenGLShader::ConvertSpirVToGLSL(const std::vector<uint32_t>& spirv, 
-                                                         Vortex::Shader::ShaderStage stage)
+                                                         ShaderStage stage)
     {
 #ifdef VX_SPIRV_CROSS_AVAILABLE
         try
@@ -399,7 +399,7 @@ namespace Vortex
         
         switch (stage)
         {
-            case Vortex::Shader::ShaderStage::Vertex:
+            case ShaderStage::Vertex:
                 return std::string(R"(
 #version 450 core
 
@@ -428,7 +428,7 @@ void main()
 }
 )");
                 
-            case Vortex::Shader::ShaderStage::Fragment:
+            case ShaderStage::Fragment:
                 return std::string(R"(
 #version 450 core
 
@@ -464,7 +464,7 @@ void main()
 #endif
     }
 
-    Result<GLuint> OpenGLShader::CompileShader(const std::string& source, Vortex::Shader::ShaderStage stage)
+    Result<GLuint> OpenGLShader::CompileShader(const std::string& source, ShaderStage stage)
     {
         GLenum glType = ShaderStageToGLType(stage);
         GLuint shaderId = glCreateShader(glType);
@@ -563,37 +563,37 @@ void main()
         VX_CORE_TRACE("OpenGLShader: Cached {} uniform locations", m_UniformLocationCache.size());
     }
 
-    GLenum OpenGLShader::ShaderStageToGLType(Vortex::Shader::ShaderStage stage)
+    GLenum OpenGLShader::ShaderStageToGLType(ShaderStage stage)
     {
         switch (stage)
         {
-            case Vortex::Shader::ShaderStage::Vertex:    return GL_VERTEX_SHADER;
-            case Vortex::Shader::ShaderStage::Fragment:  return GL_FRAGMENT_SHADER;
-            case Vortex::Shader::ShaderStage::Geometry:  return GL_GEOMETRY_SHADER;
-            case Vortex::Shader::ShaderStage::Compute:   return GL_COMPUTE_SHADER;
-            case Vortex::Shader::ShaderStage::TessellationControl: return GL_TESS_CONTROL_SHADER;
-            case Vortex::Shader::ShaderStage::TessellationEvaluation: return GL_TESS_EVALUATION_SHADER;
+            case ShaderStage::Vertex:    return GL_VERTEX_SHADER;
+            case ShaderStage::Fragment:  return GL_FRAGMENT_SHADER;
+            case ShaderStage::Geometry:  return GL_GEOMETRY_SHADER;
+            case ShaderStage::Compute:   return GL_COMPUTE_SHADER;
+            case ShaderStage::TessellationControl: return GL_TESS_CONTROL_SHADER;
+            case ShaderStage::TessellationEvaluation: return GL_TESS_EVALUATION_SHADER;
             default:
                 VX_CORE_ERROR("OpenGLShader: Unknown shader stage");
                 return GL_VERTEX_SHADER;
         }
     }
 
-    const char* OpenGLShader::GetShaderStageName(Vortex::Shader::ShaderStage stage)
+    const char* OpenGLShader::GetShaderStageName(ShaderStage stage)
     {
         switch (stage)
         {
-            case Vortex::Shader::ShaderStage::Vertex:    return "Vertex";
-            case Vortex::Shader::ShaderStage::Fragment:  return "Fragment";
-            case Vortex::Shader::ShaderStage::Geometry:  return "Geometry";
-            case Vortex::Shader::ShaderStage::Compute:   return "Compute";
-            case Vortex::Shader::ShaderStage::TessellationControl: return "Tessellation Control";
-            case Vortex::Shader::ShaderStage::TessellationEvaluation: return "Tessellation Evaluation";
+            case ShaderStage::Vertex:    return "Vertex";
+            case ShaderStage::Fragment:  return "Fragment";
+            case ShaderStage::Geometry:  return "Geometry";
+            case ShaderStage::Compute:   return "Compute";
+            case ShaderStage::TessellationControl: return "Tessellation Control";
+            case ShaderStage::TessellationEvaluation: return "Tessellation Evaluation";
             default: return "Unknown";
         }
     }
 
-    void OpenGLShader::CacheUniformLocationsFromReflection(const Vortex::Shader::ShaderReflectionData& reflection)
+    void OpenGLShader::CacheUniformLocationsFromReflection(const ShaderReflectionData& reflection)
     {
         if (!IsValid()) return;
         
@@ -615,8 +615,8 @@ void main()
         // Also cache texture/sampler uniforms
         for (const auto& resource : reflection.Resources)
         {
-            if (resource.Type == Vortex::Shader::ShaderResourceType::Texture2D ||
-                resource.Type == Vortex::Shader::ShaderResourceType::Sampler)
+            if (resource.Type == ShaderResourceType::Texture2D ||
+                resource.Type == ShaderResourceType::Sampler)
             {
                 GLint location = glGetUniformLocation(m_ProgramId, resource.Name.c_str());
                 if (location != -1)
@@ -630,7 +630,7 @@ void main()
         VX_CORE_INFO("OpenGLShader: Cached {} uniforms from reflection", m_UniformLocationCache.size());
     }
     
-    void OpenGLShader::LogReflectionInfo(const Vortex::Shader::ShaderReflectionData& reflection)
+    void OpenGLShader::LogReflectionInfo(const ShaderReflectionData& reflection)
     {
         VX_CORE_INFO("OpenGLShader: Reflection data for shader '{}':", GetName());
         

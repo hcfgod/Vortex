@@ -38,8 +38,8 @@ namespace Vortex
          * @param reflection Combined reflection data for all stages
          * @return Success/failure result
          */
-        virtual Result<void> Create(const std::unordered_map<Vortex::Shader::ShaderStage, std::vector<uint32_t>>& shaders,
-                                   const Vortex::Shader::ShaderReflectionData& reflection) = 0;
+        virtual Result<void> Create(const std::unordered_map<ShaderStage, std::vector<uint32_t>>& shaders,
+                                   const ShaderReflectionData& reflection) = 0;
 
         /**
          * @brief Destroy shader and release GPU resources
@@ -129,20 +129,20 @@ namespace Vortex
          * @brief Get shader reflection data
          * @return Reflection data
          */
-        const Vortex::Shader::ShaderReflectionData& GetReflectionData() const { return m_ReflectionData; }
+        const ShaderReflectionData& GetReflectionData() const { return m_ReflectionData; }
 
         /**
          * @brief Get shader stage flags
          * @return Bitmask of shader stages
          */
-        Vortex::Shader::ShaderStageFlags GetStageFlags() const { return m_StageFlags; }
+        ShaderStageFlags GetStageFlags() const { return m_StageFlags; }
 
         /**
          * @brief Check if shader has a specific stage
          * @param stage Shader stage to check
          * @return True if shader has this stage
          */
-        bool HasStage(Vortex::Shader::ShaderStage stage) const;
+        bool HasStage(ShaderStage stage) const;
 
         /**
          * @brief Get debug information
@@ -166,14 +166,14 @@ namespace Vortex
          * @brief Set shader metadata (called by implementations)
          */
         void SetMetadata(const std::string& name, 
-                        const Vortex::Shader::ShaderReflectionData& reflection,
-                        Vortex::Shader::ShaderStageFlags stageFlags);
+                        const ShaderReflectionData& reflection,
+                        ShaderStageFlags stageFlags);
 
     private:
         UUID m_Id;
         std::string m_Name;
-        Vortex::Shader::ShaderReflectionData m_ReflectionData;
-        Vortex::Shader::ShaderStageFlags m_StageFlags = 0;
+        ShaderReflectionData m_ReflectionData;
+        ShaderStageFlags m_StageFlags = 0;
     };
 
     /**

@@ -9,7 +9,7 @@
 #include <string>
 #include <functional>
 
-namespace Vortex::Shader
+namespace Vortex
 {
     /**
      * @brief Shader resource handle for efficient lookup and management
@@ -294,7 +294,7 @@ namespace Vortex::Shader
      */
     ShaderManager& GetShaderManager();
 
-} // namespace Vortex::Shader
+} // namespace Vortex
 
 // Convenience macros for shader management
 #define VX_LOAD_SHADER(name, path) Vortex::Shader::GetShaderManager().LoadShader(name, path)

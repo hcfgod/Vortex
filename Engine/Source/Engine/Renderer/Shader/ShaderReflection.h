@@ -11,7 +11,7 @@ namespace spirv_cross
     struct Resource;
 }
 
-namespace Vortex::Shader
+namespace Vortex
 {
     /**
      * @brief SPIR-V shader reflection system
@@ -108,4 +108,4 @@ namespace Vortex::Shader
         static std::string PrintReflectionInfo(const ShaderReflectionData& reflection);
     };
 
-} // namespace Vortex::Shader
+} // namespace Vortex

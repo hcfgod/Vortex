@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include <mutex>
 
-namespace Vortex::Shader
+namespace Vortex
 {
     // ============================================================================
     // ShaderHandle Implementation
@@ -82,8 +82,7 @@ namespace Vortex::Shader
     // ShaderManager Implementation
     // ============================================================================
 
-    ShaderManager::ShaderManager()
-        : m_Impl(std::make_unique<Impl>())
+    ShaderManager::ShaderManager() : m_Impl(std::make_unique<Impl>())
     {
     }
 
@@ -180,7 +179,7 @@ namespace Vortex::Shader
         }
 
         // Convert compiled shader to format needed by Shader::Create
-        std::unordered_map<Vortex::Shader::ShaderStage, std::vector<uint32_t>> shaderMap;
+        std::unordered_map<ShaderStage, std::vector<uint32_t>> shaderMap;
         shaderMap[compiledShader.Stage] = compiledShader.SpirV;
 
         auto createResult = shader->Create(shaderMap, compiledShader.Reflection);
@@ -209,7 +208,7 @@ namespace Vortex::Shader
         return Result<ShaderHandle>(m_Impl->CreateHandle(id));
     }
 
-    Result<ShaderHandle> ShaderManager::CreateShader(const std::string& name, const std::string& source, Vortex::Shader::ShaderStage stage, const ShaderCompileOptions& options)
+    Result<ShaderHandle> ShaderManager::CreateShader(const std::string& name, const std::string& source, ShaderStage stage, const ShaderCompileOptions& options)
     {
         std::lock_guard<std::mutex> lock(m_Impl->m_Mutex);
 
@@ -247,7 +246,7 @@ namespace Vortex::Shader
         }
 
         // Convert compiled shader to format needed by Shader::Create
-        std::unordered_map<Vortex::Shader::ShaderStage, std::vector<uint32_t>> shaderMap;
+        std::unordered_map<ShaderStage, std::vector<uint32_t>> shaderMap;
         shaderMap[compiledShader.Stage] = compiledShader.SpirV;
 
         auto createResult = shader->Create(shaderMap, compiledShader.Reflection);
@@ -285,6 +284,7 @@ namespace Vortex::Shader
         {
             return &it->second.CompiledData;
         }
+
         return nullptr;
     }
 
@@ -297,6 +297,7 @@ namespace Vortex::Shader
         {
             return m_Impl->CreateHandle(it->second);
         }
+
         return ShaderHandle(); // Invalid handle
     }
 
@@ -385,7 +386,7 @@ namespace Vortex::Shader
     }
 
     // Stub implementations for unimplemented methods
-    Result<ShaderHandle> ShaderManager::LoadShaderProgram(const std::string& name, const std::unordered_map<Vortex::Shader::ShaderStage, std::string>& shaderFiles, const ShaderCompileOptions& options)
+    Result<ShaderHandle> ShaderManager::LoadShaderProgram(const std::string& name, const std::unordered_map<ShaderStage, std::string>& shaderFiles, const ShaderCompileOptions& options)
     {
         return Result<ShaderHandle>(ErrorCode::NotImplemented, "LoadShaderProgram not yet implemented");
     }
@@ -490,4 +491,4 @@ namespace Vortex::Shader
         return s_Instance;
     }
 
-} // namespace Vortex::Shader
+} // namespace Vortex

@@ -21,8 +21,8 @@ class OpenGLShader : public GPUShader
         // SHADER LIFECYCLE
         // ============================================================================
 
-        Result<void> Create(const std::unordered_map<Vortex::Shader::ShaderStage, std::vector<uint32_t>>& shaders,
-                           const Vortex::Shader::ShaderReflectionData& reflection) override;
+        Result<void> Create(const std::unordered_map<ShaderStage, std::vector<uint32_t>>& shaders,
+                           const ShaderReflectionData& reflection) override;
 
         void Destroy() override;
         bool IsValid() const override;
@@ -86,7 +86,7 @@ class OpenGLShader : public GPUShader
          * @return OpenGL shader source code or error
          */
         Result<std::string> ConvertSpirVToGLSL(const std::vector<uint32_t>& spirv, 
-                                              Vortex::Shader::ShaderStage stage);
+                                              ShaderStage stage);
 
         /**
          * @brief Compile OpenGL shader from GLSL source
@@ -94,7 +94,7 @@ class OpenGLShader : public GPUShader
          * @param stage Shader stage
          * @return OpenGL shader handle or error
          */
-        Result<GLuint> CompileShader(const std::string& source, Vortex::Shader::ShaderStage stage);
+        Result<GLuint> CompileShader(const std::string& source, ShaderStage stage);
 
         /**
          * @brief Link OpenGL shader program from compiled shaders
@@ -107,7 +107,7 @@ class OpenGLShader : public GPUShader
          * @brief Cache uniform locations from reflection data
          * @param reflection Shader reflection data containing uniforms
          */
-        void CacheUniformLocationsFromReflection(const Vortex::Shader::ShaderReflectionData& reflection);
+        void CacheUniformLocationsFromReflection(const ShaderReflectionData& reflection);
         
         /**
          * @brief Extract additional uniform locations from compiled program
@@ -118,21 +118,21 @@ class OpenGLShader : public GPUShader
          * @brief Log detailed reflection information for debugging
          * @param reflection Shader reflection data
          */
-        void LogReflectionInfo(const Vortex::Shader::ShaderReflectionData& reflection);
+        void LogReflectionInfo(const ShaderReflectionData& reflection);
 
         /**
          * @brief Convert shader stage to OpenGL shader type
          * @param stage Vortex shader stage
          * @return OpenGL shader type
          */
-        static GLenum ShaderStageToGLType(Vortex::Shader::ShaderStage stage);
+        static GLenum ShaderStageToGLType(ShaderStage stage);
 
         /**
          * @brief Get shader stage name for error reporting
          * @param stage Shader stage
          * @return Stage name string
          */
-        static const char* GetShaderStageName(Vortex::Shader::ShaderStage stage);
+        static const char* GetShaderStageName(ShaderStage stage);
 
         // ============================================================================
         // MEMBER VARIABLES

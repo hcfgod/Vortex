@@ -8,7 +8,7 @@
 
 #include <glm/glm.hpp>
 
-namespace Vortex::Shader
+namespace Vortex
 {
     // ============================================================================
     // SHADER STAGE DEFINITIONS
@@ -243,4 +243,4 @@ namespace Vortex::Shader
     std::string ShaderStageToFileExtension(ShaderStage stage);
     ShaderStage FileExtensionToShaderStage(const std::string& extension);
     
-} // namespace Vortex::Shader
+} // namespace Vortex

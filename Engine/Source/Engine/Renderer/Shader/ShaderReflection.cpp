@@ -8,7 +8,7 @@
     #include <spirv_cross/spirv_glsl.hpp>
 #endif
 
-namespace Vortex::Shader
+namespace Vortex
 {
     Result<ShaderReflectionData> ShaderReflection::Reflect(const std::vector<uint32_t>& spirv, ShaderStage stage)
     {
@@ -82,8 +82,7 @@ namespace Vortex::Shader
         return combined;
     }
 
-    bool ShaderReflection::ValidateShaderCompatibility(const ShaderReflectionData& vertexReflection,
-                                                       const ShaderReflectionData& fragmentReflection)
+    bool ShaderReflection::ValidateShaderCompatibility(const ShaderReflectionData& vertexReflection, const ShaderReflectionData& fragmentReflection)
     {
         // Check that vertex outputs match fragment inputs
         // For now, we'll do a basic validation - can be enhanced later
@@ -105,7 +104,7 @@ namespace Vortex::Shader
         return true;  // For now, assume compatibility
     }
 
-#ifdef VX_SPIRV_CROSS_AVAILABLE
+    #ifdef VX_SPIRV_CROSS_AVAILABLE
     
     ShaderDataType ShaderReflection::SPIRTypeToShaderDataType(const spirv_cross::SPIRType& type)
     {
@@ -416,7 +415,7 @@ namespace Vortex::Shader
         }
     }
     
-#endif // VX_SPIRV_CROSS_AVAILABLE
+    #endif // VX_SPIRV_CROSS_AVAILABLE
     
     // ============================================================================
     // ReflectionUtils Implementation
@@ -515,4 +514,4 @@ namespace Vortex::Shader
         return oss.str();
     }
 
-} // namespace Vortex::Shader
+} // namespace Vortex

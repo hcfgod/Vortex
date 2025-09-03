@@ -59,7 +59,7 @@ private:
     std::shared_ptr<InputActionMap> m_GameplayActions;
 
     // Modern shader system resources
-    std::shared_ptr<Vortex::Shader::ShaderManager> m_ShaderManager;
+    std::shared_ptr<ShaderManager> m_ShaderManager;
     ShaderRef m_TriangleShader;
     bool m_UsingAdvancedShader = false;
     
