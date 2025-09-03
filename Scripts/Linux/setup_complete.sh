@@ -552,6 +552,34 @@ fi
 cd "$PROJECT_ROOT"
 echo "shaderc built and installed successfully!"
 
+# Vulkan SDK/headers setup (headers-only fallback if system Vulkan not present)
+echo "Checking for Vulkan (pkg-config)..."
+if pkg-config --exists vulkan; then
+    echo "[OK] Vulkan found via pkg-config (headers and loader available)"
+else
+    echo "[WARN] Vulkan not found via pkg-config. Setting up minimal headers (headers-only fallback)."
+    mkdir -p "Vendor/VulkanSDK/Include/vulkan"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan.h" -o "Vendor/VulkanSDK/Include/vulkan/vulkan.h" || true
+        curl -fsSL "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h" -o "Vendor/VulkanSDK/Include/vulkan/vulkan_core.h" || true
+        curl -fsSL "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h" -o "Vendor/VulkanSDK/Include/vulkan/vk_platform.h" || true
+        curl -fsSL "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xlib.h" -o "Vendor/VulkanSDK/Include/vulkan/vulkan_xlib.h" || true
+        curl -fsSL "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h" -o "Vendor/VulkanSDK/Include/vulkan/vulkan_wayland.h" || true
+    else
+        wget -q -O "Vendor/VulkanSDK/Include/vulkan/vulkan.h" "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan.h" || true
+        wget -q -O "Vendor/VulkanSDK/Include/vulkan/vulkan_core.h" "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h" || true
+        wget -q -O "Vendor/VulkanSDK/Include/vulkan/vk_platform.h" "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h" || true
+        wget -q -O "Vendor/VulkanSDK/Include/vulkan/vulkan_xlib.h" "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xlib.h" || true
+        wget -q -O "Vendor/VulkanSDK/Include/vulkan/vulkan_wayland.h" "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h" || true
+    fi
+    if [ -f "Vendor/VulkanSDK/Include/vulkan/vulkan.h" ]; then
+        echo "[OK] Minimal Vulkan headers downloaded to Vendor/VulkanSDK/Include"
+    else
+        echo "[ERROR] Failed to acquire Vulkan headers. Install system packages like libvulkan-dev (Ubuntu) or vulkan-devel (Fedora)."
+        exit 1
+    fi
+fi
+
 # Setup GLAD
 echo "Setting up GLAD..."
 if [ ! -d "Engine/Vendor/GLAD" ]; then
