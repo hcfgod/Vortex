@@ -52,11 +52,24 @@ project "Engine"
         
         filter { "system:windows", "configurations:*" }
             local vulkanSDK = os.getenv("VULKAN_SDK")
-            if vulkanSDK then
+            local vulkanFound = false
+            
+            -- Method 1: Use system VULKAN_SDK environment variable
+            if vulkanSDK and os.isdir(vulkanSDK .. "/Include") then
+                print("Engine: Using system Vulkan SDK headers: " .. vulkanSDK)
                 includedirs { vulkanSDK .. "/Include" }
-            else
-                -- Fallback to local Vulkan SDK headers only
+                vulkanFound = true
+            end
+            
+            -- Method 2: Use local Vulkan SDK headers
+            if not vulkanFound and os.isdir("../Vendor/VulkanSDK/Include") then
+                print("Engine: Using local Vulkan SDK headers")
                 includedirs { "../Vendor/VulkanSDK/Include" }
+                vulkanFound = true
+            end
+            
+            if not vulkanFound then
+                print("Engine: WARNING - No Vulkan headers found!")
             end
 
     filter "system:linux"

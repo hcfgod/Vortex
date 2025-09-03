@@ -48,18 +48,33 @@ project "Sandbox"
             "VX_USE_SDL"
         }
         
-        -- Add Vulkan SDK include if available. Avoid adding SDK libdir globally to prevent accidentally
-        -- linking SDK's third-party libs (shaderc/glslang/spirv) with mismatched runtimes.
+        -- Add Vulkan SDK include and linking. Try multiple approaches in order of preference.
         filter { "system:windows", "configurations:*" }
             local vulkanSDK = os.getenv("VULKAN_SDK")
-            if vulkanSDK then
+            local vulkanFound = false
+            
+            -- Method 1: Use system VULKAN_SDK environment variable
+            if vulkanSDK and os.isfile(vulkanSDK .. "/Lib/vulkan-1.lib") then
+                print("Using system Vulkan SDK: " .. vulkanSDK)
                 includedirs { vulkanSDK .. "/Include" }
-                -- Link Vulkan loader explicitly via absolute path
                 links { vulkanSDK .. "/Lib/vulkan-1.lib" }
-            else
-                -- Fallback to local Vulkan SDK
+                vulkanFound = true
+            end
+            
+            -- Method 2: Check for local Vulkan SDK with proper lib
+            if not vulkanFound and os.isfile("%{wks.location}/Vendor/VulkanSDK/Lib/vulkan-1.lib") then
+                print("Using local Vulkan SDK with static lib")
                 includedirs { "%{wks.location}/Vendor/VulkanSDK/Include" }
                 links { "%{wks.location}/Vendor/VulkanSDK/Lib/vulkan-1.lib" }
+                vulkanFound = true
+            end
+            
+            -- Method 3: Use headers-only setup with dynamic loading (fallback)
+            if not vulkanFound then
+                print("Using Vulkan headers-only setup (dynamic loading)")
+                includedirs { "%{wks.location}/Vendor/VulkanSDK/Include" }
+                defines { "VK_USE_PLATFORM_WIN32_KHR" }
+                -- Don't link vulkan-1.lib, assume dynamic loading at runtime
             end
 
         links

@@ -4,6 +4,8 @@ echo Building Vortex Engine...
 :: Navigate to project root (go up two directories from Scripts\Windows)
 pushd "%~dp0..\.."
 
+Vendor\Premake\premake5.exe vs 2022
+
 :: Find MSBuild location
 set MSBUILD_PATH=""
 

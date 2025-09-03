@@ -203,57 +203,127 @@ if not exist "Engine\Vendor\nlohmann_json" (
 echo Setting up Vulkan SDK...
 set VULKAN_SDK_VERSION=1.3.280.0
 
-:: Check if Vulkan SDK is already installed
+:: First, check if system-wide Vulkan SDK is installed via environment variable
 if defined VULKAN_SDK (
     if exist "%VULKAN_SDK%\Bin\vulkaninfo.exe" (
-        echo Vulkan SDK found via system installation!
-        echo Using: %VULKAN_SDK%
-        goto :vulkan_found
+        if exist "%VULKAN_SDK%\Lib\vulkan-1.lib" (
+            echo Vulkan SDK found via system installation!
+            echo Using: %VULKAN_SDK%
+            goto :vulkan_found
+        )
     )
 )
 
-:: Check for local Vulkan SDK installation
-if not exist "Vendor\VulkanSDK" (
-    echo Vulkan SDK not found. Setting up local installation...
-    mkdir "Vendor\VulkanSDK"
+:: Check common installation paths for Vulkan SDK
+echo Checking for system-wide Vulkan SDK installations...
+set VULKAN_FOUND=0
+
+:: Check C:\VulkanSDK\[version]
+if exist "C:\VulkanSDK" (
+    for /d %%i in ("C:\VulkanSDK\*") do (
+        if exist "%%i\Bin\vulkaninfo.exe" (
+            if exist "%%i\Lib\vulkan-1.lib" (
+                set "VULKAN_SDK=%%i"
+                set VULKAN_FOUND=1
+                echo Found Vulkan SDK at: %%i
+                goto :vulkan_found
+            )
+        )
+    )
+)
+
+:: Check Program Files\VulkanSDK
+if exist "%ProgramFiles%\VulkanSDK" (
+    for /d %%i in ("%ProgramFiles%\VulkanSDK\*") do (
+        if exist "%%i\Bin\vulkaninfo.exe" (
+            if exist "%%i\Lib\vulkan-1.lib" (
+                set "VULKAN_SDK=%%i"
+                set VULKAN_FOUND=1
+                echo Found Vulkan SDK at: %%i
+                goto :vulkan_found
+            )
+        )
+    )
+)
+
+:: If no system installation found, set up local version
+if %VULKAN_FOUND% EQU 0 (
+    echo No system Vulkan SDK found. Setting up local installation...
     
-    echo Downloading Vulkan SDK %VULKAN_SDK_VERSION% for Windows...
-    powershell -Command "Invoke-WebRequest -Uri 'https://sdk.lunarg.com/sdk/download/1.3.280.0/windows/VulkanSDK-1.3.280.0-Installer.exe' -OutFile 'Vendor\VulkanSDK\VulkanSDK-Installer.exe'"
-    
-    if %ERRORLEVEL% NEQ 0 (
-        echo Failed to download Vulkan SDK! Trying to use minimal setup...
-        echo Setting up minimal Vulkan headers and libraries...
-        
-        :: Download Vulkan headers
-        if not exist "Vendor\VulkanSDK\Include\vulkan" mkdir "Vendor\VulkanSDK\Include\vulkan"
-        echo Downloading Vulkan headers...
-        powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vulkan.h'"
-        powershell -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vulkan_core.h'"
-        
-        goto :skip_vulkan_installer
+    :: Check if we already have a local installation with headers
+    if exist "Vendor\VulkanSDK\Include\vulkan\vulkan.h" (
+        echo Local Vulkan SDK headers found.
+        set "VULKAN_SDK=%CD%\Vendor\VulkanSDK"
+        goto :vulkan_found
     )
     
-    echo Please run the Vulkan SDK installer manually: Vendor\VulkanSDK\VulkanSDK-Installer.exe
-    echo After installation, re-run this setup script.
+    if not exist "Vendor\VulkanSDK" mkdir "Vendor\VulkanSDK"
+    
+    :: Try to download the full SDK first
+    echo Downloading Vulkan Runtime %VULKAN_SDK_VERSION% for Windows...
+    powershell -Command "Invoke-WebRequest -Uri 'https://sdk.lunarg.com/sdk/download/1.3.280.0/windows/vulkan_sdk.exe' -OutFile 'Vendor\VulkanSDK\vulkan_sdk.exe'"
+    
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to download Vulkan SDK! Trying alternative download...
+        powershell -Command "Invoke-WebRequest -Uri 'https://vulkan.lunarg.com/sdk/download/1.3.280.0/windows/VulkanSDK-1.3.280.0-Installer.exe' -OutFile 'Vendor\VulkanSDK\VulkanSDK-Installer.exe'"
+        
+        if %ERRORLEVEL% NEQ 0 (
+            echo Download failed! Will continue with headers-only setup...
+        )
+    )
+    
+    :: Always set up minimal headers for compilation (even if installer downloaded)
+    echo Setting up minimal Vulkan headers for development...
+    
+    :: Create basic directory structure
+    if not exist "Vendor\VulkanSDK\Include\vulkan" mkdir "Vendor\VulkanSDK\Include\vulkan"
+    if not exist "Vendor\VulkanSDK\Lib" mkdir "Vendor\VulkanSDK\Lib"
+    
+    :: Download essential headers
+    echo Downloading essential Vulkan headers...
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vulkan.h' } catch { Write-Host 'Failed to download vulkan.h' }"
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vulkan_core.h' } catch { Write-Host 'Failed to download vulkan_core.h' }"
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vk_platform.h' } catch { Write-Host 'Failed to download vk_platform.h' }"
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_win32.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vulkan_win32.h' } catch { Write-Host 'Failed to download vulkan_win32.h' }"
+    
+    :: Check if headers were downloaded successfully
+    if exist "Vendor\VulkanSDK\Include\vulkan\vulkan.h" (
+        echo Vulkan headers downloaded successfully!
+    ) else (
+        echo Failed to download Vulkan headers. You may need to install the full Vulkan SDK manually.
+        echo Download from: https://vulkan.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe
+    )
+    
+    :: Note about Vulkan library - will use headers-only approach
     echo.
-    echo Note: You can also install Vulkan SDK system-wide and it will be detected automatically.
-    pause
-    popd
-    exit /b 1
-) else (
-    echo Local Vulkan SDK directory found.
+    echo Note: Using headers-only Vulkan setup. The project will compile and can use
+    echo dynamic loading at runtime. For full development features, consider installing
+    echo the complete Vulkan SDK from the official website.
+    echo.
 )
 
 :skip_vulkan_installer
 
-:: Set local Vulkan SDK path for this session
+:: Set local Vulkan SDK path for this session if using local installation
 if exist "Vendor\VulkanSDK\Include" (
-    set "VULKAN_SDK=%CD%\Vendor\VulkanSDK"
-    echo Local Vulkan SDK path set: !VULKAN_SDK!
+    if not defined VULKAN_SDK (
+        set "VULKAN_SDK=%CD%\Vendor\VulkanSDK"
+        echo Local Vulkan SDK path set: !VULKAN_SDK!
+    )
 )
 
 :vulkan_found
 echo Vulkan SDK setup complete.
+if defined VULKAN_SDK (
+    echo Using Vulkan SDK: %VULKAN_SDK%
+    if exist "%VULKAN_SDK%\Lib\vulkan-1.lib" (
+        echo Vulkan library found: %VULKAN_SDK%\Lib\vulkan-1.lib
+    ) else (
+        echo WARNING: Vulkan library not found at expected location!
+    )
+else (
+    echo WARNING: VULKAN_SDK environment variable not set!
+)
 
 :: Check for Python early since it's needed for shaderc
 echo Checking for Python...
