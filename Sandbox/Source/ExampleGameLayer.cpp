@@ -1,6 +1,6 @@
 #include "ExampleGameLayer.h"
 #include <glad/gl.h>
-#include "Engine/Renderer/ShaderCompiler.h"
+#include "Engine/Renderer/Shader/ShaderCompiler.h"
 
 namespace {
 // Example Vertex Shader
@@ -406,98 +406,62 @@ void ExampleGameLayer::OnFireAction(InputActionPhase phase)
     }
 }
 
+// -----------------------------------------------------------------------------
+// Test function to exercise the engine ShaderCompiler
+// -----------------------------------------------------------------------------
 void ExampleGameLayer::TestShaderCompiler()
 {
-    VX_INFO("[Shaderc] Testing ShaderCompiler integration...");
-    
-    ShaderCompiler compiler;
-    
-    // Test vertex shader compilation
-    const std::string vertexShaderSource = R"(
-#version 450 core
-layout(location = 0) in vec3 aPos;
-layout(location = 1) in vec3 aColor;
+    VX_INFO("[ShaderTest] Running TestShaderCompiler...");
 
-layout(location = 0) out vec3 fragColor;
+    Vortex::Shader::ShaderCompiler compiler;
 
-void main()
-{
-    gl_Position = vec4(aPos, 1.0);
-    fragColor = aColor;
-}
-)";
-    
-    auto vertexResult = compiler.CompileGLSL(vertexShaderSource, ShaderStage::Vertex, "test_vertex.glsl");
-    
-    if (vertexResult.Success)
+    Vortex::Shader::ShaderCompileOptions options;
+    options.OptimizationLevel = Vortex::Shader::ShaderOptimizationLevel::None;
+    options.GenerateDebugInfo = true;
+    options.TargetProfile = "vulkan1.1"; // Compile GLSL for Vulkan semantics
+
+    const char* vsSource = R"(
+        #version 450
+        layout(location = 0) in vec3 aPos;
+        void main() {
+            gl_Position = vec4(aPos, 1.0);
+        }
+    )";
+
+    const char* fsSource = R"(
+        #version 450
+        layout(location = 0) out vec4 FragColor;
+        void main() {
+            FragColor = vec4(1.0, 0.2, 0.2, 1.0);
+        }
+    )";
+
+    // Compile vertex shader
+    auto vsResult = compiler.CompileFromSource(vsSource, Vortex::Shader::ShaderStage::Vertex, options, "Example/Test.vert");
+    if (!vsResult.IsSuccess())
     {
-        VX_INFO("[Shaderc] ✅ Vertex shader compiled successfully! SPIR-V size: {} bytes", 
-                vertexResult.SpirV.size() * sizeof(uint32_t));
+        VX_WARN("[ShaderTest] Vertex shader compile failed: {}", vsResult.GetErrorMessage());
     }
     else
     {
-        VX_ERROR("[Shaderc] ❌ Vertex shader compilation failed: {}", vertexResult.ErrorMessage);
+        const auto& vs = vsResult.GetValue();
+        VX_INFO("[ShaderTest] Vertex shader compiled. SPIR-V words: {}", vs.SpirV.size());
     }
-    
-    // Test fragment shader compilation
-    const std::string fragmentShaderSource = R"(
-#version 450 core
-layout(location = 0) in vec3 fragColor;
-layout(location = 0) out vec4 outColor;
 
-void main()
-{
-    outColor = vec4(fragColor, 1.0);
-}
-)";
-    
-    auto fragmentResult = compiler.CompileGLSL(fragmentShaderSource, ShaderStage::Fragment, "test_fragment.glsl");
-    
-    if (fragmentResult.Success)
+    // Compile fragment shader
+    auto fsResult = compiler.CompileFromSource(fsSource, Vortex::Shader::ShaderStage::Fragment, options, "Example/Test.frag");
+    if (!fsResult.IsSuccess())
     {
-        VX_INFO("[Shaderc] ✅ Fragment shader compiled successfully! SPIR-V size: {} bytes", 
-                fragmentResult.SpirV.size() * sizeof(uint32_t));
+        VX_WARN("[ShaderTest] Fragment shader compile failed: {}", fsResult.GetErrorMessage());
     }
     else
     {
-        VX_ERROR("[Shaderc] ❌ Fragment shader compilation failed: {}", fragmentResult.ErrorMessage);
+        const auto& fs = fsResult.GetValue();
+        VX_INFO("[ShaderTest] Fragment shader compiled. SPIR-V words: {}", fs.SpirV.size());
     }
-    
-    // Test compute shader compilation
-    const std::string computeShaderSource = R"(
-#version 450 core
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
-layout(std430, binding = 0) restrict readonly buffer InputBuffer
-{
-    float inputData[];
-};
-
-layout(std430, binding = 1) restrict writeonly buffer OutputBuffer
-{
-    float outputData[];
-};
-
-void main()
-{
-    uint index = gl_GlobalInvocationID.x;
-    if (index >= inputData.length()) return;
-    
-    outputData[index] = inputData[index] * 2.0;
-}
-)";
-    
-    auto computeResult = compiler.CompileGLSL(computeShaderSource, ShaderStage::Compute, "test_compute.glsl");
-    
-    if (computeResult.Success)
-    {
-        VX_INFO("[Shaderc] ✅ Compute shader compiled successfully! SPIR-V size: {} bytes", 
-                computeResult.SpirV.size() * sizeof(uint32_t));
-    }
-    else
-    {
-        VX_ERROR("[Shaderc] ❌ Compute shader compilation failed: {}", computeResult.ErrorMessage);
-    }
-    
-    VX_INFO("[Shaderc] ShaderCompiler test complete!");
+    // Print compiler stats
+    auto stats = compiler.GetStats();
+    VX_INFO("[ShaderTest] Compiler Stats - Compiled: {}, CacheHits: {}, CacheMisses: {}, Errors: {}",
+            stats.ShadersCompiled, stats.CacheHits, stats.CacheMisses, stats.CompilationErrors);
 }
