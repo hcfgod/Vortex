@@ -27,34 +27,108 @@ if not exist "Vendor\Premake\premake5.exe" (
     echo Premake5 installed successfully!
 )
 
-:: Check if CMake is installed
+:: Check prerequisites
+echo Checking prerequisites...
+echo.
+
+set PREREQUISITES_MISSING=0
+
+:: Check for Git
+echo Checking for Git...
+git --version >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Git not found!
+    set PREREQUISITES_MISSING=1
+) else (
+    echo [OK] Git found
+)
+
+:: Check for CMake
 echo Checking for CMake...
 cmake --version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-    echo CMake not found. Installing CMake...
-    if not exist "Vendor\CMake" mkdir "Vendor\CMake"
-    
-    echo Downloading CMake for Windows...
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/Kitware/CMake/releases/download/v3.27.7/cmake-3.27.7-windows-x86_64.zip' -OutFile 'Vendor\CMake\cmake.zip'"
-    
-    if %ERRORLEVEL% NEQ 0 (
-        echo Failed to download CMake!
-        popd
-        pause
-        exit /b 1
-    )
-    
-    echo Extracting CMake...
-    powershell -Command "Expand-Archive -Path 'Vendor\CMake\cmake.zip' -DestinationPath 'Vendor\CMake' -Force"
-    del "Vendor\CMake\cmake.zip"
-    
-    :: Add CMake to PATH for this session
-    set "PATH=%CD%\Vendor\CMake\cmake-3.27.7-windows-x86_64\bin;%PATH%"
-    
-    echo CMake installed successfully!
+    echo [ERROR] CMake not found!
+    set PREREQUISITES_MISSING=1
 ) else (
-    echo CMake found!
+    echo [OK] CMake found
 )
+
+:: Check for Python
+echo Checking for Python...
+set PYTHON_FOUND=0
+set PYTHON_CMD=
+
+:: Try different Python commands - start with py launcher first (most reliable on Windows)
+py --version >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    set PYTHON_FOUND=1
+    set PYTHON_CMD=py
+    echo [OK] Python found via 'py' launcher
+) else (
+    python --version >nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        set PYTHON_FOUND=1
+        set PYTHON_CMD=python
+        echo [OK] Python found via 'python' command
+    ) else (
+        python3 --version >nul 2>&1
+        if %ERRORLEVEL% EQU 0 (
+            set PYTHON_FOUND=1
+            set PYTHON_CMD=python3
+            echo [OK] Python found via 'python3' command
+        ) else (
+            :: Try searching common installation paths
+            if exist "%LOCALAPPDATA%\Programs\Python" (
+                for /d %%i in ("%LOCALAPPDATA%\Programs\Python\Python*") do (
+                    if exist "%%i\python.exe" (
+                        set PYTHON_FOUND=1
+                        set PYTHON_CMD="%%i\python.exe"
+                        echo [OK] Python found at %%i\python.exe
+                        goto :python_check_done
+                    )
+                )
+            )
+        )
+    )
+)
+
+:python_check_done
+
+if %PYTHON_FOUND% EQU 0 (
+    echo [ERROR] Python not found!
+    set PREREQUISITES_MISSING=1
+)
+
+:: Check if any prerequisites are missing
+if %PREREQUISITES_MISSING% EQU 1 (
+    echo.
+    echo ========================================
+    echo MISSING PREREQUISITES DETECTED
+    echo ========================================
+    echo.
+    echo Please install the following tools before running this setup script:
+    echo.
+    echo 1. Git - https://git-scm.com/download/windows
+    echo    - Required for downloading dependencies
+    echo.
+    echo 2. CMake - https://cmake.org/download/
+    echo    - Required for building C++ dependencies
+    echo    - Make sure to add CMake to your PATH during installation
+    echo.
+    echo 3. Python - https://www.python.org/downloads/
+    echo    - Required for generating GLAD OpenGL loader
+    echo    - Make sure to check "Add Python to PATH" during installation
+    echo.
+    echo After installing these tools, restart your command prompt and run this script again.
+    echo.
+    pause
+    popd
+    exit /b 1
+)
+
+echo.
+echo All prerequisites found! Continuing with setup...
+echo.
 
 :: Setup spdlog
 echo Setting up spdlog...
@@ -325,112 +399,6 @@ else (
     echo WARNING: VULKAN_SDK environment variable not set!
 )
 
-:: Check for Python early since it's needed for shaderc
-echo Checking for Python...
-echo Current PATH: %PATH%
-echo.
-
-:: Try multiple ways to find Python
-set PYTHON_FOUND=0
-
-:: Method 1: Try python command
-echo Trying 'python' command...
-python --version >nul 2>&1
-if %ERRORLEVEL% EQU 0 (
-    set PYTHON_FOUND=1
-    set PYTHON_CMD=python
-    echo Python found via 'python' command!
-    python --version
-)
-
-:: Method 2: Try python3 command
-if %PYTHON_FOUND% EQU 0 (
-    echo Trying 'python3' command...
-    python3 --version >nul 2>&1
-    if %ERRORLEVEL% EQU 0 (
-        set PYTHON_FOUND=1
-        set PYTHON_CMD=python3
-        echo Python found via 'python3' command!
-        python3 --version
-    )
-)
-
-:: Method 3: Try py launcher
-if %PYTHON_FOUND% EQU 0 (
-    echo Trying 'py' launcher...
-    py --version >nul 2>&1
-    if %ERRORLEVEL% EQU 0 (
-        set PYTHON_FOUND=1
-        set PYTHON_CMD=py
-        echo Python found via 'py' launcher!
-        py --version
-    )
-)
-
-:: Method 4: Search common installation paths
-if %PYTHON_FOUND% EQU 0 (
-    echo Searching common Python installation paths...
-    
-    :: Check %LOCALAPPDATA%\Programs\Python
-    if exist "%LOCALAPPDATA%\Programs\Python" (
-        echo Found Python directory: %LOCALAPPDATA%\Programs\Python
-        for /d %%i in ("%LOCALAPPDATA%\Programs\Python\Python*") do (
-            if exist "%%i\python.exe" (
-                set PYTHON_FOUND=1
-                set PYTHON_CMD="%%i\python.exe"
-                echo Python found at: %%i\python.exe
-                "%%i\python.exe" --version
-                goto :python_found_early
-            )
-        )
-    )
-    
-    :: Check %APPDATA%\Local\Programs\Python
-    if exist "%APPDATA%\Local\Programs\Python" (
-        echo Found Python directory: %APPDATA%\Local\Programs\Python
-        for /d %%i in ("%APPDATA%\Local\Programs\Python\Python*") do (
-            if exist "%%i\python.exe" (
-                set PYTHON_FOUND=1
-                set PYTHON_CMD="%%i\python.exe"
-                echo Python found at: %%i\python.exe
-                "%%i\python.exe" --version
-                goto :python_found_early
-            )
-        )
-    )
-    
-    :: Check C:\Python*
-    if exist "C:\Python*" (
-        for /d %%i in ("C:\Python*") do (
-            if exist "%%i\python.exe" (
-                set PYTHON_FOUND=1
-                set PYTHON_CMD="%%i\python.exe"
-                echo Python found at: %%i\python.exe
-                "%%i\python.exe" --version
-                goto :python_found_early
-            )
-        )
-    )
-)
-
-:python_found_early
-if %PYTHON_FOUND% EQU 0 (
-    echo.
-    echo Python not found! 
-    echo Please install Python from https://www.python.org/downloads/
-    echo Make sure to check "Add Python to PATH" during installation.
-    echo.
-    echo You may need to restart your command prompt after installing Python.
-    echo After installing Python, re-run this setup script.
-    popd
-    pause
-    exit /b 1
-) else (
-    echo.
-    echo Python successfully detected!
-    echo Using: %PYTHON_CMD%
-    echo.
-)
 
 :: Setup SPIRV-Headers (dependency for shaderc)
 echo Setting up SPIRV-Headers...

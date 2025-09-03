@@ -4,8 +4,8 @@
 #include <vector>
 #include <memory>
 
-namespace Vortex {
-
+namespace Vortex 
+{
     enum class ShaderStage
     {
         Vertex,
@@ -30,15 +30,10 @@ namespace Vortex {
         ~ShaderCompiler();
 
         // Compile GLSL source code to SPIR-V
-        CompiledShader CompileGLSL(const std::string& source, 
-                                   ShaderStage stage,
-                                   const std::string& filename = "shader");
+        CompiledShader CompileGLSL(const std::string& source, ShaderStage stage, const std::string& filename = "shader");
 
         // Compile HLSL source code to SPIR-V
-        CompiledShader CompileHLSL(const std::string& source, 
-                                   ShaderStage stage,
-                                   const std::string& entryPoint = "main",
-                                   const std::string& filename = "shader");
+        CompiledShader CompileHLSL(const std::string& source, ShaderStage stage, const std::string& entryPoint = "main", const std::string& filename = "shader");
 
     private:
         class Impl;
