@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Vortex.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 using namespace Vortex;
 
@@ -37,8 +39,7 @@ private:
     void OnResetAction(InputActionPhase phase);
     void OnFireAction(InputActionPhase phase);
     
-    // Test functions
-    void TestShaderCompiler();
+    void SetupShaderSystem();
 
 private:
     // Game state
@@ -53,9 +54,12 @@ private:
     // Input action map
     std::shared_ptr<InputActionMap> m_GameplayActions;
 
-    // GL resources for demo triangle
+    // Modern shader system resources
+    std::shared_ptr<Vortex::Shader::ShaderManager> m_ShaderManager;
+    ShaderRef m_TriangleShader;
+    
+    // GL resources for demo triangle (VAO/VBO still needed for vertex data)
     unsigned int m_VBO = 0;
     unsigned int m_VAO = 0;
     unsigned int m_EBO = 0;
-    unsigned int m_ShaderProgram = 0;
 };

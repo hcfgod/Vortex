@@ -165,7 +165,16 @@ project "Sandbox"
             {
                 "%{wks.location}/Engine/Vendor/SDL3/install/Debug/lib",
                 "%{wks.location}/Engine/Vendor/shaderc/install/Debug/lib",
-                "%{wks.location}/Engine/Vendor/SPIRV-Tools/install/Debug/lib"
+                "%{wks.location}/Engine/Vendor/SPIRV-Tools/install/Debug/lib",
+                "%{wks.location}/Engine/Vendor/SPIRV-Cross/install/Debug/lib"
+            }
+            
+            links
+            {
+                -- Debug versions of SPIRV-Cross libraries (with 'd' suffix)
+                "spirv-cross-cored",
+                "spirv-cross-glsld",
+                "spirv-cross-utild"
             }
 
         filter { "system:linux", "configurations:Debug" }
@@ -197,7 +206,16 @@ project "Sandbox"
             {
                 "%{wks.location}/Engine/Vendor/SDL3/install/Release/lib",
                 "%{wks.location}/Engine/Vendor/shaderc/install/Release/lib",
-                "%{wks.location}/Engine/Vendor/SPIRV-Tools/install/Release/lib"
+                "%{wks.location}/Engine/Vendor/SPIRV-Tools/install/Release/lib",
+                "%{wks.location}/Engine/Vendor/SPIRV-Cross/install/Release/lib"
+            }
+            
+            links
+            {
+                -- Release versions of SPIRV-Cross libraries (no suffix)
+                "spirv-cross-core",
+                "spirv-cross-glsl",
+                "spirv-cross-util"
             }
 
         filter { "system:linux", "configurations:Release" }
@@ -229,7 +247,16 @@ project "Sandbox"
             {
                 "%{wks.location}/Engine/Vendor/SDL3/install/Release/lib",
                 "%{wks.location}/Engine/Vendor/shaderc/install/Release/lib",
-                "%{wks.location}/Engine/Vendor/SPIRV-Tools/install/Release/lib"
+                "%{wks.location}/Engine/Vendor/SPIRV-Tools/install/Release/lib",
+                "%{wks.location}/Engine/Vendor/SPIRV-Cross/install/Release/lib"
+            }
+            
+            links
+            {
+                -- Dist uses Release libraries (no suffix)
+                "spirv-cross-core",
+                "spirv-cross-glsl",
+                "spirv-cross-util"
             }
 
         filter { "system:linux", "configurations:Dist" }

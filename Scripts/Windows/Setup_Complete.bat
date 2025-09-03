@@ -615,6 +615,89 @@ cmake --install . --config Release --prefix "../install/Release"
 cd "..\..\..\.."
 echo shaderc built and installed successfully!
 
+:: Setup SPIRV-Cross (for shader reflection and cross-compilation)
+echo Setting up SPIRV-Cross...
+if not exist "Engine\Vendor\SPIRV-Cross" (
+    echo Cloning SPIRV-Cross...
+    git clone https://github.com/KhronosGroup/SPIRV-Cross.git "Engine\Vendor\SPIRV-Cross"
+    
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to clone SPIRV-Cross! Make sure git is installed.
+        popd
+        pause
+        exit /b 1
+    )
+    
+    echo SPIRV-Cross cloned successfully!
+) else (
+    echo Updating SPIRV-Cross...
+    cd "Engine\Vendor\SPIRV-Cross"
+    git pull origin main
+    cd "..\..\.."
+    echo SPIRV-Cross updated successfully!
+)
+
+:: Build SPIRV-Cross
+echo Building SPIRV-Cross...
+if not exist "Engine\Vendor\SPIRV-Cross\build" mkdir "Engine\Vendor\SPIRV-Cross\build"
+cd "Engine\Vendor\SPIRV-Cross\build"
+
+echo Configuring SPIRV-Cross build...
+cmake .. -G "Visual Studio 17 2022" -A x64 ^
+    -DSPIRV_CROSS_ENABLE_TESTS=OFF ^
+    -DSPIRV_CROSS_ENABLE_GLSL=ON ^
+    -DSPIRV_CROSS_ENABLE_HLSL=ON ^
+    -DSPIRV_CROSS_ENABLE_MSL=OFF ^
+    -DSPIRV_CROSS_ENABLE_CPP=OFF ^
+    -DSPIRV_CROSS_ENABLE_REFLECT=OFF ^
+    -DSPIRV_CROSS_ENABLE_C_API=ON ^
+    -DSPIRV_CROSS_ENABLE_UTIL=ON ^
+    -DSPIRV_CROSS_CLI=OFF ^
+    -DBUILD_SHARED_LIBS=OFF ^
+    -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>" ^
+    -DCMAKE_CXX_FLAGS_DEBUG="/MTd" ^
+    -DCMAKE_CXX_FLAGS_RELEASE="/MT" ^
+    -DCMAKE_C_FLAGS_DEBUG="/MTd" ^
+    -DCMAKE_C_FLAGS_RELEASE="/MT" ^
+    -DCMAKE_INSTALL_PREFIX="../install"
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to configure SPIRV-Cross build!
+    cd "..\..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+echo Building SPIRV-Cross Debug configuration...
+cmake --build . --config Debug
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to build SPIRV-Cross Debug!
+    cd "..\..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+echo Building SPIRV-Cross Release configuration...
+cmake --build . --config Release
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to build SPIRV-Cross Release!
+    cd "..\..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+echo Installing SPIRV-Cross...
+cmake --install . --config Debug --prefix "../install/Debug"
+cmake --install . --config Release --prefix "../install/Release"
+
+cd "..\..\..\.."
+echo SPIRV-Cross built and installed successfully!
+
 :: Setup GLAD
 if not exist "Engine\Vendor\GLAD" (
     echo Cloning GLAD...

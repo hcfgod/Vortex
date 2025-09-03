@@ -4,6 +4,7 @@
 #include "Core/Debug/Log.h"
 
 #include <shaderc/shaderc.hpp>
+
 #include <fstream>
 #include <filesystem>
 #include <future>

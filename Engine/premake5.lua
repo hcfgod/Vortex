@@ -37,7 +37,8 @@ project "Engine"
         "Vendor/glm",
         "Vendor/nlohmann_json/single_include",
         "Vendor/SPIRV-Headers/include",
-        "Vendor/shaderc/libshaderc/include"
+        "Vendor/shaderc/libshaderc/include",
+        "Vendor/SPIRV-Cross"
     }
 
     filter "system:windows"
@@ -109,7 +110,7 @@ project "Engine"
         }
 
     filter "configurations:Debug"
-        defines "VX_DEBUG"
+        defines { "VX_DEBUG", "VX_SPIRV_CROSS_AVAILABLE" }
         runtime "Debug"
         symbols "on"
 
@@ -118,7 +119,8 @@ project "Engine"
             "Vendor/SDL3/install/Debug/include",
             "Vendor/SDL3/install/include",
             "Vendor/shaderc/install/Debug/include",
-            "Vendor/SPIRV-Tools/install/Debug/include"
+            "Vendor/SPIRV-Tools/install/Debug/include",
+            "Vendor/SPIRV-Cross/install/Debug/include"
         }
 
         filter "system:linux"
@@ -128,7 +130,7 @@ project "Engine"
             }
 
     filter "configurations:Release"
-        defines "VX_RELEASE"
+        defines { "VX_RELEASE", "VX_SPIRV_CROSS_AVAILABLE" }
         runtime "Release"
         optimize "on"
 
@@ -137,7 +139,8 @@ project "Engine"
             "Vendor/SDL3/install/Release/include",
             "Vendor/SDL3/install/include",
             "Vendor/shaderc/install/Release/include",
-            "Vendor/SPIRV-Tools/install/Release/include"
+            "Vendor/SPIRV-Tools/install/Release/include",
+            "Vendor/SPIRV-Cross/install/Release/include"
         }
 
         filter "system:linux"
@@ -147,7 +150,7 @@ project "Engine"
             }
 
     filter "configurations:Dist"
-        defines "VX_DIST"
+        defines { "VX_DIST", "VX_SPIRV_CROSS_AVAILABLE" }
         runtime "Release"
         optimize "on"
 
@@ -156,7 +159,8 @@ project "Engine"
             "Vendor/SDL3/install/Release/include",
             "Vendor/SDL3/install/include",
             "Vendor/shaderc/install/Release/include",
-            "Vendor/SPIRV-Tools/install/Release/include"
+            "Vendor/SPIRV-Tools/install/Release/include",
+            "Vendor/SPIRV-Cross/install/Release/include"
         }
 
         filter "system:linux"

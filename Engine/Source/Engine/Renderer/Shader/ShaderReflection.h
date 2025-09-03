@@ -85,7 +85,7 @@ namespace Vortex::Shader
         /**
          * @brief Find a resource by name in reflection data
          */
-        static const ShaderResource* FindResource(const ShaderReflectionData& reflection, const std::string& name);
+        static const ShaderResource* FindShaderResource(const ShaderReflectionData& reflection, const std::string& name);
         
         /**
          * @brief Get the total size of a uniform buffer

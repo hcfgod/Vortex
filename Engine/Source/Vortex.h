@@ -2,9 +2,11 @@
 
 // For use by Vortex applications
 
-#include "Engine/Engine.h"
+// Core
 #include "Core/Application.h"
 #include "Core/EngineConfig.h"
+#include "Core/FileSystem.h"
+#include "Engine/Engine.h"
 
 // Event System
 #include "Core/Events/EventSystem.h"
@@ -40,6 +42,10 @@
 #include "Engine/Renderer/RenderCommand.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
 #include "Engine/Systems/RenderSystem.h"
+#include "Engine/Renderer/Shader/Shader.h"
+#include "Engine/Renderer/Shader/ShaderCompiler.h"
+#include "Engine/Renderer/Shader/ShaderManager.h"
+#include "Engine/Renderer/Shader/ShaderReflection.h"
 
 // ---Entry Point---------------------
 // Only include EntryPoint when VX_IMPLEMENT_MAIN is defined
