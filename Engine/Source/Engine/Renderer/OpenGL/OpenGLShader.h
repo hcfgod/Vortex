@@ -104,9 +104,21 @@ class OpenGLShader : public GPUShader
         Result<void> LinkProgram(const std::vector<GLuint>& shaderIds);
 
         /**
-         * @brief Extract uniform locations from compiled program
+         * @brief Cache uniform locations from reflection data
+         * @param reflection Shader reflection data containing uniforms
+         */
+        void CacheUniformLocationsFromReflection(const Vortex::Shader::ShaderReflectionData& reflection);
+        
+        /**
+         * @brief Extract additional uniform locations from compiled program
          */
         void CacheUniformLocations();
+        
+        /**
+         * @brief Log detailed reflection information for debugging
+         * @param reflection Shader reflection data
+         */
+        void LogReflectionInfo(const Vortex::Shader::ShaderReflectionData& reflection);
 
         /**
          * @brief Convert shader stage to OpenGL shader type

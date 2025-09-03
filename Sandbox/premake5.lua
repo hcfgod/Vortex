@@ -98,11 +98,12 @@ project "Sandbox"
             "shaderc_combined"
         }
 
-        -- Copy the Config directory next to the executable after build
+        -- Copy the Config and Assets directories next to the executable after build
         postbuildcommands
         {
             -- Ensure destination exists and copy recursively (quiet)
-            'xcopy /E /I /Y "%{wks.location}\\Config" "%{cfg.targetdir}\\Config\\" >nul'
+            'xcopy /E /I /Y "%{wks.location}\\Config" "%{cfg.targetdir}\\Config\\" >nul',
+            'xcopy /E /I /Y "%{wks.location}\\Assets" "%{cfg.targetdir}\\Assets\\" >nul'
         }
 
     filter "system:linux"
@@ -140,11 +141,13 @@ project "Sandbox"
             "shaderc_combined"
         }
 
-        -- Copy the Config directory next to the executable after build
+        -- Copy the Config and Assets directories next to the executable after build
         postbuildcommands
         {
             'mkdir -p "%{cfg.targetdir}/Config"',
-            'cp -r "%{wks.location}/Config/"* "%{cfg.targetdir}/Config/"'
+            'cp -r "%{wks.location}/Config/"* "%{cfg.targetdir}/Config/"',
+            'mkdir -p "%{cfg.targetdir}/Assets"',
+            'cp -r "%{wks.location}/Assets/"* "%{cfg.targetdir}/Assets/"'
         }
 
     filter "configurations:Debug"

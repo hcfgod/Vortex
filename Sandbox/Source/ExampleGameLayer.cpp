@@ -14,13 +14,13 @@
 
 namespace 
 {
-    // Triangle vertices with position and texture coordinates
+    // Triangle vertices with position, texture coordinates, normal, and tangent
     const float kVertices[] =
     {
-        // Position (x, y, z)    // TexCoord (u, v)
-        -0.8f, -0.8f, 0.0f,     0.0f, 0.0f, // Bottom-left
-         0.8f, -0.8f, 0.0f,     1.0f, 0.0f, // Bottom-right
-         0.0f,  0.8f, 0.0f,     0.5f, 1.0f  // Top-center
+        // Position (x, y, z)    // TexCoord (u, v)  // Normal (x, y, z)     // Tangent (x, y, z)
+        -0.8f, -0.8f, 0.0f,     0.0f, 0.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, // Bottom-left
+         0.8f, -0.8f, 0.0f,     1.0f, 0.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, // Bottom-right
+         0.0f,  0.8f, 0.0f,     0.5f, 1.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f  // Top-center
     };
 
     const unsigned int kIndices[] =
@@ -57,8 +57,8 @@ void ExampleGameLayer::OnAttach()
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(kIndices), kIndices, GL_STATIC_DRAW);
 
-    // Vertex attributes: position (3 floats) + texcoord (2 floats) = stride of 5 floats
-    const int stride = 5 * sizeof(float);
+    // Vertex attributes: position (3 floats) + texcoord (2 floats) + normal (3 floats) + tangent (3 floats) = stride of 11 floats
+    const int stride = 11 * sizeof(float);
     
     // Position attribute (location = 0)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
@@ -67,6 +67,14 @@ void ExampleGameLayer::OnAttach()
     // Texture coordinate attribute (location = 1)
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    
+    // Normal attribute (location = 2)
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)(5 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    
+    // Tangent attribute (location = 3)
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)(8 * sizeof(float)));
+    glEnableVertexAttribArray(3);
 
     // Unbind for safety
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -255,23 +263,85 @@ void ExampleGameLayer::OnRender()
         // Bind our shader
         m_TriangleShader->Bind();
         
-        // Set matrix uniforms (identity matrices for now - simple 2D rendering)
+        // Set matrix uniforms for advanced shader
         glm::mat4 viewProjection = glm::mat4(1.0f);
-        glm::mat4 transform = glm::mat4(1.0f);
-        
-        m_TriangleShader->SetUniform("u_ViewProjection", viewProjection);
-        m_TriangleShader->SetUniform("u_Transform", transform);
+        glm::mat4 view = glm::mat4(1.0f);
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat3 normalMatrix = glm::mat3(1.0f);
         
         // Set uniforms for animation
         float timeValue = m_IsPaused ? 0.0f : m_GameTime;
-        m_TriangleShader->SetUniform("u_Time", timeValue);
         
-        // Set color uniform
-        glm::vec3 triangleColor(1.0f, 0.5f, 0.2f); // Orange
-        m_TriangleShader->SetUniform("u_Color", triangleColor);
-        
-        // Set alpha uniform
-        m_TriangleShader->SetUniform("u_Alpha", 1.0f);
+        if (m_UsingAdvancedShader)
+        {
+            // === Matrix uniforms (required by advanced shader) ===
+            m_TriangleShader->SetUniform("u_ViewProjection", viewProjection);
+            m_TriangleShader->SetUniform("u_View", view);
+            m_TriangleShader->SetUniform("u_Model", model);
+            m_TriangleShader->SetUniform("u_NormalMatrix", normalMatrix);
+            
+            // === Animation and time ===
+            m_TriangleShader->SetUniform("u_Time", timeValue);
+            
+            // === Camera position ===
+            glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
+            m_TriangleShader->SetUniform("u_CameraPos", cameraPos);
+            
+            // === Material properties ===
+            glm::vec3 albedo(0.7f, 0.3f, 0.1f); // Reddish-orange material
+            m_TriangleShader->SetUniform("u_Albedo", albedo);
+            m_TriangleShader->SetUniform("u_Metallic", 0.2f);
+            m_TriangleShader->SetUniform("u_Roughness", 0.4f);
+            m_TriangleShader->SetUniform("u_AO", 1.0f);
+            m_TriangleShader->SetUniform("u_Alpha", 1.0f);
+            
+            // Emission for some glow effect
+            float emissionStrength = (sin(timeValue * 2.0f) * 0.5f + 0.5f) * 0.1f;
+            glm::vec3 emission(emissionStrength, emissionStrength * 0.5f, 0.0f);
+            m_TriangleShader->SetUniform("u_Emission", emission);
+            
+            // === Lighting ===
+            glm::vec3 lightPos(2.0f, 2.0f, 2.0f);
+            glm::vec3 lightColor(1.0f, 1.0f, 0.9f); // Warm white
+            m_TriangleShader->SetUniform("u_LightPosition", lightPos);
+            m_TriangleShader->SetUniform("u_LightColor", lightColor);
+            m_TriangleShader->SetUniform("u_LightIntensity", 10.0f);
+            
+            // === Transform uniforms for vertex animation ===
+            glm::vec3 translation(0.0f, 0.0f, 0.0f);
+            glm::vec3 rotation(0.0f, timeValue * 0.2f, 0.0f); // Slow Y rotation
+            glm::vec3 scale(1.0f, 1.0f, 1.0f);
+            m_TriangleShader->SetUniform("u_Translation", translation);
+            m_TriangleShader->SetUniform("u_Rotation", rotation);
+            m_TriangleShader->SetUniform("u_Scale", scale);
+            
+            // === Wind animation parameters ===
+            float windStrength = (sin(timeValue * 1.5f) * 0.5f + 0.5f) * 0.05f;
+            m_TriangleShader->SetUniform("u_WindStrength", windStrength);
+
+            // === Rim lighting effect ===
+            m_TriangleShader->SetUniform("u_RimPower", 2.0f);
+            glm::vec3 rimColor(0.2f, 0.4f, 1.0f); // Blue rim
+            m_TriangleShader->SetUniform("u_RimColor", rimColor);
+            m_TriangleShader->SetUniform("u_FresnelStrength", 0.3f);
+            
+            // === Texture flags (all disabled for now since we don't have textures) ===
+            m_TriangleShader->SetUniform("u_UseAlbedoTexture", 0);
+            m_TriangleShader->SetUniform("u_UseNormalTexture", 0);
+            m_TriangleShader->SetUniform("u_UseMetallicRoughnessTexture", 0);
+            m_TriangleShader->SetUniform("u_UseEmissionTexture", 0);
+            m_TriangleShader->SetUniform("u_UseAOTexture", 0);
+        }
+        else
+        {
+            // Fallback for basic shaders (if we ever implement them)
+            m_TriangleShader->SetUniform("u_ViewProjection", viewProjection);
+            m_TriangleShader->SetUniform("u_Transform", model);
+            m_TriangleShader->SetUniform("u_Time", timeValue);
+            glm::vec3 triangleColor(1.0f, 0.5f, 0.2f);
+            m_TriangleShader->SetUniform("u_Color", triangleColor);
+            m_TriangleShader->SetUniform("u_Alpha", 1.0f);
+        }
         
         // Bind vertex array and draw
         glBindVertexArray(m_VAO);
@@ -383,189 +453,15 @@ void ExampleGameLayer::OnFireAction(InputActionPhase phase)
 
 void ExampleGameLayer::SetupShaderSystem()
 {
-    VX_INFO("[ShaderSystem] Setting up modern shader system...");
+    VX_INFO("[ShaderSystem] Setting up modern shader system with advanced reflection...");
     
     try
     {
         // Create shader manager
         m_ShaderManager = std::make_shared<Vortex::Shader::ShaderManager>();
         
-        // Load and compile shaders from files
-        // Look for shaders in the deployed Assets/Shaders directory next to the executable
-        std::string vertShaderPath = "Assets/Shaders/Triangle.vert";
-        std::string fragShaderPath = "Assets/Shaders/Triangle.frag";
-        
-        // Create shader compilation request
-        Vortex::Shader::ShaderCompileOptions options;
-        options.OptimizationLevel = Vortex::Shader::ShaderOptimizationLevel::None;
-        options.GenerateDebugInfo = true;
-        options.TargetProfile = "opengl"; // Target OpenGL for now
-        
-        // Check if shader files exist (fallback to embedded GLSL if not)
-        VX_INFO("[ShaderSystem] Loading shaders from {} and {}", vertShaderPath, fragShaderPath);
-
-        // Log CWD and executable directory to help diagnose asset path issues
-        namespace fs = std::filesystem;
-        fs::path cwd = fs::current_path();
-        fs::path exeDir;
-        #if defined(_WIN32)
-        {
-            char exePathA[MAX_PATH] = {0};
-            DWORD len = GetModuleFileNameA(NULL, exePathA, MAX_PATH);
-            if (len != 0) exeDir = fs::path(exePathA).parent_path();
-        }
-        #elif defined(__linux__)
-        {
-            char exePath[4096];
-            ssize_t l = readlink("/proc/self/exe", exePath, sizeof(exePath)-1);
-            if (l > 0) { exePath[l] = '\0'; exeDir = fs::path(exePath).parent_path(); }
-        }
-        #endif
-        VX_INFO("[ShaderSystem] CWD: {}", cwd.string());
-        if (!exeDir.empty()) VX_INFO("[ShaderSystem] EXE dir: {}", exeDir.string());
-        
-        // For now, let's use the ShaderCompiler directly to create SPIR-V, then pass to our GPU shader
-        Vortex::Shader::ShaderCompiler compiler;
-        
-        // Load vertex shader source from file or use fallback
-        std::string vertSource;
-        std::string fragSource;
-        
-        // Try multiple candidate locations for vertex shader: relative, CWD, and EXE dir
-        {
-            std::string loadedPath;
-            auto try_read = [&](const fs::path& p) -> bool 
-            {
-                std::ifstream f(p.string());
-                if (f.is_open())
-                {
-                    std::stringstream buffer; buffer << f.rdbuf();
-                    vertSource = buffer.str();
-                    f.close();
-                    loadedPath = p.string();
-                    return true;
-                }
-
-                return false;
-            };
-
-            bool loaded = false;
-            loaded = loaded || try_read(fs::path(vertShaderPath));
-            loaded = loaded || try_read(cwd / vertShaderPath);
-            if (!exeDir.empty()) loaded = loaded || try_read(exeDir / vertShaderPath);
-
-            if (loaded) {
-                VX_INFO("[ShaderSystem] Loaded vertex shader from file: {}", loadedPath);
-            } else {
-                // Fallback to simple embedded shader
-                vertSource = R"(
-                #version 450 core
-                layout(location = 0) in vec3 a_Position;
-                layout(location = 1) in vec2 a_TexCoord;
-                layout(location = 0) out vec2 v_TexCoord;
-                layout(location = 0) uniform float u_Time = 0.0;
-                layout(location = 1) uniform mat4 u_ViewProjection = mat4(1.0);
-                layout(location = 2) uniform mat4 u_Transform = mat4(1.0);
-                void main() {
-                    v_TexCoord = a_TexCoord;
-                    vec4 worldPos = u_Transform * vec4(a_Position, 1.0);
-                    float angle = u_Time * 0.5;
-                    mat2 rotation = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
-                    worldPos.xy = rotation * worldPos.xy;
-                    gl_Position = u_ViewProjection * worldPos;
-                }
-                )";
-                VX_WARN("[ShaderSystem] Using fallback vertex shader (file not found: {})", vertShaderPath);
-            }
-        }
-        
-        // Try multiple candidate locations for fragment shader: relative, CWD, and EXE dir
-        {
-            std::string loadedPath;
-            auto try_read = [&](const fs::path& p) -> bool 
-            {
-                std::ifstream f(p.string());
-
-                if (f.is_open()) 
-                {
-                    std::stringstream buffer; buffer << f.rdbuf();
-                    fragSource = buffer.str();
-                    f.close();
-                    loadedPath = p.string();
-                    return true;
-                }
-
-                return false;
-            };
-
-            bool loaded = false;
-            loaded = loaded || try_read(fs::path(fragShaderPath));
-            loaded = loaded || try_read(cwd / fragShaderPath);
-            if (!exeDir.empty()) loaded = loaded || try_read(exeDir / fragShaderPath);
-
-            if (loaded) {
-                VX_INFO("[ShaderSystem] Loaded fragment shader from file: {}", loadedPath);
-            } else {
-                // Fallback to simple embedded shader
-                fragSource = R"(
-                #version 450 core
-                layout(location = 0) in vec2 v_TexCoord;
-                layout(location = 0) out vec4 FragColor;
-                layout(location = 3) uniform vec3 u_Color = vec3(1.0, 0.5, 0.2);
-                layout(location = 0) uniform float u_Time = 0.0;
-                layout(location = 4) uniform float u_Alpha = 1.0;
-                void main() {
-                    vec2 center = vec2(0.5, 0.5);
-                    float dist = distance(v_TexCoord, center);
-                    float pulse = sin(u_Time * 2.0) * 0.5 + 0.5;
-                    vec3 gradient = mix(u_Color, u_Color * 1.5, v_TexCoord.x);
-                    gradient = mix(gradient, gradient * 0.7, dist);
-                    gradient = mix(gradient * 0.8, gradient, pulse);
-                    FragColor = vec4(gradient, u_Alpha);
-                }
-                )";
-                VX_WARN("[ShaderSystem] Using fallback fragment shader (file not found: {})", fragShaderPath);
-            }
-        }
-        
-        // Compile shaders to SPIR-V
-        auto vsResult = compiler.CompileFromSource(vertSource, Vortex::Shader::ShaderStage::Vertex, options, "Triangle.vert");
-        auto fsResult = compiler.CompileFromSource(fragSource, Vortex::Shader::ShaderStage::Fragment, options, "Triangle.frag");
-        
-        if (!vsResult.IsSuccess()) 
-        {
-            VX_ERROR("[ShaderSystem] Vertex shader compilation failed: {}", vsResult.GetErrorMessage());
-            return;
-        }
-        
-        if (!fsResult.IsSuccess()) 
-        {
-            VX_ERROR("[ShaderSystem] Fragment shader compilation failed: {}", fsResult.GetErrorMessage());
-            return;
-        }
-        
-        // Create GPU shader
-        m_TriangleShader = GPUShader::Create("TriangleShader");
-        
-        // Prepare shader stages
-        std::unordered_map<Vortex::Shader::ShaderStage, std::vector<uint32_t>> shaderStages;
-        shaderStages[Vortex::Shader::ShaderStage::Vertex] = vsResult.GetValue().SpirV;
-        shaderStages[Vortex::Shader::ShaderStage::Fragment] = fsResult.GetValue().SpirV;
-        
-        // Create empty reflection data for now
-        Vortex::Shader::ShaderReflectionData reflection{};
-        
-        // Create the GPU shader
-        auto createResult = m_TriangleShader->Create(shaderStages, reflection);
-        if (!createResult.IsSuccess())
-        {
-            VX_ERROR("[ShaderSystem] Failed to create GPU shader: {}", static_cast<int>(createResult.GetErrorCode()));
-            m_TriangleShader.reset();
-            return;
-        }
-        
-        VX_INFO("[ShaderSystem] Successfully created triangle shader!");
-        VX_INFO("[ShaderSystem] Shader debug info:\n{}", m_TriangleShader->GetDebugInfo());
+        // Try to load advanced shaders first, fallback to simple triangle shaders
+        SetupAdvancedShaders();
     }
     catch (const std::exception& e)
     {
@@ -573,4 +469,117 @@ void ExampleGameLayer::SetupShaderSystem()
         m_TriangleShader.reset();
         m_ShaderManager.reset();
     }
+}
+
+void ExampleGameLayer::SetupAdvancedShaders()
+{
+    VX_INFO("[ShaderSystem] Attempting to load advanced PBR shaders...");
+    
+    // Load and compile advanced shaders from files
+    std::string vertShaderPath = "Assets/Shaders/AdvancedTriangle.vert";
+    std::string fragShaderPath = "Assets/Shaders/AdvancedTriangle.frag";
+    
+    // Create shader compilation request
+    Vortex::Shader::ShaderCompileOptions options;
+    options.OptimizationLevel = Vortex::Shader::ShaderOptimizationLevel::None;
+    options.GenerateDebugInfo = true;
+    options.TargetProfile = "opengl";
+    
+    // Load shader sources
+    std::string vertSource, fragSource;
+    if (LoadShaderFromFile(vertShaderPath, vertSource) && LoadShaderFromFile(fragShaderPath, fragSource))
+    {
+        // Compile shaders to SPIR-V
+        Vortex::Shader::ShaderCompiler compiler;
+        
+        auto vsResult = compiler.CompileFromSource(vertSource, Vortex::Shader::ShaderStage::Vertex, options, "AdvancedTriangle.vert");
+        auto fsResult = compiler.CompileFromSource(fragSource, Vortex::Shader::ShaderStage::Fragment, options, "AdvancedTriangle.frag");
+        
+        if (vsResult.IsSuccess() && fsResult.IsSuccess())
+        {
+            // Create GPU shader
+            m_TriangleShader = GPUShader::Create("AdvancedTriangleShader");
+            
+            // Prepare shader stages
+            std::unordered_map<Vortex::Shader::ShaderStage, std::vector<uint32_t>> shaderStages;
+            shaderStages[Vortex::Shader::ShaderStage::Vertex] = vsResult.GetValue().SpirV;
+            shaderStages[Vortex::Shader::ShaderStage::Fragment] = fsResult.GetValue().SpirV;
+            
+            // Get reflection data from compiled shaders
+            Vortex::Shader::ShaderReflectionData reflection = vsResult.GetValue().Reflection;
+            // Merge fragment shader reflection (in a real implementation, we'd have a proper merge function)
+            const auto& fragReflection = fsResult.GetValue().Reflection;
+            reflection.Uniforms.insert(reflection.Uniforms.end(), fragReflection.Uniforms.begin(), fragReflection.Uniforms.end());
+            reflection.Resources.insert(reflection.Resources.end(), fragReflection.Resources.begin(), fragReflection.Resources.end());
+            
+            // Create the GPU shader with reflection
+            auto createResult = m_TriangleShader->Create(shaderStages, reflection);
+            if (createResult.IsSuccess())
+            {
+                VX_INFO("[ShaderSystem] Successfully created advanced PBR shader!");
+                VX_INFO("[ShaderSystem] Advanced shader debug info:\n{}", m_TriangleShader->GetDebugInfo());
+                m_UsingAdvancedShader = true;
+                return;
+            }
+            else
+            {
+                VX_ERROR("[ShaderSystem] Failed to create advanced GPU shader: {}", static_cast<int>(createResult.GetErrorCode()));
+                m_TriangleShader.reset();
+            }
+        }
+        else
+        {
+            if (!vsResult.IsSuccess()) VX_ERROR("[ShaderSystem] Advanced vertex shader compilation failed: {}", vsResult.GetErrorMessage());
+            if (!fsResult.IsSuccess()) VX_ERROR("[ShaderSystem] Advanced fragment shader compilation failed: {}", fsResult.GetErrorMessage());
+        }
+    }
+}
+
+bool ExampleGameLayer::LoadShaderFromFile(const std::string& path, std::string& source)
+{
+    namespace fs = std::filesystem;
+    fs::path cwd = fs::current_path();
+    fs::path exeDir;
+    
+    #if defined(_WIN32)
+    {
+        char exePathA[MAX_PATH] = {0};
+        DWORD len = GetModuleFileNameA(NULL, exePathA, MAX_PATH);
+        if (len != 0) exeDir = fs::path(exePathA).parent_path();
+    }
+    #elif defined(__linux__)
+    {
+        char exePath[4096];
+        ssize_t l = readlink("/proc/self/exe", exePath, sizeof(exePath)-1);
+        if (l > 0) { exePath[l] = '\0'; exeDir = fs::path(exePath).parent_path(); }
+    }
+    #endif
+    
+    auto try_read = [&](const fs::path& p) -> bool 
+    {
+        std::ifstream f(p.string());
+        if (f.is_open())
+        {
+            std::stringstream buffer;
+            buffer << f.rdbuf();
+            source = buffer.str();
+            f.close();
+            VX_INFO("[ShaderSystem] Loaded shader from: {}", p.string());
+            return true;
+        }
+        return false;
+    };
+    
+    // Try multiple candidate paths
+    bool loaded = false;
+    loaded = loaded || try_read(fs::path(path));
+    loaded = loaded || try_read(cwd / path);
+    if (!exeDir.empty()) loaded = loaded || try_read(exeDir / path);
+    
+    if (!loaded)
+    {
+        VX_WARN("[ShaderSystem] Could not load shader file: {}", path);
+    }
+    
+    return loaded;
 }

@@ -310,7 +310,7 @@ namespace Vortex::Shader
     {
         if (source.empty())
         {
-return Result<CompiledShader>(ErrorCode::InvalidParameter, "Empty shader source code");
+            return Result<CompiledShader>(ErrorCode::InvalidParameter, "Empty shader source code");
         }
 
         // Compute hash for caching

@@ -112,7 +112,10 @@ namespace Vortex
 
         m_IsLinked = true;
 
-        // Cache uniform locations for faster access
+        // Cache uniform locations using reflection data first
+        CacheUniformLocationsFromReflection(reflection);
+        
+        // Also cache any additional uniforms found at runtime
         CacheUniformLocations();
 
         // Update shader metadata
@@ -122,6 +125,9 @@ namespace Vortex
             stageFlags |= static_cast<uint32_t>(stage);
         }
         SetMetadata(GetName(), reflection, stageFlags);
+        
+        // Log reflection information for debugging
+        LogReflectionInfo(reflection);
 
         VX_CORE_INFO("OpenGLShader: Successfully created shader '{}' with program ID {}", GetName(), m_ProgramId);
         return Success();
@@ -585,6 +591,92 @@ void main()
             case Vortex::Shader::ShaderStage::TessellationEvaluation: return "Tessellation Evaluation";
             default: return "Unknown";
         }
+    }
+
+    void OpenGLShader::CacheUniformLocationsFromReflection(const Vortex::Shader::ShaderReflectionData& reflection)
+    {
+        if (!IsValid()) return;
+        
+        // Cache uniform locations from reflection data
+        for (const auto& uniform : reflection.Uniforms)
+        {
+            GLint location = glGetUniformLocation(m_ProgramId, uniform.Name.c_str());
+            if (location != -1)
+            {
+                m_UniformLocationCache[uniform.Name] = location;
+                VX_CORE_TRACE("OpenGLShader: Cached uniform '{}' at location {}", uniform.Name, location);
+            }
+            else
+            {
+                VX_CORE_WARN("OpenGLShader: Uniform '{}' from reflection not found in program", uniform.Name);
+            }
+        }
+        
+        // Also cache texture/sampler uniforms
+        for (const auto& resource : reflection.Resources)
+        {
+            if (resource.Type == Vortex::Shader::ShaderResourceType::Texture2D ||
+                resource.Type == Vortex::Shader::ShaderResourceType::Sampler)
+            {
+                GLint location = glGetUniformLocation(m_ProgramId, resource.Name.c_str());
+                if (location != -1)
+                {
+                    m_UniformLocationCache[resource.Name] = location;
+                    VX_CORE_TRACE("OpenGLShader: Cached texture uniform '{}' at location {}", resource.Name, location);
+                }
+            }
+        }
+        
+        VX_CORE_INFO("OpenGLShader: Cached {} uniforms from reflection", m_UniformLocationCache.size());
+    }
+    
+    void OpenGLShader::LogReflectionInfo(const Vortex::Shader::ShaderReflectionData& reflection)
+    {
+        VX_CORE_INFO("OpenGLShader: Reflection data for shader '{}':", GetName());
+        
+        // Log vertex inputs
+        if (!reflection.VertexInputs.empty())
+        {
+            VX_CORE_INFO("  Vertex Inputs ({}):", reflection.VertexInputs.size());
+            for (const auto& input : reflection.VertexInputs)
+            {
+                VX_CORE_INFO("    - {} (location: {}, type: {})", input.Name, input.Location, 
+                           static_cast<int>(input.Type));
+            }
+        }
+        
+        // Log uniforms
+        if (!reflection.Uniforms.empty())
+        {
+            VX_CORE_INFO("  Uniforms ({}):", reflection.Uniforms.size());
+            for (const auto& uniform : reflection.Uniforms)
+            {
+                VX_CORE_INFO("    - {} (location: {}, type: {}, size: {})", uniform.Name, uniform.Location, 
+                           static_cast<int>(uniform.Type), uniform.Size);
+            }
+        }
+        
+        // Log resources (textures, buffers, etc.)
+        if (!reflection.Resources.empty())
+        {
+            VX_CORE_INFO("  Resources ({}):", reflection.Resources.size());
+            for (const auto& resource : reflection.Resources)
+            {
+                VX_CORE_INFO("    - {} (binding: {}, set: {}, type: {})", resource.Name, resource.Binding, 
+                           resource.Set, static_cast<int>(resource.Type));
+            }
+        }
+        
+        // Log compute workgroup size if available
+        if (reflection.LocalSize.x > 0 || reflection.LocalSize.y > 0 || reflection.LocalSize.z > 0)
+        {
+            VX_CORE_INFO("  Compute Workgroup Size: {}x{}x{}", 
+                       reflection.LocalSize.x, reflection.LocalSize.y, reflection.LocalSize.z);
+        }
+        
+        // Log statistics
+        VX_CORE_INFO("  Statistics: {} instructions, {} memory usage", 
+                   reflection.InstructionCount, reflection.MemoryUsage);
     }
 
 } // namespace Vortex

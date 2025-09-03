@@ -40,6 +40,10 @@ private:
     void OnFireAction(InputActionPhase phase);
     
     void SetupShaderSystem();
+    void SetupAdvancedShaders();
+
+    // Utility functions
+    bool LoadShaderFromFile(const std::string& path, std::string& source);
 
 private:
     // Game state
@@ -57,6 +61,7 @@ private:
     // Modern shader system resources
     std::shared_ptr<Vortex::Shader::ShaderManager> m_ShaderManager;
     ShaderRef m_TriangleShader;
+    bool m_UsingAdvancedShader = false;
     
     // GL resources for demo triangle (VAO/VBO still needed for vertex data)
     unsigned int m_VBO = 0;
