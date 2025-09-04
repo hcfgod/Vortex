@@ -1,5 +1,6 @@
 #include "vxpch.h"
 #include "Core/Configuration.h"
+#include "Core/Debug/Log.h"
 
 #include <fstream>
 #include <sstream>

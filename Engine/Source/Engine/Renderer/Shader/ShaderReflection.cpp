@@ -14,8 +14,8 @@ struct PairHash {
 };
 
 #ifdef VX_SPIRV_CROSS_AVAILABLE
-    #include <spirv_cross/spirv_cross.hpp>
-    #include <spirv_cross/spirv_glsl.hpp>
+    #include <spirv_cross.hpp>
+    #include <spirv_glsl.hpp>
 #endif
 
 namespace Vortex

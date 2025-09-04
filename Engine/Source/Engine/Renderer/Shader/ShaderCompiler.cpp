@@ -613,6 +613,163 @@ return Result<CompiledShader>(ErrorCode::InvalidParameter, "Could not determine 
     }
 
     // ============================================================================
+    // ASYNC COROUTINE COMPILATION METHODS
+    // ============================================================================
+
+    Task<Result<CompiledShader>> ShaderCompiler::CompileFromSourceAsync(
+        std::string source, 
+        ShaderStage stage,
+        ShaderCompileOptions options,
+        CoroutinePriority priority,
+        std::string filename)
+    {
+        // Yield control with specified priority to allow scheduler to manage workload
+        co_await YieldExecution(priority);
+
+        // Log compilation start for debugging
+        VX_CORE_TRACE("Starting async shader compilation: {0} (priority: {1})", 
+                     filename.empty() ? "<source>" : filename, static_cast<int>(priority));
+
+        // Perform the compilation (this is the expensive operation)
+        auto result = CompileFromSource(source, stage, options, filename);
+
+        // Yield again after compilation to allow other coroutines to run
+        co_await YieldExecution();
+
+        VX_CORE_TRACE("Completed async shader compilation: {0}", 
+                     filename.empty() ? "<source>" : filename);
+
+        co_return result;
+    }
+
+    Task<Result<CompiledShader>> ShaderCompiler::CompileFromFileAsync(
+        std::string filePath, 
+        ShaderCompileOptions options,
+        CoroutinePriority priority)
+    {
+        // Yield control with specified priority
+        co_await YieldExecution(priority);
+
+        VX_CORE_TRACE("Starting async file shader compilation: {0} (priority: {1})", 
+                     filePath, static_cast<int>(priority));
+
+        // Use the synchronous method for actual compilation
+        auto result = CompileFromFile(filePath, options);
+
+        // Yield after compilation
+        co_await YieldExecution();
+
+        VX_CORE_TRACE("Completed async file shader compilation: {0}", filePath);
+
+        co_return result;
+    }
+
+    Task<Result<std::unordered_map<uint64_t, CompiledShader>>> ShaderCompiler::CompileVariantsAsync(
+        std::string source,
+        ShaderStage stage, 
+        std::vector<ShaderMacros> variants,
+        ShaderCompileOptions options,
+        CoroutinePriority priority)
+    {
+        co_await YieldExecution(priority);
+
+        VX_CORE_TRACE("Starting async variant compilation: {0} variants (priority: {1})", 
+                     variants.size(), static_cast<int>(priority));
+
+        std::unordered_map<uint64_t, CompiledShader> results;
+        
+        // Compile each variant, yielding between compilations to prevent blocking
+        for (size_t i = 0; i < variants.size(); ++i)
+        {
+            const auto& variantMacros = variants[i];
+            
+            // Create options for this variant
+            ShaderCompileOptions variantOptions = options;
+            for (const auto& macro : variantMacros)
+            {
+                variantOptions.Macros[macro.Name] = macro.Value;
+            }
+            
+            // Generate hash for this variant
+            uint64_t variantHash = ShaderVariantManager::GenerateVariantHash(variantMacros);
+            
+            // Compile this variant
+            auto result = CompileFromSource(source, stage, variantOptions, "variant_" + std::to_string(i));
+            
+            if (result.IsSuccess())
+            {
+                results[variantHash] = std::move(const_cast<CompiledShader&>(result.GetValue()));
+                VX_CORE_TRACE("Compiled shader variant {0}/{1} successfully (hash: {2})", 
+                             i + 1, variants.size(), variantHash);
+            }
+            else
+            {
+                VX_CORE_ERROR("Failed to compile shader variant {0}/{1}: {2}", 
+                             i + 1, variants.size(), result.GetErrorMessage());
+                // Return early on first error
+                co_return Result<std::unordered_map<uint64_t, CompiledShader>>(
+                    result.GetErrorCode(), 
+                    "Variant compilation failed: " + result.GetErrorMessage());
+            }
+            
+            // Yield between variants to allow other work
+            if (i < variants.size() - 1)
+            {
+                co_await YieldExecution();
+            }
+        }
+
+        VX_CORE_INFO("Completed async variant compilation: {0} variants compiled", results.size());
+        
+        co_return Result<std::unordered_map<uint64_t, CompiledShader>>(std::move(results));
+    }
+
+    Task<std::vector<Result<CompiledShader>>> ShaderCompiler::CompileBatchAsync(
+        std::vector<std::tuple<std::string, ShaderStage, ShaderCompileOptions>> compilationTasks,
+        size_t maxConcurrency)
+    {
+        co_await YieldExecution(CoroutinePriority::Normal);
+
+        VX_CORE_INFO("Starting batch shader compilation: {0} shaders (max concurrency: {1})", 
+                    compilationTasks.size(), maxConcurrency);
+
+        std::vector<Result<CompiledShader>> results;
+        results.reserve(compilationTasks.size());
+
+        // Process tasks in batches to respect concurrency limit
+        for (size_t startIdx = 0; startIdx < compilationTasks.size(); startIdx += maxConcurrency)
+        {
+            size_t endIdx = std::min(startIdx + maxConcurrency, compilationTasks.size());
+            std::vector<Task<Result<CompiledShader>>> currentBatch;
+            
+            // Start coroutines for current batch
+            for (size_t i = startIdx; i < endIdx; ++i)
+            {
+                const auto& [source, stage, options] = compilationTasks[i];
+                currentBatch.push_back(
+                    CompileFromSourceAsync(source, stage, options, CoroutinePriority::Normal, 
+                                         "batch_" + std::to_string(i))
+                );
+            }
+            
+            // Wait for all tasks in current batch to complete
+            // For now, process each task sequentially since WhenAll doesn't support iterators yet
+            for (auto& task : currentBatch)
+            {
+                auto result = co_await task;
+                results.push_back(std::move(result));
+            }
+            
+            // Yield between batches to allow other work
+            co_await YieldExecution();
+        }
+
+        VX_CORE_INFO("Completed batch shader compilation: {0} shaders processed", results.size());
+        
+        co_return results;
+    }
+
+    // ============================================================================
     // Static utility methods (stub implementations)
     // ============================================================================
 
@@ -673,6 +830,47 @@ return Result<CompiledShader>(ErrorCode::InvalidParameter, "Could not determine 
                                                        const ShaderCompileOptions& options)
     {
         return Result<uint32_t>(ErrorCode::NotImplemented, "PrecompileShaders not yet implemented");
+    }
+
+    // ============================================================================
+    // ShaderVariantManager Implementation
+    // ============================================================================
+
+    std::vector<ShaderMacros> ShaderVariantManager::GenerateVariants(
+        const std::vector<std::vector<ShaderMacro>>& macroGroups)
+    {
+        // TODO: Implement variant generation logic
+        std::vector<ShaderMacros> variants;
+        return variants;
+    }
+
+    uint64_t ShaderVariantManager::GenerateVariantHash(const ShaderMacros& macros)
+    {
+        std::stringstream ss;
+        for (const auto& macro : macros)
+        {
+            ss << macro.Name << "=" << macro.Value << ";";
+        }
+        return HashString(ss.str());
+    }
+
+    ShaderMacros ShaderVariantManager::ParseVariantString(const std::string& variantString)
+    {
+        ShaderMacros macros;
+        // TODO: Implement string parsing logic
+        // Format: "MACRO1=value1;MACRO2=value2;..."
+        return macros;
+    }
+
+    std::string ShaderVariantManager::MacrosToString(const ShaderMacros& macros)
+    {
+        std::stringstream ss;
+        for (size_t i = 0; i < macros.size(); ++i)
+        {
+            if (i > 0) ss << ";";
+            ss << macros[i].Name << "=" << macros[i].Value;
+        }
+        return ss.str();
     }
 
 } // namespace Vortex

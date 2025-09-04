@@ -18,16 +18,22 @@ namespace Vortex
 #ifdef VX_PLATFORM_WINDOWS
 			// Initialize symbol handler
 			HANDLE process = GetCurrentProcess();
-			SymInitialize(process, NULL, TRUE);
+			// Load line info and demangled names where possible
+			SymSetOptions(SYMOPT_UNDNAME | SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
+			BOOL symInitialized = SymInitialize(process, NULL, TRUE);
 
-			// Capture the stack
+			// Capture the stack (cap to our local array size)
 			void* stack[64];
-			WORD numberOfFrames = CaptureStackBackTrace(0, maxFrames, stack, NULL);
+			int framesToCapture = (maxFrames > 0 && maxFrames <= 64) ? maxFrames : 64;
+			USHORT numberOfFrames = CaptureStackBackTrace(0, (ULONG)framesToCapture, stack, NULL);
 
-			// Get symbol information
+			// Get symbol information (optional)
 			SYMBOL_INFO* symbol = (SYMBOL_INFO*)calloc(sizeof(SYMBOL_INFO) + 256 * sizeof(char), 1);
-			symbol->MaxNameLen = 255;
-			symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+			if (symbol)
+			{
+				symbol->MaxNameLen = 255;
+				symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+			}
 
 			for (int i = 0; i < numberOfFrames; i++)
 			{
@@ -35,14 +41,15 @@ namespace Vortex
 				
 				std::string frameInfo = "0x" + std::to_string(address);
 				
-				if (SymFromAddr(process, address, 0, symbol))
+				// Resolve symbol name if available
+				if (symbol && symInitialized && SymFromAddr(process, address, 0, symbol))
 				{
 					frameInfo += " " + std::string(symbol->Name);
 					
 					// Try to get line information
-					IMAGEHLP_LINE64 line;
+					IMAGEHLP_LINE64 line{};
 					line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
-					DWORD displacement;
+					DWORD displacement = 0;
 					
 					if (SymGetLineFromAddr64(process, address, &displacement, &line))
 					{
@@ -53,8 +60,8 @@ namespace Vortex
 				stackTrace.push_back(frameInfo);
 			}
 
-			free(symbol);
-			SymCleanup(process);
+			if (symbol) free(symbol);
+			if (symInitialized) SymCleanup(process);
 #else
 			stackTrace.push_back("Stack trace not implemented for this platform");
 #endif

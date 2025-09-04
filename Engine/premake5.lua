@@ -15,13 +15,26 @@ project "Engine"
         flags { "NoPCH" }
         compileas "C"
         disablewarnings { "4005" }
+        
+    -- Disable PCH for SPIRV-Cross source files to avoid conflicts
+    filter "files:Vendor/SPIRV-Cross/**.cpp"
+        flags { "NoPCH" }
+        disablewarnings { "4996", "4244", "4267" }
     filter {}
 
     files
     {
         "Source/**.h",
         "Source/**.cpp",
-        "Vendor/GLAD/generated/src/gl.c"
+        "Vendor/GLAD/generated/src/gl.c",
+        -- SPIRV-Cross core + GLSL backend + required support files
+        "Vendor/SPIRV-Cross/spirv_cross.cpp",
+        "Vendor/SPIRV-Cross/spirv_cross_util.cpp",
+        "Vendor/SPIRV-Cross/spirv_cross_parsed_ir.cpp",
+        "Vendor/SPIRV-Cross/spirv_parser.cpp",
+        "Vendor/SPIRV-Cross/spirv_cfg.cpp",
+        "Vendor/SPIRV-Cross/spirv_reflect.cpp",
+        "Vendor/SPIRV-Cross/spirv_glsl.cpp"
     }
 
     defines
@@ -31,7 +44,12 @@ project "Engine"
 
     includedirs
     {
-        "Source",
+        "Source"
+    }
+
+    -- Mark vendor headers as external to silence their warnings (fmt/spdlog, glm, json, etc.)
+    externalincludedirs
+    {
         "Vendor/spdlog/include",
         "Vendor/GLAD/generated/include",
         "Vendor/glm",
@@ -41,8 +59,12 @@ project "Engine"
         "Vendor/SPIRV-Cross"
     }
 
+    -- Disable warnings from external headers
+    externalwarnings "Off"
+
     filter "system:windows"
-        buildoptions { "/utf-8" }
+        -- Ensure MSVC does not run code analysis on external headers and keeps their warnings at W0
+        buildoptions { "/utf-8", "/analyze:external-" }
         systemversion "latest"
 
         defines
@@ -114,7 +136,7 @@ project "Engine"
         runtime "Debug"
         symbols "on"
 
-        includedirs
+        externalincludedirs
         {
             "Vendor/SDL3/install/Debug/include",
             "Vendor/SDL3/install/include",
@@ -122,6 +144,17 @@ project "Engine"
             "Vendor/SPIRV-Tools/install/Debug/include",
             "Vendor/SPIRV-Cross/install/Debug/include"
         }
+
+        filter { "system:windows", "configurations:Debug" }
+            libdirs
+            {
+                "Vendor/SDL3/install/Debug/lib",
+                "Vendor/shaderc/install/Debug/lib",
+                "Vendor/SPIRV-Tools/install/Debug/lib",
+                "Vendor/SPIRV-Cross/install/Debug/lib"
+            }
+            
+            -- SPIRV-Cross libraries removed - building from source now
 
         filter "system:linux"
             libdirs
@@ -134,7 +167,7 @@ project "Engine"
         runtime "Release"
         optimize "on"
 
-        includedirs
+        externalincludedirs
         {
             "Vendor/SDL3/install/Release/include",
             "Vendor/SDL3/install/include",
@@ -142,6 +175,17 @@ project "Engine"
             "Vendor/SPIRV-Tools/install/Release/include",
             "Vendor/SPIRV-Cross/install/Release/include"
         }
+
+        filter { "system:windows", "configurations:Release" }
+            libdirs
+            {
+                "Vendor/SDL3/install/Release/lib",
+                "Vendor/shaderc/install/Release/lib",
+                "Vendor/SPIRV-Tools/install/Release/lib",
+                "Vendor/SPIRV-Cross/install/Release/lib"
+            }
+            
+            -- SPIRV-Cross libraries removed - building from source now
 
         filter "system:linux"
             libdirs
@@ -154,7 +198,7 @@ project "Engine"
         runtime "Release"
         optimize "on"
 
-        includedirs
+        externalincludedirs
         {
             "Vendor/SDL3/install/Release/include",
             "Vendor/SDL3/install/include",
@@ -162,6 +206,17 @@ project "Engine"
             "Vendor/SPIRV-Tools/install/Release/include",
             "Vendor/SPIRV-Cross/install/Release/include"
         }
+
+        filter { "system:windows", "configurations:Dist" }
+            libdirs
+            {
+                "Vendor/SDL3/install/Release/lib",
+                "Vendor/shaderc/install/Release/lib",
+                "Vendor/SPIRV-Tools/install/Release/lib",
+                "Vendor/SPIRV-Cross/install/Release/lib"
+            }
+            
+            -- SPIRV-Cross libraries removed - building from source now
 
         filter "system:linux"
             libdirs

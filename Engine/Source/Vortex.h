@@ -6,6 +6,9 @@
 #include "Core/Application.h"
 #include "Core/EngineConfig.h"
 #include "Core/FileSystem.h"
+#include "Core/Async/Task.h"
+#include "Core/Async/Coroutine.h"
+#include "Core/Async/CoroutineScheduler.h"
 #include "Engine/Engine.h"
 
 // Event System

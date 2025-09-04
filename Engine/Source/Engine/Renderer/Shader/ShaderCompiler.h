@@ -3,6 +3,8 @@
 #include "ShaderTypes.h"
 #include "ShaderReflection.h"
 #include "Core/Debug/ErrorCodes.h"
+#include "Core/Async/Task.h"
+#include "Core/Async/Coroutine.h"
 
 #include <memory>
 #include <functional>
@@ -82,6 +84,64 @@ namespace Vortex
          */
         Result<ShaderProgram> CompileProgram(const std::unordered_map<ShaderStage, std::string>& shaderFiles,
                                            const ShaderCompileOptions& options);
+
+        // ============================================================================
+        // ASYNC COROUTINE COMPILATION METHODS
+        // ============================================================================
+
+        /**
+         * @brief Asynchronously compile shader from source using coroutines
+         * @param source Shader source code
+         * @param stage Shader stage
+         * @param options Compilation options
+         * @param priority Compilation priority
+         * @param filename Optional filename for error reporting
+         * @return Task that yields CompiledShader result
+         */
+        Task<Result<CompiledShader>> CompileFromSourceAsync(
+            std::string source, 
+            ShaderStage stage,
+            ShaderCompileOptions options,
+            CoroutinePriority priority = CoroutinePriority::Normal,
+            std::string filename = "");
+
+        /**
+         * @brief Asynchronously compile shader from file using coroutines
+         * @param filePath Path to shader file
+         * @param options Compilation options
+         * @param priority Compilation priority
+         * @return Task that yields CompiledShader result
+         */
+        Task<Result<CompiledShader>> CompileFromFileAsync(
+            std::string filePath, 
+            ShaderCompileOptions options,
+            CoroutinePriority priority = CoroutinePriority::Normal);
+
+        /**
+         * @brief Asynchronously compile multiple shader variants using coroutines
+         * @param source Shader source code
+         * @param stage Shader stage
+         * @param variants Vector of macro combinations
+         * @param options Base compilation options
+         * @param priority Compilation priority
+         * @return Task that yields map of variant hash to compiled shader
+         */
+        Task<Result<std::unordered_map<uint64_t, CompiledShader>>> CompileVariantsAsync(
+            std::string source,
+            ShaderStage stage, 
+            std::vector<ShaderMacros> variants,
+            ShaderCompileOptions options,
+            CoroutinePriority priority = CoroutinePriority::Normal);
+
+        /**
+         * @brief Asynchronously compile multiple shaders concurrently
+         * @param compilationTasks Vector of compilation tasks
+         * @param maxConcurrency Maximum number of concurrent compilations
+         * @return Task that yields vector of compilation results
+         */
+        Task<std::vector<Result<CompiledShader>>> CompileBatchAsync(
+            std::vector<std::tuple<std::string, ShaderStage, ShaderCompileOptions>> compilationTasks,
+            size_t maxConcurrency = 4);
 
         // ============================================================================
         // CACHE MANAGEMENT

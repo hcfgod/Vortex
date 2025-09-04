@@ -537,7 +537,7 @@ namespace Vortex
         }
 
         uint32_t glCullMode = ConvertCullMode(cullMode);
-        uint32_t glFrontFace = ConvertFrontFace(frontFace);
+        uint32_t glFrontFaceMode = ConvertFrontFace(frontFace);
 
         // Update culling enable/disable
         bool cullEnabled = (cullMode != CULL_MODE_NONE);
@@ -562,10 +562,10 @@ namespace Vortex
         }
 
         // Update front face
-        if (m_CurrentState.FrontFace != glFrontFace)
+        if (m_CurrentState.FrontFace != glFrontFaceMode)
         {
-            ::glFrontFace(glFrontFace);
-            m_CurrentState.FrontFace = glFrontFace;
+            ::glFrontFace(glFrontFaceMode);
+            m_CurrentState.FrontFace = glFrontFaceMode;
         }
 
         if (!CheckGLError("SetCullState"))

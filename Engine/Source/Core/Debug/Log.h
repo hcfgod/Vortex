@@ -116,7 +116,9 @@ namespace Vortex
 
 // Client log macros
 #define VX_TRACE(...)         ::Vortex::Log::GetClientLogger()->trace(__VA_ARGS__)
+#ifndef VX_DEBUG
 #define VX_DEBUG(...)         ::Vortex::Log::GetClientLogger()->debug(__VA_ARGS__)
+#endif
 #define VX_INFO(...)          ::Vortex::Log::GetClientLogger()->info(__VA_ARGS__)
 #define VX_WARN(...)          ::Vortex::Log::GetClientLogger()->warn(__VA_ARGS__)
 #define VX_ERROR(...)         ::Vortex::Log::GetClientLogger()->error(__VA_ARGS__)

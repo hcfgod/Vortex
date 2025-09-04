@@ -9,8 +9,8 @@
 
 // For SPIRV-Cross (stub for now - can be implemented when SPIRV-Cross is available)
 #ifdef VX_SPIRV_CROSS_AVAILABLE
-#include <spirv_cross/spirv_cross.hpp>
-#include <spirv_cross/spirv_glsl.hpp>
+#include <spirv_cross.hpp>
+#include <spirv_glsl.hpp>
 #endif
 #include <Engine/Renderer/RenderCommandQueue.h>
 

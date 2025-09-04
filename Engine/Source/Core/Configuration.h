@@ -1,12 +1,5 @@
 #pragma once
 
-// If your project uses a precompiled header, include it first
-#ifdef __has_include
-#  if __has_include("vxpch.h")
-#    include "vxpch.h"
-#  endif
-#endif
-
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <unordered_map>
@@ -15,13 +8,6 @@
 #include <string>
 #include <shared_mutex>
 #include <algorithm>
-#include <spdlog/spdlog.h>
-
-#ifndef VX_CORE_INFO
-#define VX_CORE_INFO(...) (void)0
-#define VX_CORE_WARN(...) (void)0
-#define VX_CORE_ERROR(...) (void)0
-#endif
 
 namespace Vortex
 {

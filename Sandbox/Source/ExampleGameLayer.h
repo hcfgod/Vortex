@@ -40,7 +40,7 @@ private:
     void OnFireAction(InputActionPhase phase);
     
     void SetupShaderSystem();
-    void SetupAdvancedShaders();
+    Task<void> SetupAdvancedShadersAsync();
 
     // Utility functions
     bool LoadShaderFromFile(const std::string& path, std::string& source);
@@ -62,6 +62,11 @@ private:
     std::shared_ptr<ShaderManager> m_ShaderManager;
     ShaderRef m_TriangleShader;
     bool m_UsingAdvancedShader = false;
+    
+    // Async shader compilation state
+    std::optional<Task<void>> m_ShaderCompilationTask;
+    bool m_ShadersCompiling = false;
+    bool m_ShadersReady = false;
     
     // GL resources for demo triangle (VAO/VBO still needed for vertex data)
     unsigned int m_VBO = 0;

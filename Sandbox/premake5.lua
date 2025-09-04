@@ -17,13 +17,21 @@ project "Sandbox"
     -- Global include directories
     includedirs
     {
-        "%{wks.location}/Engine/Source",
+        "%{wks.location}/Engine/Source"
+    }
+
+    -- Treat vendor headers as external (suppresses their warnings and code analysis noise)
+    externalincludedirs
+    {
         "%{wks.location}/Engine/Vendor/spdlog/include",
         "%{wks.location}/Engine/Vendor/GLAD/generated/include",
         "%{wks.location}/Engine/Vendor/glm",
         "%{wks.location}/Engine/Vendor/nlohmann_json/single_include",
         "%{wks.location}/Engine/Vendor/SPIRV-Headers/include"
     }
+
+    -- Disable warnings from external headers
+    externalwarnings "Off"
 
     -- Global links
     links
@@ -39,7 +47,8 @@ project "Sandbox"
 
     filter "system:windows"
         systemversion "latest"
-        buildoptions { "/utf-8" }
+        -- Ensure MSVC does not run code analysis on external headers and keeps their warnings at W0
+        buildoptions { "/utf-8", "/analyze:external-" }
 
         defines
         {
@@ -151,11 +160,10 @@ project "Sandbox"
         }
 
     filter "configurations:Debug"
-        defines "VX_DEBUG"
         runtime "Debug"
         symbols "on"
 
-        includedirs
+        externalincludedirs
         {
             "%{wks.location}/Engine/Vendor/SDL3/install/Debug/include",
             "%{wks.location}/Engine/Vendor/SDL3/install/include",
@@ -172,13 +180,7 @@ project "Sandbox"
                 "%{wks.location}/Engine/Vendor/SPIRV-Cross/install/Debug/lib"
             }
             
-            links
-            {
-                -- Debug versions of SPIRV-Cross libraries (with 'd' suffix)
-                "spirv-cross-cored",
-                "spirv-cross-glsld",
-                "spirv-cross-utild"
-            }
+            -- SPIRV-Cross libraries removed - now built into Engine directly
 
         filter { "system:linux", "configurations:Debug" }
             libdirs
@@ -196,7 +198,7 @@ project "Sandbox"
         runtime "Release"
         optimize "on"
 
-        includedirs
+        externalincludedirs
         {
             "%{wks.location}/Engine/Vendor/SDL3/install/Release/include",
             "%{wks.location}/Engine/Vendor/SDL3/install/include",
@@ -213,13 +215,7 @@ project "Sandbox"
                 "%{wks.location}/Engine/Vendor/SPIRV-Cross/install/Release/lib"
             }
             
-            links
-            {
-                -- Release versions of SPIRV-Cross libraries (no suffix)
-                "spirv-cross-core",
-                "spirv-cross-glsl",
-                "spirv-cross-util"
-            }
+            -- SPIRV-Cross libraries removed - now built into Engine directly
 
         filter { "system:linux", "configurations:Release" }
             libdirs
@@ -237,7 +233,7 @@ project "Sandbox"
         runtime "Release"
         optimize "on"
 
-        includedirs
+        externalincludedirs
         {
             "%{wks.location}/Engine/Vendor/SDL3/install/Release/include",
             "%{wks.location}/Engine/Vendor/SDL3/install/include",
@@ -254,13 +250,7 @@ project "Sandbox"
                 "%{wks.location}/Engine/Vendor/SPIRV-Cross/install/Release/lib"
             }
             
-            links
-            {
-                -- Dist uses Release libraries (no suffix)
-                "spirv-cross-core",
-                "spirv-cross-glsl",
-                "spirv-cross-util"
-            }
+            -- SPIRV-Cross libraries removed - now built into Engine directly
 
         filter { "system:linux", "configurations:Dist" }
             libdirs

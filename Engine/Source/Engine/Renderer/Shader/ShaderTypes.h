@@ -211,7 +211,7 @@ namespace Vortex
     struct ShaderCompileOptions
     {
         ShaderOptimizationLevel OptimizationLevel = ShaderOptimizationLevel::None;
-        ShaderMacros Macros;
+        std::unordered_map<std::string, std::string> Macros;
         std::vector<std::string> IncludePaths;
         
         bool GenerateDebugInfo = false;

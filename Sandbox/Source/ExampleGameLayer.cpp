@@ -97,6 +97,28 @@ void ExampleGameLayer::OnDetach()
 
 void ExampleGameLayer::OnUpdate()
 {
+    // Check if async shader compilation is still running
+    if (m_ShadersCompiling && m_ShaderCompilationTask.has_value() && m_ShaderCompilationTask->IsCompleted())
+    {
+        // Shader compilation finished - the m_ShadersReady flag is set inside the coroutine
+        // Give it a moment to complete and then check
+        if (m_ShadersReady)
+        {
+            VX_INFO("[ShaderSystem] 🎉 Async shader compilation completed successfully!");
+        }
+        else if (m_TriangleShader && m_TriangleShader->IsValid())
+        {
+            // Shader is valid but flag wasn't set - this is still a success
+            VX_INFO("[ShaderSystem] ✅ Async shader compilation completed successfully (shader is valid)!");
+            m_ShadersReady = true;
+        }
+        else
+        {
+            VX_WARN("[ShaderSystem] ⚠️ Async shader compilation finished but shaders are not ready");
+        }
+        m_ShadersCompiling = false;
+    }
+    
     // === Input Polling Demonstration ===
     
     // WASD + Gamepad Left Stick movement (polling)
@@ -257,6 +279,20 @@ void ExampleGameLayer::OnUpdate()
 
 void ExampleGameLayer::OnRender()
 {
+    // Show compilation status if shaders are still compiling
+    if (m_ShadersCompiling)
+    {
+        // Could render a "Loading..." screen or progress indicator here
+        // For now, just skip rendering and show periodic status
+        static float lastStatusTime = 0.0f;
+        if (Time::GetTime() - lastStatusTime >= 1.0f)
+        {
+            VX_INFO("[Render] Shaders still compiling asynchronously... Please wait.");
+            lastStatusTime = Time::GetTime();
+        }
+        return;
+    }
+    
     // Use the modern shader system for rendering
     if (m_TriangleShader && m_TriangleShader->IsValid() && m_VAO != 0)
     {
@@ -453,33 +489,38 @@ void ExampleGameLayer::OnFireAction(InputActionPhase phase)
 
 void ExampleGameLayer::SetupShaderSystem()
 {
-    VX_INFO("[ShaderSystem] Setting up modern shader system with advanced reflection...");
+    VX_INFO("[ShaderSystem] Setting up modern shader system with async compilation...");
     
     try
     {
         // Create shader manager
         m_ShaderManager = std::make_shared<ShaderManager>();
         
-        // Try to load advanced shaders first, fallback to simple triangle shaders
-        SetupAdvancedShaders();
+        // Start async shader compilation - this returns immediately
+        m_ShaderCompilationTask = SetupAdvancedShadersAsync();
+        m_ShadersCompiling = true;
+        m_ShadersReady = false;
+        
+        VX_INFO("[ShaderSystem] Async shader compilation started...");
     }
     catch (const std::exception& e)
     {
         VX_ERROR("[ShaderSystem] Exception during shader setup: {}", e.what());
         m_TriangleShader.reset();
         m_ShaderManager.reset();
+        m_ShadersCompiling = false;
     }
 }
 
-void ExampleGameLayer::SetupAdvancedShaders()
+Task<void> ExampleGameLayer::SetupAdvancedShadersAsync()
 {
-    VX_INFO("[ShaderSystem] Attempting to load advanced PBR shaders...");
+    VX_INFO("[ShaderSystem] Starting async compilation of advanced PBR shaders...");
     
-    // Load and compile advanced shaders from files
+    // Load shader file paths
     std::string vertShaderPath = "Assets/Shaders/AdvancedTriangle.vert";
     std::string fragShaderPath = "Assets/Shaders/AdvancedTriangle.frag";
     
-    // Create shader compilation request
+    // Create shader compilation options
     ShaderCompileOptions options;
     options.OptimizationLevel = ShaderOptimizationLevel::None;
     options.GenerateDebugInfo = true;
@@ -487,65 +528,103 @@ void ExampleGameLayer::SetupAdvancedShaders()
     
     // Load shader sources
     std::string vertSource, fragSource;
-    if (LoadShaderFromFile(vertShaderPath, vertSource) && LoadShaderFromFile(fragShaderPath, fragSource))
+    if (!LoadShaderFromFile(vertShaderPath, vertSource) || !LoadShaderFromFile(fragShaderPath, fragSource))
     {
-        // Compile shaders to SPIR-V with caching enabled
-        ShaderCompiler compiler;
-        
-        // Enable shader caching for faster subsequent loads
-        compiler.SetCachingEnabled(true, "cache/shaders/");
-        
-        auto vsResult = compiler.CompileFromSource(vertSource, ShaderStage::Vertex, options, "AdvancedTriangle.vert");
-        auto fsResult = compiler.CompileFromSource(fragSource, ShaderStage::Fragment, options, "AdvancedTriangle.frag");
-        
-        if(!vsResult.IsSuccess())
-        {
-            VX_ERROR("[ShaderSystem] Vertex shader compilation error: {}", vsResult.GetErrorMessage());
-			return;
-		}
-        if (!fsResult.IsSuccess())
-        {
-            VX_ERROR("[ShaderSystem] Fragment shader compilation error: {}", fsResult.GetErrorMessage());
-            return;
-        }
-
-        // Create GPU shader
-        m_TriangleShader = GPUShader::Create("AdvancedTriangleShader");
-
-        // Prepare shader stages
-        std::unordered_map<ShaderStage, std::vector<uint32_t>> shaderStages;
-        shaderStages[ShaderStage::Vertex] = vsResult.GetValue().SpirV;
-        shaderStages[ShaderStage::Fragment] = fsResult.GetValue().SpirV;
-
-        // Get reflection data from compiled shaders
-        const auto& vertReflection = vsResult.GetValue().Reflection;
-        const auto& fragReflection = fsResult.GetValue().Reflection;
-
-        // Use our advanced reflection merge system with conflict resolution
-        std::vector<ShaderReflectionData> reflections = { vertReflection, fragReflection };
-        ShaderReflectionData reflection = ShaderReflection::CombineReflections(reflections);
-
-        // Validate the merged reflection for consistency
-        if (!ShaderReflection::ValidateMergedReflection(reflection))
-        {
-            VX_WARN("[ShaderSystem] Merged reflection validation failed - some conflicts were detected and resolved");
-        }
-
-        // Create the GPU shader with reflection
-        auto createResult = m_TriangleShader->Create(shaderStages, reflection);
-        if (createResult.IsSuccess())
-        {
-            VX_INFO("[ShaderSystem] Successfully created advanced PBR shader!");
-            VX_INFO("[ShaderSystem] Advanced shader debug info:\n{}", m_TriangleShader->GetDebugInfo());
-            m_UsingAdvancedShader = true;
-            return;
-        }
-        else
-        {
-            VX_ERROR("[ShaderSystem] Failed to create advanced GPU shader: {}", static_cast<int>(createResult.GetErrorCode()));
-            m_TriangleShader.reset();
-        }
+        VX_ERROR("[ShaderSystem] Failed to load shader files");
+        co_return;
     }
+    
+    // Create shader compiler with caching enabled
+    ShaderCompiler compiler;
+    compiler.SetCachingEnabled(true, "cache/shaders/");
+    
+    VX_INFO("[ShaderSystem] Compiling vertex shader asynchronously...");
+    
+    // Compile vertex shader asynchronously
+    auto vsResultTask = compiler.CompileFromSourceAsync(
+        vertSource, 
+        ShaderStage::Vertex, 
+        options, 
+        CoroutinePriority::Normal,
+        "AdvancedTriangle.vert"
+    );
+    
+    VX_INFO("[ShaderSystem] Compiling fragment shader asynchronously...");
+    
+    // Compile fragment shader asynchronously
+    auto fsResultTask = compiler.CompileFromSourceAsync(
+        fragSource, 
+        ShaderStage::Fragment, 
+        options, 
+        CoroutinePriority::Normal,
+        "AdvancedTriangle.frag"
+    );
+    
+    VX_INFO("[ShaderSystem] Waiting for both shaders to compile...");
+    
+    // Wait for both compilations to complete
+    auto vsResult = co_await vsResultTask;
+    auto fsResult = co_await fsResultTask;
+    
+    // Check compilation results
+    if (!vsResult.IsSuccess())
+    {
+        VX_ERROR("[ShaderSystem] Vertex shader compilation error: {}", vsResult.GetErrorMessage());
+        co_return;
+    }
+    
+    if (!fsResult.IsSuccess())
+    {
+        VX_ERROR("[ShaderSystem] Fragment shader compilation error: {}", fsResult.GetErrorMessage());
+        co_return;
+    }
+    
+    VX_INFO("[ShaderSystem] Both shaders compiled successfully! Creating GPU shader...");
+    
+    // Create GPU shader
+    m_TriangleShader = GPUShader::Create("AdvancedTriangleShader");
+    
+    // Prepare shader stages
+    std::unordered_map<ShaderStage, std::vector<uint32_t>> shaderStages;
+    shaderStages[ShaderStage::Vertex] = vsResult.GetValue().SpirV;
+    shaderStages[ShaderStage::Fragment] = fsResult.GetValue().SpirV;
+    
+    // Get reflection data from compiled shaders
+    const auto& vertReflection = vsResult.GetValue().Reflection;
+    const auto& fragReflection = fsResult.GetValue().Reflection;
+    
+    // Use our advanced reflection merge system with conflict resolution
+    std::vector<ShaderReflectionData> reflections = { vertReflection, fragReflection };
+    ShaderReflectionData reflection = ShaderReflection::CombineReflections(reflections);
+    
+    // Validate the merged reflection for consistency
+    if (!ShaderReflection::ValidateMergedReflection(reflection))
+    {
+        VX_WARN("[ShaderSystem] Merged reflection validation failed - some conflicts were detected and resolved");
+    }
+    
+    // Create the GPU shader with reflection
+    auto createResult = m_TriangleShader->Create(shaderStages, reflection);
+    if (createResult.IsSuccess())
+    {
+        VX_INFO("[ShaderSystem] ✅ Successfully created advanced PBR shader asynchronously!");
+        VX_INFO("[ShaderSystem] Advanced shader debug info:\n{}", m_TriangleShader->GetDebugInfo());
+        m_UsingAdvancedShader = true;
+        m_ShadersReady = true;
+        
+        // Get compilation stats from the compiler
+        auto stats = compiler.GetStats();
+        VX_INFO("[ShaderSystem] Compilation stats: {} shaders compiled, {} cache hits, {} cache misses, {}μs total time", 
+               stats.ShadersCompiled, stats.CacheHits, stats.CacheMisses, stats.CompilationTime);
+    }
+    else
+    {
+        VX_ERROR("[ShaderSystem] Failed to create advanced GPU shader: {}", static_cast<int>(createResult.GetErrorCode()));
+        m_TriangleShader.reset();
+    }
+    
+    m_ShadersCompiling = false;
+    co_return;
 }
 
 bool ExampleGameLayer::LoadShaderFromFile(const std::string& path, std::string& source)
