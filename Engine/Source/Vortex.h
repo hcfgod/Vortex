@@ -10,6 +10,7 @@
 #include "Core/Async/Coroutine.h"
 #include "Core/Async/CoroutineScheduler.h"
 #include "Engine/Engine.h"
+#include "Core/Common/SmartRef.h"
 
 // Event System
 #include "Core/Events/EventSystem.h"
@@ -49,6 +50,12 @@
 #include "Engine/Renderer/Shader/ShaderCompiler.h"
 #include "Engine/Renderer/Shader/ShaderManager.h"
 #include "Engine/Renderer/Shader/ShaderReflection.h"
+
+// Assets
+#include "Engine/Assets/Asset.h"
+#include "Engine/Assets/AssetHandle.h"
+#include "Engine/Assets/ShaderAsset.h"
+#include "Engine/Assets/AssetSystem.h"
 
 // ---Entry Point---------------------
 // Only include EntryPoint when VX_IMPLEMENT_MAIN is defined

@@ -32,6 +32,7 @@ namespace Vortex
 		TextureLoadFailed = 202,
 		BufferCreationFailed = 203,
 		RenderTargetCreationFailed = 204,
+		CompilationFailed = 205,
 
 		// Audio errors (300-399)
 		AudioInitFailed = 300,

@@ -11,25 +11,27 @@ layout(location = 5) in vec3 v_Bitangent;
 // Output
 layout(location = 0) out vec4 FragColor;
 
-// Material uniforms
-layout(location = 11) uniform vec3 u_Albedo;
-layout(location = 12) uniform float u_Metallic;
-layout(location = 13) uniform float u_Roughness;
-layout(location = 14) uniform float u_AO;
-layout(location = 15) uniform vec3 u_Emission;
-layout(location = 16) uniform float u_Alpha;
+// Animation and shared uniforms (must match vertex shader where shared)
+layout(location = 15) uniform float u_Time;       // matches VS
+layout(location = 16) uniform vec3  u_CameraPos;  // matches VS
 
-// Lighting uniforms
-layout(location = 17) uniform vec3 u_LightPosition;
-layout(location = 18) uniform vec3 u_LightColor;
-layout(location = 19) uniform float u_LightIntensity;
-layout(location = 5) uniform vec3 u_CameraPos;  // Must match vertex shader
+// Material uniforms (fragment-only)
+layout(location = 22) uniform vec3  u_Albedo;
+layout(location = 23) uniform float u_Metallic;
+layout(location = 24) uniform float u_Roughness;
+layout(location = 25) uniform float u_AO;
+layout(location = 26) uniform vec3  u_Emission;
+layout(location = 27) uniform float u_Alpha;
 
-// Animation and effects
-layout(location = 4) uniform float u_Time;
-layout(location = 21) uniform float u_RimPower;
-layout(location = 22) uniform vec3 u_RimColor;
-layout(location = 23) uniform float u_FresnelStrength;
+// Lighting uniforms (fragment-only)
+layout(location = 28) uniform vec3  u_LightPosition;
+layout(location = 29) uniform vec3  u_LightColor;
+layout(location = 30) uniform float u_LightIntensity;
+
+// Rim/fresnel effects (fragment-only)
+layout(location = 31) uniform float u_RimPower;
+layout(location = 32) uniform vec3  u_RimColor;
+layout(location = 33) uniform float u_FresnelStrength;
 
 // Texture samplers
 layout(binding = 0) uniform sampler2D u_AlbedoTexture;
@@ -40,11 +42,11 @@ layout(binding = 4) uniform sampler2D u_AOTexture;
 layout(binding = 5) uniform samplerCube u_EnvironmentMap;
 
 // Texture flags
-layout(location = 24) uniform int u_UseAlbedoTexture;
-layout(location = 25) uniform int u_UseNormalTexture;
-layout(location = 26) uniform int u_UseMetallicRoughnessTexture;
-layout(location = 27) uniform int u_UseEmissionTexture;
-layout(location = 28) uniform int u_UseAOTexture;
+layout(location = 34) uniform int u_UseAlbedoTexture;
+layout(location = 35) uniform int u_UseNormalTexture;
+layout(location = 36) uniform int u_UseMetallicRoughnessTexture;
+layout(location = 37) uniform int u_UseEmissionTexture;
+layout(location = 38) uniform int u_UseAOTexture;
 
 // Constants
 const float PI = 3.14159265359;

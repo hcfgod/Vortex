@@ -4,6 +4,7 @@
 #include "Engine/Renderer/GraphicsContext.h"
 #include "Engine/Renderer/RendererAPI.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
+#include "Engine/Renderer/Shader/ShaderManager.h"
 #include "Core/Window.h"
 #include "Core/Debug/ErrorCodes.h"
 

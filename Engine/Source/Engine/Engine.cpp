@@ -11,6 +11,7 @@
 #include "Engine/Input/InputSystem.h"
 #include "Core/Events/EngineEvent.h"
 #include "Engine/Time/Time.h"
+#include "Engine/Assets/AssetSystem.h"
 
 namespace Vortex 
 {
@@ -179,6 +180,16 @@ namespace Vortex
 			{
 				VX_CORE_ERROR("Failed to register RenderSystem");
 				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register RenderSystem");
+			}
+		}
+
+		// Register AssetSystem (Core priority)
+		{
+			auto* assetSystem = m_SystemManager.RegisterSystem<AssetSystem>();
+			if (!assetSystem)
+			{
+				VX_CORE_ERROR("Failed to register AssetSystem");
+				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register AssetSystem");
 			}
 		}
 

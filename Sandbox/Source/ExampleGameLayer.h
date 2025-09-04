@@ -6,15 +6,6 @@
 
 using namespace Vortex;
 
-/**
- * @brief Example game layer that demonstrates the new Input system
- * 
- * This layer shows how to:
- * - Use the Input polling API (Input::GetKey, Input::GetMouseButton, etc.)
- * - Set up InputActions with callbacks
- * - Update game logic
- * - Work with the Time system
- */
 class ExampleGameLayer : public Layer
 {
 public:
@@ -31,7 +22,7 @@ public:
     virtual bool OnEvent(Event& event) override;
 
 private:
-    // Input setup
+    void SetupShaderSystem();
     void SetupInputActions();
     
     // Action callbacks
@@ -39,11 +30,7 @@ private:
     void OnResetAction(InputActionPhase phase);
     void OnFireAction(InputActionPhase phase);
     
-    void SetupShaderSystem();
-    Task<void> SetupAdvancedShadersAsync();
 
-    // Utility functions
-    bool LoadShaderFromFile(const std::string& path, std::string& source);
 
 private:
     // Game state
@@ -58,16 +45,20 @@ private:
     // Input action map
     std::shared_ptr<InputActionMap> m_GameplayActions;
 
-    // Modern shader system resources
-    std::shared_ptr<ShaderManager> m_ShaderManager;
-    ShaderRef m_TriangleShader;
-    bool m_UsingAdvancedShader = false;
-    
-    // Async shader compilation state
-    std::optional<Task<void>> m_ShaderCompilationTask;
-    bool m_ShadersCompiling = false;
-    bool m_ShadersReady = false;
-    
+    // Cached system references for performance (using SmartRef for clean access)
+    SmartRef<Application> m_Application;
+    SmartRef<Engine> m_Engine;
+    SmartRef<SystemManager> m_SystemManager;
+    SmartRef<ShaderManager> m_ShaderManager;
+    bool m_SystemsInitialized = false;
+
+    // Asset-system managed shader handle
+    AssetHandle<ShaderAsset> m_ShaderHandle;
+
+    // Loading indicator state
+    bool m_ShaderLoading = false;
+    float m_ShaderProgress = 0.0f;
+
     // GL resources for demo triangle (VAO/VBO still needed for vertex data)
     unsigned int m_VBO = 0;
     unsigned int m_VAO = 0;

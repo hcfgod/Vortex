@@ -1,16 +1,5 @@
 #include "ExampleGameLayer.h"
 #include <glad/gl.h>
-#include <fstream>
-#include <sstream>
-#include <filesystem>
-#if defined(_WIN32)
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#elif defined(__linux__)
-#include <unistd.h>
-#endif
 
 namespace 
 {
@@ -40,8 +29,30 @@ void ExampleGameLayer::OnAttach()
     VX_INFO("  - Mouse/Right Stick: Look around (Polling)");
     VX_INFO("  - PS5 Controller: Full support for buttons and sticks");
     
+    // Cache system references for performance (do this first!)
+    auto* app = Application::Get();
+    if (!app)
+    {
+        VX_ERROR("Application instance not available!");
+        return;
+    }
+    
+    auto* engine = app->GetEngine();
+    if (!engine)
+    {
+        VX_ERROR("Engine instance not available!");
+        return;
+    }
+    
+    // Initialize SmartRef wrappers for clean modern C++ access
+    m_Application.Reset(*app);
+    m_Engine.Reset(*engine);
+    m_SystemManager.Reset(engine->GetSystemManager());
+    m_ShaderManager.Reset(GetShaderManager());
+    m_SystemsInitialized = true;
+    
     SetupInputActions();
-
+    
     // Initialize the modern shader system
     SetupShaderSystem();
 
@@ -85,10 +96,6 @@ void ExampleGameLayer::OnDetach()
 {
     VX_INFO("ExampleGameLayer detached - Final Score: {}", m_Score);
 
-    // Cleanup shader resources
-    m_TriangleShader.reset();
-    m_ShaderManager.reset();
-    
     // Cleanup GL resources
     if (m_VAO) { glDeleteVertexArrays(1, &m_VAO); m_VAO = 0; }
     if (m_VBO) { glDeleteBuffers(1, &m_VBO); m_VBO = 0; }
@@ -97,28 +104,6 @@ void ExampleGameLayer::OnDetach()
 
 void ExampleGameLayer::OnUpdate()
 {
-    // Check if async shader compilation is still running
-    if (m_ShadersCompiling && m_ShaderCompilationTask.has_value() && m_ShaderCompilationTask->IsCompleted())
-    {
-        // Shader compilation finished - the m_ShadersReady flag is set inside the coroutine
-        // Give it a moment to complete and then check
-        if (m_ShadersReady)
-        {
-            VX_INFO("[ShaderSystem] 🎉 Async shader compilation completed successfully!");
-        }
-        else if (m_TriangleShader && m_TriangleShader->IsValid())
-        {
-            // Shader is valid but flag wasn't set - this is still a success
-            VX_INFO("[ShaderSystem] ✅ Async shader compilation completed successfully (shader is valid)!");
-            m_ShadersReady = true;
-        }
-        else
-        {
-            VX_WARN("[ShaderSystem] ⚠️ Async shader compilation finished but shaders are not ready");
-        }
-        m_ShadersCompiling = false;
-    }
-    
     // === Input Polling Demonstration ===
     
     // WASD + Gamepad Left Stick movement (polling)
@@ -279,26 +264,22 @@ void ExampleGameLayer::OnUpdate()
 
 void ExampleGameLayer::OnRender()
 {
-    // Show compilation status if shaders are still compiling
-    if (m_ShadersCompiling)
+    // Use cached ShaderManager reference for better performance
+    if (!m_SystemsInitialized)
     {
-        // Could render a "Loading..." screen or progress indicator here
-        // For now, just skip rendering and show periodic status
-        static float lastStatusTime = 0.0f;
-        if (Time::GetTime() - lastStatusTime >= 1.0f)
-        {
-            VX_INFO("[Render] Shaders still compiling asynchronously... Please wait.");
-            lastStatusTime = Time::GetTime();
-        }
+        VX_WARN("Systems not initialized properly!");
         return;
     }
-    
-    // Use the modern shader system for rendering
-    if (m_TriangleShader && m_TriangleShader->IsValid() && m_VAO != 0)
+
+    // Bind shader through ShaderManager; if not ready or invalid, skip rendering this frame
+    if (auto shaderBindResult = m_ShaderManager->BindShader(m_ShaderHandle); !shaderBindResult.IsSuccess())
     {
-        // Bind our shader
-        m_TriangleShader->Bind();
-        
+        VX_WARN("Shader not ready: {}", shaderBindResult.GetErrorMessage());
+        return;
+    }
+
+    if (m_VAO != 0)
+    {
         // Set matrix uniforms for advanced shader
         glm::mat4 viewProjection = glm::mat4(1.0f);
         glm::mat4 view = glm::mat4(1.0f);
@@ -308,93 +289,65 @@ void ExampleGameLayer::OnRender()
         // Set uniforms for animation
         float timeValue = m_IsPaused ? 0.0f : m_GameTime;
         
-        if (m_UsingAdvancedShader)
-        {
-            // === Matrix uniforms (required by advanced shader) ===
-            m_TriangleShader->SetUniform("u_ViewProjection", viewProjection);
-            m_TriangleShader->SetUniform("u_View", view);
-            m_TriangleShader->SetUniform("u_Model", model);
-            m_TriangleShader->SetUniform("u_NormalMatrix", normalMatrix);
-            
-            // === Animation and time ===
-            m_TriangleShader->SetUniform("u_Time", timeValue);
-            
-            // === Camera position ===
-            glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
-            m_TriangleShader->SetUniform("u_CameraPos", cameraPos);
-            
-            // === Material properties ===
-            glm::vec3 albedo(0.7f, 0.3f, 0.1f); // Reddish-orange material
-            m_TriangleShader->SetUniform("u_Albedo", albedo);
-            m_TriangleShader->SetUniform("u_Metallic", 0.2f);
-            m_TriangleShader->SetUniform("u_Roughness", 0.4f);
-            m_TriangleShader->SetUniform("u_AO", 1.0f);
-            m_TriangleShader->SetUniform("u_Alpha", 1.0f);
-            
-            // Emission for some glow effect
-            float emissionStrength = (sin(timeValue * 2.0f) * 0.5f + 0.5f) * 0.1f;
-            glm::vec3 emission(emissionStrength, emissionStrength * 0.5f, 0.0f);
-            m_TriangleShader->SetUniform("u_Emission", emission);
-            
-            // === Lighting ===
-            glm::vec3 lightPos(2.0f, 2.0f, 2.0f);
-            glm::vec3 lightColor(1.0f, 1.0f, 0.9f); // Warm white
-            m_TriangleShader->SetUniform("u_LightPosition", lightPos);
-            m_TriangleShader->SetUniform("u_LightColor", lightColor);
-            m_TriangleShader->SetUniform("u_LightIntensity", 10.0f);
-            
-            // === Transform uniforms for vertex animation ===
-            glm::vec3 translation(0.0f, 0.0f, 0.0f);
-            glm::vec3 rotation(0.0f, timeValue * 0.2f, 0.0f); // Slow Y rotation
-            glm::vec3 scale(1.0f, 1.0f, 1.0f);
-            m_TriangleShader->SetUniform("u_Translation", translation);
-            m_TriangleShader->SetUniform("u_Rotation", rotation);
-            m_TriangleShader->SetUniform("u_Scale", scale);
-            
-            // === Wind animation parameters ===
-            float windStrength = (sin(timeValue * 1.5f) * 0.5f + 0.5f) * 0.05f;
-            m_TriangleShader->SetUniform("u_WindStrength", windStrength);
+        // === Matrix uniforms (required by advanced shader) ===
+        m_ShaderManager->SetUniform("u_ViewProjection", viewProjection);
+        m_ShaderManager->SetUniform("u_View", view);
+        m_ShaderManager->SetUniform("u_Model", model);
+        m_ShaderManager->SetUniform("u_NormalMatrix", normalMatrix);
+        
+        // === Animation and time ===
+        m_ShaderManager->SetUniform("u_Time", timeValue);
+        
+        // === Camera position ===
+        glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
+        m_ShaderManager->SetUniform("u_CameraPos", cameraPos);
+        
+        // === Material properties ===
+        glm::vec3 albedo(0.7f, 0.3f, 0.1f); // Reddish-orange material
+        m_ShaderManager->SetUniform("u_Albedo", albedo);
+        m_ShaderManager->SetUniform("u_Metallic", 0.2f);
+        m_ShaderManager->SetUniform("u_Roughness", 0.4f);
+        m_ShaderManager->SetUniform("u_AO", 1.0f);
+        m_ShaderManager->SetUniform("u_Alpha", 1.0f);
+        
+        // Emission for some glow effect
+        float emissionStrength = (sin(timeValue * 2.0f) * 0.5f + 0.5f) * 0.1f;
+        glm::vec3 emission(emissionStrength, emissionStrength * 0.5f, 0.0f);
+        m_ShaderManager->SetUniform("u_Emission", emission);
+        
+        // === Lighting ===
+        glm::vec3 lightPos(2.0f, 2.0f, 2.0f);
+        glm::vec3 lightColor(1.0f, 1.0f, 0.9f); // Warm white
+        m_ShaderManager->SetUniform("u_LightPosition", lightPos);
+        m_ShaderManager->SetUniform("u_LightColor", lightColor);
+        m_ShaderManager->SetUniform("u_LightIntensity", 10.0f);
+        
+        // === Transform uniforms for vertex animation ===
+        glm::vec3 translation(0.0f, 0.0f, 0.0f);
+        glm::vec3 rotation(0.0f, timeValue * 0.2f, 0.0f); // Slow Y rotation
+        glm::vec3 scale(1.0f, 1.0f, 1.0f);
+        m_ShaderManager->SetUniform("u_Translation", translation);
+        m_ShaderManager->SetUniform("u_Rotation", rotation);
+        m_ShaderManager->SetUniform("u_Scale", scale);
+        
+        // === Wind animation parameters ===
+        float windStrength = (sin(timeValue * 1.5f) * 0.5f + 0.5f) * 0.05f;
+        m_ShaderManager->SetUniform("u_WindStrength", windStrength);
 
-            // === Rim lighting effect ===
-            m_TriangleShader->SetUniform("u_RimPower", 2.0f);
-            glm::vec3 rimColor(0.2f, 0.4f, 1.0f); // Blue rim
-            m_TriangleShader->SetUniform("u_RimColor", rimColor);
-            m_TriangleShader->SetUniform("u_FresnelStrength", 0.3f);
-            
-            // === Texture flags (all disabled for now since we don't have textures) ===
-            m_TriangleShader->SetUniform("u_UseAlbedoTexture", 0);
-            m_TriangleShader->SetUniform("u_UseNormalTexture", 0);
-            m_TriangleShader->SetUniform("u_UseMetallicRoughnessTexture", 0);
-            m_TriangleShader->SetUniform("u_UseEmissionTexture", 0);
-            m_TriangleShader->SetUniform("u_UseAOTexture", 0);
-        }
-        else
-        {
-            // Fallback for basic shaders (if we ever implement them)
-            m_TriangleShader->SetUniform("u_ViewProjection", viewProjection);
-            m_TriangleShader->SetUniform("u_Transform", model);
-            m_TriangleShader->SetUniform("u_Time", timeValue);
-            glm::vec3 triangleColor(1.0f, 0.5f, 0.2f);
-            m_TriangleShader->SetUniform("u_Color", triangleColor);
-            m_TriangleShader->SetUniform("u_Alpha", 1.0f);
-        }
+        // === Rim lighting effect ===
+        m_ShaderManager->SetUniform("u_RimPower", 2.0f);
+        glm::vec3 rimColor(0.2f, 0.4f, 1.0f); // Blue rim
+        m_ShaderManager->SetUniform("u_RimColor", rimColor);
+        m_ShaderManager->SetUniform("u_FresnelStrength", 0.3f);
         
         // Bind vertex array and draw
         glBindVertexArray(m_VAO);
         glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
-        
-        // Unbind shader
-        m_TriangleShader->Unbind();
     }
 
-    // Optional periodic log
-    static int renderCallCount = 0;
-    renderCallCount++;
-    if (renderCallCount % 120 == 0)
-    {
-        //VX_INFO("[Render] Modern shader system triangle render (frame #{}) - VAO={}", renderCallCount, m_VAO);
-    }
+    // Unbind shader through ShaderManager
+    m_ShaderManager->UnbindShader();
 }
 
 bool ExampleGameLayer::OnEvent(Event& event)
@@ -404,17 +357,69 @@ bool ExampleGameLayer::OnEvent(Event& event)
     return false; // Don't consume any events
 }
 
+void ExampleGameLayer::SetupShaderSystem()
+{
+    VX_INFO("[ShaderSystem] Setting up modern shader system via AssetSystem (async)...");
+
+    try
+    {
+        if (!m_SystemsInitialized)
+        {
+            VX_ERROR("[ShaderSystem] Systems not initialized properly");
+            return;
+        }
+
+        auto* assetSystem = m_SystemManager->GetSystem<AssetSystem>();
+        m_ShaderLoading = true;
+        m_ShaderProgress = 0.0f;
+        if (!assetSystem)
+        {
+            VX_ERROR("[ShaderSystem] AssetSystem not available");
+            return;
+        }
+
+        ShaderCompileOptions options; options.GenerateDebugInfo = true; options.TargetProfile = "opengl";
+        // Request async load with progress callback for logging and window title updates
+        m_ShaderHandle = assetSystem->LoadShaderAsync(
+            "AdvancedTriangleShader",
+            (std::filesystem::path("Shaders") / "AdvancedTriangle.vert").string(),
+            (std::filesystem::path("Shaders") / "AdvancedTriangle.frag").string(),
+            options,
+            [this](float progress)
+            {
+                m_ShaderProgress = progress;
+
+                // Always log progress
+                VX_CORE_INFO("[AssetSystem] Shader loading progress: {:.1f}%", progress * 100.0f);
+
+                // Update window title with loading progress
+                std::string title = "Vortex Sandbox - Loading Shaders: " + std::to_string(static_cast<int>(progress * 100)) + "%";
+                if (progress >= 1.0f)
+                {
+                    title = "Vortex Sandbox - Shaders Loaded!";
+                    VX_CORE_INFO("[AssetSystem] Shader loading completed!");
+                    m_ShaderLoading = false;
+                }
+                m_Application->GetWindow()->SetTitle(title);
+            }
+        ); 
+    }
+    catch (const std::exception& e)
+    {
+        VX_ERROR("[ShaderSystem] Exception during shader setup: {}", e.what());
+    }
+}
+
 void ExampleGameLayer::SetupInputActions()
 {
-    // Get the Application and Engine to access InputSystem
-    auto* app = Application::Get();
-    if (!app || !app->GetEngine())
+    // Use cached system references
+    if (!m_SystemsInitialized)
     {
-        VX_WARN("Application or Engine not available for ExampleGameLayer");
+        VX_WARN("System references not cached properly for ExampleGameLayer");
         return;
     }
     
-	auto* inputSystem = app->GetEngine()->GetSystemManager().GetSystem<InputSystem>();
+	auto* inputSystem = m_SystemManager->GetSystem<InputSystem>();
     if (!inputSystem)
     {
         VX_WARN("InputSystem not available for ExampleGameLayer");
@@ -485,193 +490,4 @@ void ExampleGameLayer::OnFireAction(InputActionPhase phase)
     {
         VX_INFO("[Action] Can't score while paused! (via Input Action)");
     }
-}
-
-void ExampleGameLayer::SetupShaderSystem()
-{
-    VX_INFO("[ShaderSystem] Setting up modern shader system with async compilation...");
-    
-    try
-    {
-        // Create shader manager
-        m_ShaderManager = std::make_shared<ShaderManager>();
-        
-        // Start async shader compilation - this returns immediately
-        m_ShaderCompilationTask = SetupAdvancedShadersAsync();
-        m_ShadersCompiling = true;
-        m_ShadersReady = false;
-        
-        VX_INFO("[ShaderSystem] Async shader compilation started...");
-    }
-    catch (const std::exception& e)
-    {
-        VX_ERROR("[ShaderSystem] Exception during shader setup: {}", e.what());
-        m_TriangleShader.reset();
-        m_ShaderManager.reset();
-        m_ShadersCompiling = false;
-    }
-}
-
-Task<void> ExampleGameLayer::SetupAdvancedShadersAsync()
-{
-    VX_INFO("[ShaderSystem] Starting async compilation of advanced PBR shaders...");
-    
-    // Load shader file paths
-    std::string vertShaderPath = "Assets/Shaders/AdvancedTriangle.vert";
-    std::string fragShaderPath = "Assets/Shaders/AdvancedTriangle.frag";
-    
-    // Create shader compilation options
-    ShaderCompileOptions options;
-    options.OptimizationLevel = ShaderOptimizationLevel::None;
-    options.GenerateDebugInfo = true;
-    options.TargetProfile = "opengl";
-    
-    // Load shader sources
-    std::string vertSource, fragSource;
-    if (!LoadShaderFromFile(vertShaderPath, vertSource) || !LoadShaderFromFile(fragShaderPath, fragSource))
-    {
-        VX_ERROR("[ShaderSystem] Failed to load shader files");
-        co_return;
-    }
-    
-    // Create shader compiler with caching enabled
-    ShaderCompiler compiler;
-    compiler.SetCachingEnabled(true, "cache/shaders/");
-    
-    VX_INFO("[ShaderSystem] Compiling vertex shader asynchronously...");
-    
-    // Compile vertex shader asynchronously
-    auto vsResultTask = compiler.CompileFromSourceAsync(
-        vertSource, 
-        ShaderStage::Vertex, 
-        options, 
-        CoroutinePriority::Normal,
-        "AdvancedTriangle.vert"
-    );
-    
-    VX_INFO("[ShaderSystem] Compiling fragment shader asynchronously...");
-    
-    // Compile fragment shader asynchronously
-    auto fsResultTask = compiler.CompileFromSourceAsync(
-        fragSource, 
-        ShaderStage::Fragment, 
-        options, 
-        CoroutinePriority::Normal,
-        "AdvancedTriangle.frag"
-    );
-    
-    VX_INFO("[ShaderSystem] Waiting for both shaders to compile...");
-    
-    // Wait for both compilations to complete
-    auto vsResult = co_await vsResultTask;
-    auto fsResult = co_await fsResultTask;
-    
-    // Check compilation results
-    if (!vsResult.IsSuccess())
-    {
-        VX_ERROR("[ShaderSystem] Vertex shader compilation error: {}", vsResult.GetErrorMessage());
-        co_return;
-    }
-    
-    if (!fsResult.IsSuccess())
-    {
-        VX_ERROR("[ShaderSystem] Fragment shader compilation error: {}", fsResult.GetErrorMessage());
-        co_return;
-    }
-    
-    VX_INFO("[ShaderSystem] Both shaders compiled successfully! Creating GPU shader...");
-    
-    // Create GPU shader
-    m_TriangleShader = GPUShader::Create("AdvancedTriangleShader");
-    
-    // Prepare shader stages
-    std::unordered_map<ShaderStage, std::vector<uint32_t>> shaderStages;
-    shaderStages[ShaderStage::Vertex] = vsResult.GetValue().SpirV;
-    shaderStages[ShaderStage::Fragment] = fsResult.GetValue().SpirV;
-    
-    // Get reflection data from compiled shaders
-    const auto& vertReflection = vsResult.GetValue().Reflection;
-    const auto& fragReflection = fsResult.GetValue().Reflection;
-    
-    // Use our advanced reflection merge system with conflict resolution
-    std::vector<ShaderReflectionData> reflections = { vertReflection, fragReflection };
-    ShaderReflectionData reflection = ShaderReflection::CombineReflections(reflections);
-    
-    // Validate the merged reflection for consistency
-    if (!ShaderReflection::ValidateMergedReflection(reflection))
-    {
-        VX_WARN("[ShaderSystem] Merged reflection validation failed - some conflicts were detected and resolved");
-    }
-    
-    // Create the GPU shader with reflection
-    auto createResult = m_TriangleShader->Create(shaderStages, reflection);
-    if (createResult.IsSuccess())
-    {
-        VX_INFO("[ShaderSystem] ✅ Successfully created advanced PBR shader asynchronously!");
-        VX_INFO("[ShaderSystem] Advanced shader debug info:\n{}", m_TriangleShader->GetDebugInfo());
-        m_UsingAdvancedShader = true;
-        m_ShadersReady = true;
-        
-        // Get compilation stats from the compiler
-        auto stats = compiler.GetStats();
-        VX_INFO("[ShaderSystem] Compilation stats: {} shaders compiled, {} cache hits, {} cache misses, {}μs total time", 
-               stats.ShadersCompiled, stats.CacheHits, stats.CacheMisses, stats.CompilationTime);
-    }
-    else
-    {
-        VX_ERROR("[ShaderSystem] Failed to create advanced GPU shader: {}", static_cast<int>(createResult.GetErrorCode()));
-        m_TriangleShader.reset();
-    }
-    
-    m_ShadersCompiling = false;
-    co_return;
-}
-
-bool ExampleGameLayer::LoadShaderFromFile(const std::string& path, std::string& source)
-{
-    namespace fs = std::filesystem;
-    fs::path cwd = fs::current_path();
-    fs::path exeDir;
-    
-    #if defined(_WIN32)
-    {
-        char exePathA[MAX_PATH] = {0};
-        DWORD len = GetModuleFileNameA(NULL, exePathA, MAX_PATH);
-        if (len != 0) exeDir = fs::path(exePathA).parent_path();
-    }
-    #elif defined(__linux__)
-    {
-        char exePath[4096];
-        ssize_t l = readlink("/proc/self/exe", exePath, sizeof(exePath)-1);
-        if (l > 0) { exePath[l] = '\0'; exeDir = fs::path(exePath).parent_path(); }
-    }
-    #endif
-    
-    auto try_read = [&](const fs::path& p) -> bool 
-    {
-        std::ifstream f(p.string());
-        if (f.is_open())
-        {
-            std::stringstream buffer;
-            buffer << f.rdbuf();
-            source = buffer.str();
-            f.close();
-            VX_INFO("[ShaderSystem] Loaded shader from: {}", p.string());
-            return true;
-        }
-        return false;
-    };
-    
-    // Try multiple candidate paths
-    bool loaded = false;
-    loaded = loaded || try_read(fs::path(path));
-    loaded = loaded || try_read(cwd / path);
-    if (!exeDir.empty()) loaded = loaded || try_read(exeDir / path);
-    
-    if (!loaded)
-    {
-        VX_WARN("[ShaderSystem] Could not load shader file: {}", path);
-    }
-    
-    return loaded;
 }

@@ -1,8 +1,12 @@
 #pragma once
 
-#include "ShaderTypes.h"
-#include "ShaderCompiler.h"
 #include "Core/Debug/ErrorCodes.h"
+#include "Engine/Assets/AssetHandle.h"
+#include "Engine/Assets/ShaderAsset.h"
+#include "Engine/Renderer/Shader/ShaderTypes.h"
+#include "Engine/Renderer/Shader/ShaderCompiler.h"
+#include "Engine/Renderer/Shader/Shader.h"
+#include "Engine/Renderer/Shader/ShaderReflection.h"
 
 #include <memory>
 #include <unordered_map>
@@ -11,24 +15,7 @@
 
 namespace Vortex
 {
-    /**
-     * @brief Shader resource handle for efficient lookup and management
-     */
-    class ShaderHandle
-    {
-    public:
-        ShaderHandle() = default;
-        explicit ShaderHandle(uint64_t id) : m_Id(id) {}
-        
-        bool IsValid() const { return m_Id != 0; }
-        uint64_t GetId() const { return m_Id; }
-        
-        bool operator==(const ShaderHandle& other) const { return m_Id == other.m_Id; }
-        bool operator!=(const ShaderHandle& other) const { return m_Id != other.m_Id; }
-        
-    private:
-        uint64_t m_Id = 0;
-    };
+    // Use AssetSystem's typed handle directly for shader assets
 
     /**
      * @brief High-level shader resource manager
@@ -78,9 +65,7 @@ namespace Vortex
          * @param options Compilation options
          * @return Shader handle or error
          */
-        Result<ShaderHandle> LoadShader(const std::string& name, 
-                                       const std::string& filePath,
-                                       const ShaderCompileOptions& options = {});
+        Result<AssetHandle<ShaderAsset>> LoadShader(const std::string& name, const std::string& filePath, const ShaderCompileOptions& options = {});
 
         /**
          * @brief Load a shader program from multiple stage files
@@ -89,9 +74,7 @@ namespace Vortex
          * @param options Compilation options
          * @return Shader handle or error
          */
-        Result<ShaderHandle> LoadShaderProgram(const std::string& name,
-                                              const std::unordered_map<ShaderStage, std::string>& shaderFiles,
-                                              const ShaderCompileOptions& options = {});
+        Result<AssetHandle<ShaderAsset>> LoadShaderProgram(const std::string& name, const std::unordered_map<ShaderStage, std::string>& shaderFiles, const ShaderCompileOptions& options = {});
 
         /**
          * @brief Load shader with variants
@@ -101,56 +84,32 @@ namespace Vortex
          * @param options Compilation options
          * @return Map of variant hash to shader handle
          */
-        Result<std::unordered_map<uint64_t, ShaderHandle>> LoadShaderVariants(
-            const std::string& name,
-            const std::string& filePath, 
-            const std::vector<ShaderMacros>& variants,
-            const ShaderCompileOptions& options = {});
-
-        /**
-         * @brief Create shader from source code
-         * @param name Shader identifier
-         * @param source Source code
-         * @param stage Shader stage
-         * @param options Compilation options
-         * @return Shader handle or error
-         */
-        Result<ShaderHandle> CreateShader(const std::string& name,
-                                         const std::string& source,
-                                         ShaderStage stage,
-                                         const ShaderCompileOptions& options = {});
+        Result<std::unordered_map<uint64_t, AssetHandle<ShaderAsset>>> LoadShaderVariants(const std::string& name, const std::string& filePath, const std::vector<ShaderMacros>& variants, const ShaderCompileOptions& options = {});
 
         // ============================================================================
         // SHADER ACCESS
         // ============================================================================
 
         /**
-         * @brief Get shader by handle
-         * @param handle Shader handle
-         * @return Pointer to compiled shader, nullptr if invalid
-         */
-        const CompiledShader* GetShader(ShaderHandle handle) const;
-
-        /**
          * @brief Get shader program by handle
          * @param handle Shader handle
          * @return Pointer to shader program, nullptr if invalid
          */
-        const ShaderProgram* GetShaderProgram(ShaderHandle handle) const;
+        const ShaderProgram* GetShaderProgram(const AssetHandle<ShaderAsset>& handle) const;
 
         /**
          * @brief Find shader by name
          * @param name Shader identifier
          * @return Shader handle, invalid if not found
          */
-        ShaderHandle FindShader(const std::string& name) const;
+        AssetHandle<ShaderAsset> FindShader(const std::string& name) const;
 
         /**
          * @brief Get shader reflection data
          * @param handle Shader handle
          * @return Pointer to reflection data, nullptr if invalid
          */
-        const ShaderReflectionData* GetReflectionData(ShaderHandle handle) const;
+        const ShaderReflectionData* GetReflectionData(const AssetHandle<ShaderAsset>& handle) const;
 
         // ============================================================================
         // SHADER BINDING
@@ -161,7 +120,7 @@ namespace Vortex
          * @param handle Shader program handle
          * @return Success/failure result
          */
-        Result<void> BindShader(ShaderHandle handle);
+        Result<void> BindShader(const AssetHandle<ShaderAsset>& handle);
 
         /**
          * @brief Unbind current shader program
@@ -172,7 +131,7 @@ namespace Vortex
          * @brief Get currently bound shader handle
          * @return Current shader handle, invalid if none bound
          */
-        ShaderHandle GetCurrentShader() const;
+        AssetHandle<ShaderAsset> GetCurrentShader() const;
 
         // ============================================================================
         // UNIFORM MANAGEMENT
@@ -217,7 +176,7 @@ namespace Vortex
          * @param handle Shader handle
          * @return Success/failure result
          */
-        Result<void> ReloadShader(ShaderHandle handle);
+        Result<void> ReloadShader(const AssetHandle<ShaderAsset>& handle);
 
         /**
          * @brief Reload all shaders from disk
@@ -229,7 +188,7 @@ namespace Vortex
          * @brief Remove shader from manager
          * @param handle Shader handle
          */
-        void RemoveShader(ShaderHandle handle);
+        void RemoveShader(const AssetHandle<ShaderAsset>& handle);
 
         /**
          * @brief Clear all shaders
@@ -270,7 +229,7 @@ namespace Vortex
         // CALLBACKS
         // ============================================================================
 
-        using ShaderReloadCallback = std::function<void(ShaderHandle handle, const std::string& name)>;
+        using ShaderReloadCallback = std::function<void(const AssetHandle<ShaderAsset>& handle, const std::string& name)>;
         using ShaderErrorCallback = std::function<void(const std::string& name, const std::vector<ShaderCompileError>& errors)>;
 
         /**
@@ -295,8 +254,3 @@ namespace Vortex
     ShaderManager& GetShaderManager();
 
 } // namespace Vortex
-
-// Convenience macros for shader management
-#define VX_LOAD_SHADER(name, path) Vortex::Shader::GetShaderManager().LoadShader(name, path)
-#define VX_BIND_SHADER(handle) Vortex::Shader::GetShaderManager().BindShader(handle)
-#define VX_SET_UNIFORM(name, value) Vortex::Shader::GetShaderManager().SetUniform(name, value)

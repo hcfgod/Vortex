@@ -15,23 +15,23 @@ layout(location = 4) out vec3 v_Tangent;
 layout(location = 5) out vec3 v_Bitangent;
 
 // Uniform matrices
-layout(location = 0) uniform mat4 u_ViewProjection;
-layout(location = 1) uniform mat4 u_View;
-layout(location = 2) uniform mat4 u_Model;
-layout(location = 3) uniform mat3 u_NormalMatrix;
+layout(location = 0)  uniform mat4 u_ViewProjection; // uses 0..3
+layout(location = 4)  uniform mat4 u_View;          // uses 4..7
+layout(location = 8)  uniform mat4 u_Model;         // uses 8..11
+layout(location = 12) uniform mat3 u_NormalMatrix;  // uses 12..14
 
-// Animation uniforms
-layout(location = 4) uniform float u_Time;
-layout(location = 5) uniform vec3 u_CameraPos;
+// Animation/uniforms shared across stages
+layout(location = 15) uniform float u_Time;
+layout(location = 16) uniform vec3  u_CameraPos;
 
-// Transform uniforms
-layout(location = 6) uniform vec3 u_Translation;
-layout(location = 7) uniform vec3 u_Rotation;
-layout(location = 8) uniform vec3 u_Scale;
+// Transform uniforms (vertex-only)
+layout(location = 17) uniform vec3 u_Translation;
+layout(location = 18) uniform vec3 u_Rotation;
+layout(location = 19) uniform vec3 u_Scale;
 
-// Wind animation parameters
-layout(location = 9) uniform float u_WindStrength;
-layout(location = 10) uniform vec2 u_WindDirection;
+// Wind animation parameters (vertex-only)
+layout(location = 20) uniform float u_WindStrength;
+layout(location = 21) uniform vec2  u_WindDirection;
 
 void main()
 {

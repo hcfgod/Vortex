@@ -31,6 +31,7 @@ namespace Vortex
 			case ErrorCode::TextureLoadFailed: return "Texture Load Failed";
 			case ErrorCode::BufferCreationFailed: return "Buffer Creation Failed";
 			case ErrorCode::RenderTargetCreationFailed: return "Render Target Creation Failed";
+			case ErrorCode::CompilationFailed: return "Compilation Failed";
 
 			// Audio errors
 			case ErrorCode::AudioInitFailed: return "Audio Initialization Failed";

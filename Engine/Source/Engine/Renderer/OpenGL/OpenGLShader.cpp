@@ -126,8 +126,10 @@ namespace Vortex
         }
         SetMetadata(GetName(), reflection, stageFlags);
         
-        // Log reflection information for debugging
+        // Log reflection information for debugging (Debug builds only)
+        #ifdef VX_DEBUG
         LogReflectionInfo(reflection);
+        #endif
 
         VX_CORE_INFO("OpenGLShader: Successfully created shader '{}' with program ID {}", GetName(), m_ProgramId);
         return Success();

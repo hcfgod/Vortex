@@ -14,12 +14,14 @@ project "Engine"
     filter "files:Vendor/GLAD/generated/src/gl.c"
         flags { "NoPCH" }
         compileas "C"
-        disablewarnings { "4005" }
+        -- Suppress macro redefinition and code analysis warnings from GLAD C source
+        disablewarnings { "4005", "6001" }
         
     -- Disable PCH for SPIRV-Cross source files to avoid conflicts
     filter "files:Vendor/SPIRV-Cross/**.cpp"
         flags { "NoPCH" }
-        disablewarnings { "4996", "4244", "4267" }
+        -- Suppress typical build and code analysis warnings from external SPIRV-Cross
+        disablewarnings { "4996", "4244", "4267", "6001", "6011" }
     filter {}
 
     files

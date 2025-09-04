@@ -187,6 +187,19 @@ namespace Vortex
                     // Apply the loaded settings
                     ApplySettings();
 
+                    // Initialize the ShaderManager
+                    auto& shaderManager = GetShaderManager();
+                    auto shaderManagerInit = shaderManager.Initialize();
+                    if (shaderManagerInit.IsError())
+                    {
+                        VX_CORE_WARN("Failed to initialize ShaderManager: {}", shaderManagerInit.GetErrorMessage());
+                        // Continue even if shader manager fails - it's not critical for basic rendering
+                    }
+                    else
+                    {
+                        VX_CORE_INFO("ShaderManager initialized successfully");
+                    }
+
                     m_Ready = true;
                     VX_CORE_INFO("RenderSystem rendering initialized (API: {})", GraphicsAPIToString(api));
                     return Result<void>();
@@ -268,7 +281,10 @@ namespace Vortex
             return Result<void>();
         }
 
-        // Shutdown render queue first (flush commands)
+        // Shutdown ShaderManager first to free GPU resources
+        GetShaderManager().Shutdown();
+        
+        // Shutdown render queue (flush commands)
         auto rqsd = ShutdownGlobalRenderQueue();
         VX_LOG_ERROR(rqsd);
 
