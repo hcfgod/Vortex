@@ -46,13 +46,13 @@ namespace Vortex
 
         // Load shader via simple manifest (json or direct guess)
         AssetHandle<ShaderAsset> LoadShaderAsync(const std::string& name,
-                                                const std::string& vertexPath,
-                                                const std::string& fragmentPath,
-                                                const ShaderCompileOptions& options = {},
-                                                ProgressCallback onProgress = {});
+            const std::string& vertexPath,
+            const std::string& fragmentPath,
+            const ShaderCompileOptions& options = {},
+            ProgressCallback onProgress = {});
         AssetHandle<ShaderAsset> LoadShaderFromManifestAsync(const std::string& manifestPath,
-                                                             const ShaderCompileOptions& defaultOptions = {},
-                                                             ProgressCallback onProgress = {});
+            const ShaderCompileOptions& defaultOptions = {},
+            ProgressCallback onProgress = {});
 
         // Ref management used by AssetHandle (friend)
         void Acquire(const UUID& id);
@@ -68,14 +68,14 @@ namespace Vortex
 
         // Builder stubs (for release builds to prebuild assets)
         Result<void> BuildShader(const std::string& name,
-                                 const std::string& vertexPath,
-                                 const std::string& fragmentPath,
-                                 const std::filesystem::path& outputDir);
+            const std::string& vertexPath,
+            const std::string& fragmentPath,
+            const std::filesystem::path& outputDir);
 
     private:
         struct AssetEntry
         {
-            std::shared_ptr<Asset> Asset;
+            std::shared_ptr<Asset> assetPtr;
             std::string Name; // for name lookup
         };
 
@@ -83,11 +83,11 @@ namespace Vortex
         void UnregisterAsset(const UUID& id);
 
         Task<void> CompileShaderTask(UUID id,
-                                     std::string name,
-                                     std::string vertexPath,
-                                     std::string fragmentPath,
-                                     ShaderCompileOptions options,
-                                     ProgressCallback progress);
+            std::string name,
+            std::string vertexPath,
+            std::string fragmentPath,
+            ShaderCompileOptions options,
+            ProgressCallback progress);
 
         // Simple built-in fallback shader
         void EnsureFallbackShader();
@@ -123,7 +123,7 @@ namespace Vortex
         std::lock_guard<std::mutex> lock(m_Mutex);
         auto it = m_Assets.find(id);
         if (it == m_Assets.end()) return nullptr;
-        return dynamic_cast<T*>(it->second.Asset.get());
+        return dynamic_cast<T*>(it->second.assetPtr.get());
     }
 
     template<typename T>
@@ -132,7 +132,7 @@ namespace Vortex
         std::lock_guard<std::mutex> lock(m_Mutex);
         auto it = m_Assets.find(id);
         if (it == m_Assets.end()) return nullptr;
-        return dynamic_cast<const T*>(it->second.Asset.get());
+        return dynamic_cast<const T*>(it->second.assetPtr.get());
     }
 
     // AssetHandle inline method defs
@@ -160,4 +160,3 @@ namespace Vortex
         return m_System ? m_System->TryGet<T>(m_Id) : nullptr;
     }
 }
-

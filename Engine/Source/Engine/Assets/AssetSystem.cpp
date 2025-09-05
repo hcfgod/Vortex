@@ -97,8 +97,8 @@ namespace Vortex
         std::lock_guard<std::mutex> lock(m_Mutex);
         m_Refs[id] += 1;
         auto it = m_Assets.find(id);
-        if (it != m_Assets.end() && it->second.Asset)
-            it->second.Asset->AddRef();
+        if (it != m_Assets.end() && it->second.assetPtr)
+            it->second.assetPtr->AddRef();
     }
 
     void AssetSystem::Release(const UUID& id)
@@ -109,8 +109,8 @@ namespace Vortex
         if (it->second > 0)
             it->second -= 1;
         auto a = m_Assets.find(id);
-        if (a != m_Assets.end() && a->second.Asset)
-            a->second.Asset->ReleaseRef();
+        if (a != m_Assets.end() && a->second.assetPtr)
+            a->second.assetPtr->ReleaseRef();
         if (it->second == 0)
         {
             // TODO: Optionally schedule unload after delay taking dependencies into account
@@ -122,7 +122,7 @@ namespace Vortex
         std::lock_guard<std::mutex> lock(m_Mutex);
         auto it = m_Assets.find(id);
         if (it == m_Assets.end()) return false;
-        return it->second.Asset->GetState() == AssetState::Loaded;
+        return it->second.assetPtr->GetState() == AssetState::Loaded;
     }
 
     float AssetSystem::GetProgress(const UUID& id) const
@@ -130,14 +130,14 @@ namespace Vortex
         std::lock_guard<std::mutex> lock(m_Mutex);
         auto it = m_Assets.find(id);
         if (it == m_Assets.end()) return 0.0f;
-        return it->second.Asset->GetProgress();
+        return it->second.assetPtr->GetProgress();
     }
 
     UUID AssetSystem::RegisterAsset(const std::shared_ptr<Asset>& asset)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
         UUID id = asset->GetId();
-        AssetEntry entry; entry.Asset = asset; entry.Name = asset->GetName();
+        AssetEntry entry; entry.assetPtr = asset; entry.Name = asset->GetName();
         m_NameToUUID[entry.Name] = id;
         m_Assets[id] = std::move(entry);
         return id;
@@ -217,9 +217,9 @@ namespace Vortex
 
 
     Result<void> AssetSystem::BuildShader(const std::string& name,
-                                          const std::string& vertexPath,
-                                          const std::string& fragmentPath,
-                                          const std::filesystem::path& outputDir)
+        const std::string& vertexPath,
+        const std::string& fragmentPath,
+        const std::filesystem::path& outputDir)
     {
         // Basic stub: compile and write SPIR-V blobs to outputDir for packaging
         ShaderCompiler compiler;
@@ -233,19 +233,19 @@ namespace Vortex
         std::filesystem::create_directories(outputDir);
         auto vout = outputDir / (name + ".vert.spv");
         auto fout = outputDir / (name + ".frag.spv");
-        std::ofstream ov(vout, std::ios::binary); 
-        ov.write(reinterpret_cast<const char*>(vs.GetValue().SpirV.data()), vs.GetValue().SpirV.size()*sizeof(uint32_t));
+        std::ofstream ov(vout, std::ios::binary);
+        ov.write(reinterpret_cast<const char*>(vs.GetValue().SpirV.data()), vs.GetValue().SpirV.size() * sizeof(uint32_t));
         std::ofstream of(fout, std::ios::binary);
-        of.write(reinterpret_cast<const char*>(fs.GetValue().SpirV.data()), fs.GetValue().SpirV.size()*sizeof(uint32_t));
+        of.write(reinterpret_cast<const char*>(fs.GetValue().SpirV.data()), fs.GetValue().SpirV.size() * sizeof(uint32_t));
         return Result<void>();
     }
 
     Task<void> AssetSystem::CompileShaderTask(UUID id,
-                                              std::string name,
-                                              std::string vertexPath,
-                                              std::string fragmentPath,
-                                              ShaderCompileOptions options,
-                                              ProgressCallback progress)
+        std::string name,
+        std::string vertexPath,
+        std::string fragmentPath,
+        ShaderCompileOptions options,
+        ProgressCallback progress)
     {
         // Small staged progress model: 0.0-0.1 read, 0.1-0.8 compile, 0.8-1.0 create
         auto setProgress = [&](float p) {
@@ -253,10 +253,10 @@ namespace Vortex
                 std::lock_guard<std::mutex> lock(m_Mutex);
                 auto it = m_Assets.find(id);
                 if (it != m_Assets.end())
-                    it->second.Asset->SetProgress(p);
+                    it->second.assetPtr->SetProgress(p);
             }
             if (progress) progress(p);
-        };
+            };
 
         setProgress(0.05f);
 
@@ -282,7 +282,7 @@ namespace Vortex
                     return acc;
                 }
                 return p;
-            };
+                };
 
             if (!vertexPath.empty())
             {
@@ -321,7 +321,7 @@ namespace Vortex
         if (!vsRes.IsSuccess() || !fsRes.IsSuccess())
         {
             VX_CORE_ERROR("AssetSystem: Shader compilation failed for '{}': VS={} FS={}", name,
-                          vsRes.IsSuccess(), fsRes.IsSuccess());
+                vsRes.IsSuccess(), fsRes.IsSuccess());
             if (!vsRes.IsSuccess())
                 VX_CORE_ERROR("  VS error: {}", vsRes.GetErrorMessage());
             if (!fsRes.IsSuccess())
@@ -331,7 +331,7 @@ namespace Vortex
             auto it = m_Assets.find(id);
             if (it != m_Assets.end())
             {
-                auto* shaderAsset = dynamic_cast<ShaderAsset*>(it->second.Asset.get());
+                auto* shaderAsset = dynamic_cast<ShaderAsset*>(it->second.assetPtr.get());
                 if (shaderAsset && m_FallbackShader && m_FallbackShader->IsValid())
                 {
                     shaderAsset->SetShader(m_FallbackShader);
@@ -343,8 +343,8 @@ namespace Vortex
                 }
                 else
                 {
-                    it->second.Asset->SetState(AssetState::Failed);
-                    it->second.Asset->SetProgress(1.0f);
+                    it->second.assetPtr->SetState(AssetState::Failed);
+                    it->second.assetPtr->SetProgress(1.0f);
                 }
             }
             co_return;
@@ -358,7 +358,7 @@ namespace Vortex
         stages[ShaderStage::Vertex] = vsRes.GetValue().SpirV;
         stages[ShaderStage::Fragment] = fsRes.GetValue().SpirV;
 
-        ShaderReflectionData reflection = ShaderReflection::CombineReflections({vsRes.GetValue().Reflection, fsRes.GetValue().Reflection});
+        ShaderReflectionData reflection = ShaderReflection::CombineReflections({ vsRes.GetValue().Reflection, fsRes.GetValue().Reflection });
 
         auto createRes = shader->Create(stages, reflection);
         if (!createRes.IsSuccess())
@@ -368,8 +368,8 @@ namespace Vortex
             auto it = m_Assets.find(id);
             if (it != m_Assets.end())
             {
-                it->second.Asset->SetState(AssetState::Failed);
-                it->second.Asset->SetProgress(1.0f);
+                it->second.assetPtr->SetState(AssetState::Failed);
+                it->second.assetPtr->SetProgress(1.0f);
             }
             co_return;
         }
@@ -381,7 +381,7 @@ namespace Vortex
             auto it = m_Assets.find(id);
             if (it != m_Assets.end())
             {
-                auto* shaderAsset = dynamic_cast<ShaderAsset*>(it->second.Asset.get());
+                auto* shaderAsset = dynamic_cast<ShaderAsset*>(it->second.assetPtr.get());
                 if (shaderAsset)
                 {
                     shaderAsset->SetShader(std::shared_ptr<GPUShader>(std::move(shader)));
@@ -399,7 +399,7 @@ namespace Vortex
     void AssetSystem::EnsureFallbackShader()
     {
         // Very small GLSL passthrough shader compiled via ShaderCompiler
-static const char* kVS = R"(
+        static const char* kVS = R"(
             #version 450 core
             layout(location = 0) in vec3 aPos;
             layout(location = 1) in vec2 aUV;
@@ -409,7 +409,7 @@ static const char* kVS = R"(
             layout(location = 4) uniform mat4 u_Model;          // uses 4..7
             void main(){ gl_Position = u_ViewProjection * u_Model * vec4(aPos,1.0); }
         )";
-static const char* kFS = R"(
+        static const char* kFS = R"(
             #version 450 core
             layout(location = 0) out vec4 FragColor;
             layout(location = 8) uniform vec4 u_Color;
@@ -429,7 +429,7 @@ static const char* kFS = R"(
         std::unordered_map<ShaderStage, std::vector<uint32_t>> stages;
         stages[ShaderStage::Vertex] = vs.GetValue().SpirV;
         stages[ShaderStage::Fragment] = fs.GetValue().SpirV;
-        ShaderReflectionData reflection = ShaderReflection::CombineReflections({vs.GetValue().Reflection, fs.GetValue().Reflection});
+        ShaderReflectionData reflection = ShaderReflection::CombineReflections({ vs.GetValue().Reflection, fs.GetValue().Reflection });
         if (shader->Create(stages, reflection).IsSuccess())
         {
             m_FallbackShader = std::shared_ptr<GPUShader>(std::move(shader));
