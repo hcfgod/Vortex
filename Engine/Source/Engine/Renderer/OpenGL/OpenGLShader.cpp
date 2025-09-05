@@ -19,6 +19,33 @@ namespace {
     inline Vortex::Result<void> Success() {
         return Vortex::Result<void>();
     }
+
+    // Determine highest supported GLSL version for current OpenGL context
+    inline int GetCurrentGLSLVersion()
+    {
+        // Default to a safe baseline
+        GLint major = 0, minor = 0;
+        glGetIntegerv(GL_MAJOR_VERSION, &major);
+        glGetIntegerv(GL_MINOR_VERSION, &minor);
+
+        int glsl = 330; // OpenGL 3.3 core baseline
+        if (major >= 4)
+        {
+            // Map 4.x -> 400, 410, 420, 430, 440, 450, 460
+            int cand = 400 + (minor * 10);
+            if (cand > 460) cand = 460;
+            if (cand < 400) cand = 400; // OpenGL 4.0 minimum mapping
+            glsl = cand;
+        }
+        else if (major == 3)
+        {
+            if (minor >= 3) glsl = 330;
+            else if (minor == 2) glsl = 150;
+            else if (minor == 1) glsl = 140;
+            else glsl = 130;
+        }
+        return glsl;
+    }
 }
 
 namespace Vortex
@@ -377,17 +404,21 @@ namespace Vortex
             // Create SPIRV-Cross compiler
             spirv_cross::CompilerGLSL glsl(spirv);
             
-            // Set options for OpenGL
+            // Set options for OpenGL, targeting the active context's supported GLSL
             spirv_cross::CompilerGLSL::Options options;
-            options.version = 450; // OpenGL 4.5 core
+            options.version = GetCurrentGLSLVersion();
             options.es = false;
             options.vulkan_semantics = false;
+            // Prefer not to require 420pack on < 420 contexts
+            if (options.version < 420) {
+                options.enable_420pack_extension = false;
+            }
             glsl.set_common_options(options);
-            
+
             // Compile to GLSL
             std::string source = glsl.compile();
-            
-            VX_CORE_TRACE("OpenGLShader: Successfully converted SPIR-V to GLSL for {} stage", GetShaderStageName(stage));
+
+            VX_CORE_TRACE("OpenGLShader: Successfully converted SPIR-V to GLSL for {} stage (GLSL {} core)", GetShaderStageName(stage), options.version);
             return source;
         }
         catch (const std::exception& e)
