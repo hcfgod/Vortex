@@ -276,11 +276,12 @@ if not exist "Engine\Vendor\nlohmann_json" (
 :: Setup Vulkan SDK
 echo Setting up Vulkan SDK...
 set VULKAN_SDK_VERSION=1.3.280.0
+set VULKAN_FOUND=0
 
 :: First, check if system-wide Vulkan SDK is installed via environment variable
 if defined VULKAN_SDK (
-    if exist "%VULKAN_SDK%\Bin\vulkaninfo.exe" (
-        if exist "%VULKAN_SDK%\Lib\vulkan-1.lib" (
+    if exist %VULKAN_SDK%"\Bin\vulkaninfoSDK.exe" (
+        if exist %VULKAN_SDK%"\Lib\vulkan-1.lib" (
             echo Vulkan SDK found via system installation!
             echo Using: %VULKAN_SDK%
             goto :vulkan_found
@@ -392,13 +393,8 @@ if defined VULKAN_SDK (
     echo Using Vulkan SDK: %VULKAN_SDK%
     if exist "%VULKAN_SDK%\Lib\vulkan-1.lib" (
         echo Vulkan library found: %VULKAN_SDK%\Lib\vulkan-1.lib
-    ) else (
-        echo WARNING: Vulkan library not found at expected location!
     )
-else (
-    echo WARNING: VULKAN_SDK environment variable not set!
 )
-
 
 :: Setup SPIRV-Headers (dependency for shaderc)
 echo Setting up SPIRV-Headers...
