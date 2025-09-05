@@ -2,133 +2,11 @@
 setlocal EnableDelayedExpansion
 echo Setting up Vortex Engine...
 
+:: Install Prerequisites 
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0BackendScripts\InstallPrerequisites.ps1"
+
 :: Navigate to project root (go up two directories from Scripts\Windows)
 pushd "%~dp0..\.."
-
-:: Check if Premake5 exists, if not download it
-if not exist "Vendor\Premake\premake5.exe" (
-    echo Premake5 not found. Downloading...
-    if not exist "Vendor\Premake" mkdir "Vendor\Premake"
-    
-    echo Downloading Premake5 for Windows...
-    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/premake/premake-core/releases/download/v5.0.0-beta2/premake-5.0.0-beta2-windows.zip' -OutFile 'Vendor\Premake\premake.zip'"
-    
-    if %ERRORLEVEL% NEQ 0 (
-        echo Failed to download Premake5!
-        popd
-        pause
-        exit /b 1
-    )
-    
-    echo Extracting Premake5...
-    powershell -Command "Expand-Archive -Path 'Vendor\Premake\premake.zip' -DestinationPath 'Vendor\Premake' -Force"
-    del "Vendor\Premake\premake.zip"
-    
-    echo Premake5 installed successfully!
-)
-
-:: Check prerequisites
-echo Checking prerequisites...
-echo.
-
-set PREREQUISITES_MISSING=0
-
-:: Check for Git
-echo Checking for Git...
-git --version >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] Git not found!
-    set PREREQUISITES_MISSING=1
-) else (
-    echo [OK] Git found
-)
-
-:: Check for CMake
-echo Checking for CMake...
-cmake --version >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] CMake not found!
-    set PREREQUISITES_MISSING=1
-) else (
-    echo [OK] CMake found
-)
-
-:: Check for Python
-echo Checking for Python...
-set PYTHON_FOUND=0
-set PYTHON_CMD=
-
-:: Try different Python commands - start with py launcher first (most reliable on Windows)
-py --version >nul 2>&1
-if %ERRORLEVEL% EQU 0 (
-    set PYTHON_FOUND=1
-    set PYTHON_CMD=py
-    echo [OK] Python found via 'py' launcher
-) else (
-    python --version >nul 2>&1
-    if %ERRORLEVEL% EQU 0 (
-        set PYTHON_FOUND=1
-        set PYTHON_CMD=python
-        echo [OK] Python found via 'python' command
-    ) else (
-        python3 --version >nul 2>&1
-        if %ERRORLEVEL% EQU 0 (
-            set PYTHON_FOUND=1
-            set PYTHON_CMD=python3
-            echo [OK] Python found via 'python3' command
-        ) else (
-            :: Try searching common installation paths
-            if exist "%LOCALAPPDATA%\Programs\Python" (
-                for /d %%i in ("%LOCALAPPDATA%\Programs\Python\Python*") do (
-                    if exist "%%i\python.exe" (
-                        set PYTHON_FOUND=1
-                        set PYTHON_CMD="%%i\python.exe"
-                        echo [OK] Python found at %%i\python.exe
-                        goto :python_check_done
-                    )
-                )
-            )
-        )
-    )
-)
-
-:python_check_done
-
-if %PYTHON_FOUND% EQU 0 (
-    echo [ERROR] Python not found!
-    set PREREQUISITES_MISSING=1
-)
-
-:: Check if any prerequisites are missing
-if %PREREQUISITES_MISSING% EQU 1 (
-    echo.
-    echo ========================================
-    echo MISSING PREREQUISITES DETECTED
-    echo ========================================
-    echo.
-    echo Please install the following tools before running this setup script:
-    echo.
-    echo 1. Git - https://git-scm.com/download/windows
-    echo    - Required for downloading dependencies
-    echo.
-    echo 2. CMake - https://cmake.org/download/
-    echo    - Required for building C++ dependencies
-    echo    - Make sure to add CMake to your PATH during installation
-    echo.
-    echo 3. Python - https://www.python.org/downloads/
-    echo    - Required for generating GLAD OpenGL loader
-    echo    - Make sure to check "Add Python to PATH" during installation
-    echo.
-    echo After installing these tools, restart your command prompt and run this script again.
-    echo.
-    pause
-    popd
-    exit /b 1
-)
-
-echo.
-echo All prerequisites found! Continuing with setup...
-echo.
 
 :: Setup spdlog
 echo Setting up spdlog...
@@ -278,7 +156,7 @@ echo Setting up Vulkan SDK...
 set VULKAN_SDK_VERSION=1.3.280.0
 set VULKAN_FOUND=0
 
-:: First, check if system-wide Vulkan SDK is installed via environment variable
+:: Check if system-wide Vulkan SDK is installed via environment variable
 if defined VULKAN_SDK (
     if exist %VULKAN_SDK%"\Bin\vulkaninfoSDK.exe" (
         if exist %VULKAN_SDK%"\Lib\vulkan-1.lib" (
@@ -289,50 +167,18 @@ if defined VULKAN_SDK (
     )
 )
 
-:: Check common installation paths for Vulkan SDK
-echo Checking for system-wide Vulkan SDK installations...
-set VULKAN_FOUND=0
-
-:: Check C:\VulkanSDK\[version]
-if exist "C:\VulkanSDK" (
-    for /d %%i in ("C:\VulkanSDK\*") do (
-        if exist "%%i\Bin\vulkaninfo.exe" (
-            if exist "%%i\Lib\vulkan-1.lib" (
-                set "VULKAN_SDK=%%i"
-                set VULKAN_FOUND=1
-                echo Found Vulkan SDK at: %%i
-                goto :vulkan_found
-            )
-        )
-    )
-)
-
-:: Check Program Files\VulkanSDK
-if exist "%ProgramFiles%\VulkanSDK" (
-    for /d %%i in ("%ProgramFiles%\VulkanSDK\*") do (
-        if exist "%%i\Bin\vulkaninfo.exe" (
-            if exist "%%i\Lib\vulkan-1.lib" (
-                set "VULKAN_SDK=%%i"
-                set VULKAN_FOUND=1
-                echo Found Vulkan SDK at: %%i
-                goto :vulkan_found
-            )
-        )
-    )
-)
-
 :: If no system installation found, set up local version
 if %VULKAN_FOUND% EQU 0 (
     echo No system Vulkan SDK found. Setting up local installation...
     
     :: Check if we already have a local installation with headers
-    if exist "Vendor\VulkanSDK\Include\vulkan\vulkan.h" (
+    if exist "Engine\Vendor\VulkanSDK\Include\vulkan\vulkan.h" (
         echo Local Vulkan SDK headers found.
-        set "VULKAN_SDK=%CD%\Vendor\VulkanSDK"
+        set "VULKAN_SDK=%CD%\Engine\Vendor\VulkanSDK"
         goto :vulkan_found
     )
     
-    if not exist "Vendor\VulkanSDK" mkdir "Vendor\VulkanSDK"
+    if not exist "Engine\Vendor\VulkanSDK" mkdir "Engine\Vendor\VulkanSDK"
     
     :: Skip full SDK download for faster setup - just use headers-only approach
     echo Skipping full SDK download to avoid long wait times...
@@ -343,18 +189,17 @@ if %VULKAN_FOUND% EQU 0 (
     echo Setting up minimal Vulkan headers for development...
     
     :: Create basic directory structure
-    if not exist "Vendor\VulkanSDK\Include\vulkan" mkdir "Vendor\VulkanSDK\Include\vulkan"
-    if not exist "Vendor\VulkanSDK\Lib" mkdir "Vendor\VulkanSDK\Lib"
-    
+    if not exist "Engine\Vendor\VulkanSDK\Include\vulkan" mkdir "Engine\Vendor\VulkanSDK\Include\vulkan"
+
     :: Download essential headers
     echo Downloading essential Vulkan headers...
-    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vulkan.h' } catch { Write-Host 'Failed to download vulkan.h' }"
-    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vulkan_core.h' } catch { Write-Host 'Failed to download vulkan_core.h' }"
-    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vk_platform.h' } catch { Write-Host 'Failed to download vk_platform.h' }"
-    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_win32.h' -OutFile 'Vendor\VulkanSDK\Include\vulkan\vulkan_win32.h' } catch { Write-Host 'Failed to download vulkan_win32.h' }"
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan.h' -OutFile 'Engine\Vendor\VulkanSDK\Include\vulkan\vulkan.h' } catch { Write-Host 'Failed to download vulkan.h' }"
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h' -OutFile 'Engine\Vendor\VulkanSDK\Include\vulkan\vulkan_core.h' } catch { Write-Host 'Failed to download vulkan_core.h' }"
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h' -OutFile 'Engine\Vendor\VulkanSDK\Include\vulkan\vk_platform.h' } catch { Write-Host 'Failed to download vk_platform.h' }"
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_win32.h' -OutFile 'Engine\Vendor\VulkanSDK\Include\vulkan\vulkan_win32.h' } catch { Write-Host 'Failed to download vulkan_win32.h' }"
     
     :: Check if headers were downloaded successfully
-    if exist "Vendor\VulkanSDK\Include\vulkan\vulkan.h" (
+    if exist "Engine\Vendor\VulkanSDK\Include\vulkan\vulkan.h" (
         echo Vulkan headers downloaded successfully!
     ) else (
         echo Failed to download Vulkan headers. You may need to install the full Vulkan SDK manually.
@@ -372,9 +217,9 @@ if %VULKAN_FOUND% EQU 0 (
 :skip_vulkan_installer
 
 :: Set local Vulkan SDK path for this session if using local installation
-if exist "Vendor\VulkanSDK\Include" (
+if exist "Engine\Vendor\VulkanSDK\Include" (
     if not defined VULKAN_SDK (
-        set "VULKAN_SDK=%CD%\Vendor\VulkanSDK"
+        set "VULKAN_SDK=%CD%\Engine\Vendor\VulkanSDK"
         echo Local Vulkan SDK path set: !VULKAN_SDK!
     )
 )
@@ -532,9 +377,31 @@ if not exist "Engine\Vendor\shaderc" (
 echo Setting up shaderc dependencies...
 cd "Engine\Vendor\shaderc"
 
-:: Check if Python is available (we know it exists from GLAD setup)
-echo Running git-sync-deps to fetch shaderc dependencies...
-%PYTHON_CMD% utils/git-sync-deps
+:: Ensure the git-sync-deps script exists
+if not exist "utils\git-sync-deps" (
+    echo [ERROR] shaderc dependency script not found at utils\git-sync-deps
+    cd "..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+:: Ensure we have a Python command available
+if not defined PYTHON_CMD (
+    echo WARNING: PYTHON_CMD not set. Attempting to locate Python...
+    for %%P in (py python python3) do (
+        %%P --version >nul 2>&1 && set "PYTHON_CMD=%%P" && goto :shaderc_have_python
+    )
+    echo [ERROR] Python interpreter not found to run git-sync-deps.
+    cd "..\..\.."
+    popd
+    pause
+    exit /b 1
+)
+
+:shaderc_have_python
+echo Running git-sync-deps to fetch shaderc dependencies using: %PYTHON_CMD%
+"%PYTHON_CMD%" "utils\git-sync-deps"
 
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to sync shaderc dependencies!
@@ -810,4 +677,4 @@ echo You can now open Vortex.sln in Visual Studio 2022
 
 :: Return to original directory
 popd
-pause
+if not defined NONINTERACTIVE pause
