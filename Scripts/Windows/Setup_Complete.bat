@@ -334,18 +334,10 @@ if %VULKAN_FOUND% EQU 0 (
     
     if not exist "Vendor\VulkanSDK" mkdir "Vendor\VulkanSDK"
     
-    :: Try to download the full SDK first
-    echo Downloading Vulkan Runtime %VULKAN_SDK_VERSION% for Windows...
-    powershell -Command "Invoke-WebRequest -Uri 'https://sdk.lunarg.com/sdk/download/1.3.280.0/windows/vulkan_sdk.exe' -OutFile 'Vendor\VulkanSDK\vulkan_sdk.exe'"
-    
-    if %ERRORLEVEL% NEQ 0 (
-        echo Failed to download Vulkan SDK! Trying alternative download...
-        powershell -Command "Invoke-WebRequest -Uri 'https://vulkan.lunarg.com/sdk/download/1.3.280.0/windows/VulkanSDK-1.3.280.0-Installer.exe' -OutFile 'Vendor\VulkanSDK\VulkanSDK-Installer.exe'"
-        
-        if %ERRORLEVEL% NEQ 0 (
-            echo Download failed! Will continue with headers-only setup...
-        )
-    )
+    :: Skip full SDK download for faster setup - just use headers-only approach
+    echo Skipping full SDK download to avoid long wait times...
+    echo Note: You can manually install the full Vulkan SDK later if needed.
+    echo Download from: https://vulkan.lunarg.com/sdk/download/latest/windows/vulkan-sdk.exe
     
     :: Always set up minimal headers for compilation (even if installer downloaded)
     echo Setting up minimal Vulkan headers for development...
