@@ -292,7 +292,7 @@ cmake .. \
     -DSDL_IME=ON \
     -DSDL_OPENGL=ON \
     -DSDL_OPENGLES=OFF \
-    -DSDL_VULKAN=OFF \
+    -DSDL_VULKAN=ON \
     -DSDL_METAL=OFF \
     -DSDL_DIRECTFB=OFF \
     -DSDL_OPENGLES2=OFF \
@@ -329,8 +329,8 @@ echo "SDL3 built and installed successfully!"
 
 # Verify SDL3 installation
 echo "Verifying SDL3 installation..."
-if [ -f "Engine/Vendor/SDL3/install/lib/libSDL3.a" ]; then
-    echo "SDL3 static library found: Engine/Vendor/SDL3/install/lib/libSDL3.a"
+if [ -f "Engine/Vendor/SDL3/install/lib/libSDL3.a" ] || [ -f "Engine/Vendor/SDL3/install/lib/libSDL3-static.a" ]; then
+    echo "SDL3 static library found in Engine/Vendor/SDL3/install/lib"
 else
     echo "ERROR: SDL3 static library not found!"
     exit 1
@@ -526,54 +526,31 @@ else
     echo "shaderc updated successfully!"
 fi
 
-# Ensure SPIRV-Tools is in the correct location for shaderc
-echo "Setting up SPIRV-Tools for shaderc..."
-if [ ! -d "Engine/Vendor/shaderc/third_party/spirv-tools" ]; then
-    echo "Linking SPIRV-Tools into shaderc third_party directory..."
-    mkdir -p "Engine/Vendor/shaderc/third_party"
-    # Create symlink to our already built SPIRV-Tools
-    ln -sf "../../SPIRV-Tools" "Engine/Vendor/shaderc/third_party/spirv-tools"
-    echo "SPIRV-Tools linked successfully for shaderc!"
-else
-    echo "SPIRV-Tools already available for shaderc!"
-fi
+# Setup shaderc dependencies using git-sync-deps
+echo "Setting up shaderc dependencies (git-sync-deps)..."
+cd "Engine/Vendor/shaderc"
 
-# Ensure SPIRV-Headers is in the correct location for shaderc
-echo "Setting up SPIRV-Headers for shaderc..."
-if [ ! -d "Engine/Vendor/shaderc/third_party/spirv-headers" ]; then
-    echo "Linking SPIRV-Headers into shaderc third_party directory..."
-    mkdir -p "Engine/Vendor/shaderc/third_party"
-    # Create symlink to our already cloned SPIRV-Headers
-    ln -sf "../../SPIRV-Headers" "Engine/Vendor/shaderc/third_party/spirv-headers"
-    echo "SPIRV-Headers linked successfully for shaderc!"
+# Detect Python
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON_CMD=python3
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_CMD=python
 else
-    echo "SPIRV-Headers already available for shaderc!"
-fi
-
-# Setup glslang (dependency for shaderc)
-echo "Setting up glslang for shaderc..."
-if [ ! -d "Engine/Vendor/shaderc/third_party/glslang" ]; then
-    echo "Cloning glslang into shaderc third_party directory..."
-    mkdir -p "Engine/Vendor/shaderc/third_party"
-    git clone --recurse-submodules https://github.com/KhronosGroup/glslang.git "Engine/Vendor/shaderc/third_party/glslang"
-    
-    if [ $? -ne 0 ]; then
-        echo "Failed to clone glslang! Make sure git is installed."
-        exit 1
-    fi
-    
-    echo "glslang cloned successfully for shaderc!"
-else
-    echo "Updating glslang for shaderc..."
-    cd "Engine/Vendor/shaderc/third_party/glslang"
-    # Reset any local changes and pull latest
-    git reset --hard HEAD
-    git clean -fd
-    git pull origin main
-    git submodule update --init --recursive
+    echo "ERROR: Python is required to run git-sync-deps"
     cd "$PROJECT_ROOT"
-    echo "glslang updated successfully for shaderc!"
+    exit 1
 fi
+
+echo "Running git-sync-deps with $PYTHON_CMD..."
+$PYTHON_CMD utils/git-sync-deps
+if [ $? -ne 0 ]; then
+    echo "Failed to sync shaderc dependencies!"
+    cd "$PROJECT_ROOT"
+    exit 1
+fi
+
+cd "$PROJECT_ROOT"
+echo "shaderc dependencies synced successfully!"
 
 # Build shaderc
 echo "Building shaderc..."
@@ -625,6 +602,26 @@ fi
 cd "$PROJECT_ROOT"
 echo "shaderc built and installed successfully!"
 
+# Setup SPIRV-Cross (for shader reflection and cross-compilation)
+echo "Setting up SPIRV-Cross..."
+if [ ! -d "Engine/Vendor/SPIRV-Cross" ]; then
+    echo "Cloning SPIRV-Cross..."
+    git clone https://github.com/KhronosGroup/SPIRV-Cross.git "Engine/Vendor/SPIRV-Cross"
+    if [ $? -ne 0 ]; then
+        echo "Failed to clone SPIRV-Cross! Make sure git is installed."
+        exit 1
+    fi
+    echo "SPIRV-Cross cloned successfully!"
+else
+    echo "Updating SPIRV-Cross..."
+    cd "Engine/Vendor/SPIRV-Cross"
+    git reset --hard HEAD
+    git clean -fd
+    git pull origin main
+    cd "$PROJECT_ROOT"
+    echo "SPIRV-Cross updated successfully!"
+fi
+
 # Vulkan SDK/headers setup (headers-only fallback if system Vulkan not present)
 echo "Checking for Vulkan (pkg-config)..."
 if pkg-config --exists vulkan; then
@@ -668,9 +665,11 @@ if [ ! -d "Engine/Vendor/GLAD" ]; then
 else
     echo "Updating GLAD..."
     cd "Engine/Vendor/GLAD"
-    # Completely reset and force update to handle divergent branches
+    # Reset and update; try glad2 branch first, then fallback to master
     git fetch origin
-    git reset --hard origin/glad2
+    git checkout -q glad2 2>/dev/null || git checkout -q master
+    git reset --hard HEAD
+    git pull --ff-only
     git clean -fd
     cd "$PROJECT_ROOT"
     echo "GLAD updated successfully!"
@@ -703,15 +702,15 @@ echo "Installing required Python packages..."
 echo "Attempting to install jinja2 and glad2..."
 
 # Try different installation methods
-if $PYTHON_CMD -m pip install --user jinja2 glad2; then
+if "$PYTHON_CMD" -m pip install --user jinja2 glad2; then
     echo "Python packages installed successfully!"
-elif $PYTHON_CMD -m pip install --user --break-system-packages jinja2 glad2; then
+elif "$PYTHON_CMD" -m pip install --user --break-system-packages jinja2 glad2; then
     echo "Python packages installed successfully with system override!"
 else
     echo "Failed to install Python packages with pip. Trying alternative methods..."
     
     # Try installing with sudo (not recommended but sometimes necessary)
-    if sudo $PYTHON_CMD -m pip install jinja2 glad2; then
+    if sudo "$PYTHON_CMD" -m pip install jinja2 glad2; then
         echo "Python packages installed successfully with sudo!"
     else
         echo "ERROR: Failed to install required Python packages!"
@@ -725,7 +724,7 @@ fi
 
 # Generate GLAD
 echo "Generating GLAD for OpenGL 4.6 Core..."
-$PYTHON_CMD -m glad --api="gl:core=4.6" --out-path=generated c
+"$PYTHON_CMD" -m glad --api="gl:core=4.6" --out-path=generated c
 
 if [ $? -ne 0 ]; then
     echo "Failed to generate GLAD files!"
@@ -809,6 +808,13 @@ if [ -d "Engine/Vendor/SPIRV-Headers" ]; then
     echo "✅ SPIRV-Headers found"
 else
     echo "❌ SPIRV-Headers missing"
+    exit 1
+fi
+
+if [ -d "Engine/Vendor/SPIRV-Cross" ]; then
+    echo "✅ SPIRV-Cross found"
+else
+    echo "❌ SPIRV-Cross missing"
     exit 1
 fi
 

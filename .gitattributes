@@ -61,3 +61,18 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# Enforce line endings for scripts and sources
+###############################################################################
+*.sh text eol=lf
+Scripts/Linux/*.sh text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.lua text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.c text eol=lf
+*.hpp text eol=lf
+*.inl text eol=lf
+*.py text eol=lf
