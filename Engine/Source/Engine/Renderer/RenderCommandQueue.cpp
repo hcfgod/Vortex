@@ -45,9 +45,13 @@ namespace Vortex
         if (executeImmediate || IsOnRenderThread()) {
             std::lock_guard<std::mutex> lock(m_ExecutionMutex);
             auto start = std::chrono::high_resolution_clock::now();
+            // Capture command info before moving
+            const std::string cmdName = command->GetDebugName();
+            const float cmdCost = command->GetEstimatedCost();
             auto res = ExecuteCommand(std::move(command));
             auto end = std::chrono::high_resolution_clock::now();
-            UpdateStatistics(nullptr, std::chrono::duration_cast<std::chrono::microseconds>(end - start));
+            m_Stats.ProcessedCommands++;
+            UpdateStatistics(cmdName, cmdCost, std::chrono::duration_cast<std::chrono::microseconds>(end - start));
             return res.IsSuccess();
         }
 
@@ -94,6 +98,9 @@ namespace Vortex
             }
 
             auto start = std::chrono::high_resolution_clock::now();
+            // Capture command info before moving
+            const std::string cmdName = cmd->GetDebugName();
+            const float cmdCost = cmd->GetEstimatedCost();
             auto res = ExecuteCommand(std::move(cmd));
             auto end = std::chrono::high_resolution_clock::now();
 
@@ -101,9 +108,9 @@ namespace Vortex
                 VX_CORE_ERROR("Render command failed: {}", res.GetErrorMessage());
             }
 
-            UpdateStatistics(nullptr, std::chrono::duration_cast<std::chrono::microseconds>(end - start));
             processed++;
             m_Stats.ProcessedCommands++;
+            UpdateStatistics(cmdName, cmdCost, std::chrono::duration_cast<std::chrono::microseconds>(end - start));
         }
 
         m_Stats.LastProcessTime = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - startBatch);
@@ -150,10 +157,15 @@ namespace Vortex
         return command->Execute(m_GraphicsContext);
     }
 
-    void RenderCommandQueue::UpdateStatistics(const RenderCommand* /*command*/, std::chrono::microseconds executionTime) {
+    void RenderCommandQueue::UpdateStatistics(const std::string& commandName, float estimatedCost, std::chrono::microseconds executionTime) {
         std::lock_guard<std::mutex> lock(m_StatsMutex);
         m_Stats.TotalCost += static_cast<float>(executionTime.count());
-        // Average cost could be computed over ProcessedCommands; keep simple here
+        m_Stats.EstimatedTotalCost += estimatedCost;
+        m_Stats.EstimatedCostByCommand[commandName] += estimatedCost;
+        m_Stats.CountByCommand[commandName] += 1;
+        if (m_Stats.ProcessedCommands > 0) {
+            m_Stats.AverageCost = m_Stats.EstimatedTotalCost / static_cast<float>(m_Stats.ProcessedCommands);
+        }
     }
 
     // ===================== Global Render Command Queue =====================

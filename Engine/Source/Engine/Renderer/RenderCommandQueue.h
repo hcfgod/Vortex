@@ -10,6 +10,8 @@
 #include <condition_variable>
 #include <thread>
 #include <queue>
+#include <unordered_map>
+#include <cstring>
 
 namespace Vortex
 {
@@ -35,8 +37,11 @@ namespace Vortex
             size_t ProcessedCommands = 0;
             size_t TotalCommandsThisFrame = 0;
             size_t DroppedCommands = 0;  // Commands dropped due to full queue
-            float AverageCost = 0.0f;    // Average cost of processed commands
-            float TotalCost = 0.0f;      // Total cost this frame
+            float AverageCost = 0.0f;    // Average estimated cost of processed commands
+            float TotalCost = 0.0f;      // Total execution time (microseconds) accumulated
+            float EstimatedTotalCost = 0.0f; // Sum of GetEstimatedCost() across processed
+            std::unordered_map<std::string, float> EstimatedCostByCommand; // Sum per command name
+            std::unordered_map<std::string, size_t> CountByCommand;        // Count per command name
             std::chrono::microseconds LastProcessTime{ 0 };
         };
 
@@ -247,7 +252,18 @@ namespace Vortex
 
         bool BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage, bool executeImmediate = false)
         {
-            return Submit(std::make_unique<BufferDataCommand>(target, data, size, usage), executeImmediate);
+            auto payload = std::make_shared<BufferDataCommand::ByteVector>();
+            if (data && size > 0)
+            {
+                payload->resize(static_cast<size_t>(size));
+                std::memcpy(payload->data(), data, static_cast<size_t>(size));
+            }
+            return Submit(std::make_unique<BufferDataCommand>(target, std::move(payload), usage), executeImmediate);
+        }
+
+        bool BufferData(uint32_t target, std::shared_ptr<BufferDataCommand::ByteVector> payload, uint32_t usage, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BufferDataCommand>(target, std::move(payload), usage), executeImmediate);
         }
 
         bool VertexAttribPointer(uint32_t index, int32_t size, uint32_t type, bool normalized,
@@ -313,10 +329,11 @@ namespace Vortex
 
         /**
          * @brief Update statistics with command execution
-         * @param command The command that was executed
+         * @param commandName The name of the command that was executed
+         * @param estimatedCost The estimated cost of the command
          * @param executionTime Time taken to execute
          */
-        void UpdateStatistics(const RenderCommand* command, std::chrono::microseconds executionTime);
+        void UpdateStatistics(const std::string& commandName, float estimatedCost, std::chrono::microseconds executionTime);
 
         // Configuration
         Config m_Config;

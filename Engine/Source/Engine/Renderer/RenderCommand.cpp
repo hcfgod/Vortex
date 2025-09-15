@@ -70,7 +70,8 @@ namespace Vortex
     {
         auto* renderer = GetRenderer();
         if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
-        return renderer->BufferData(m_Target, m_Data, m_Size, m_Usage);
+        const void* dataPtr = (m_Payload && !m_Payload->empty()) ? static_cast<const void*>(m_Payload->data()) : nullptr;
+        return renderer->BufferData(m_Target, dataPtr, m_Size, m_Usage);
     }
 
     // --------------------- VertexAttribPointerCommand --------------------

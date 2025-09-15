@@ -4,6 +4,8 @@
 #include "Core/Debug/ErrorCodes.h"
 #include "RenderTypes.h"
 #include <glm/glm.hpp>
+#include <memory>
+#include <vector>
 
 namespace Vortex
 {
@@ -240,8 +242,10 @@ namespace Vortex
     class BufferDataCommand : public RenderCommand
     {
     public:
-        BufferDataCommand(uint32_t target, const void* data, uint64_t size, uint32_t usage)
-            : m_Target(target), m_Data(data), m_Size(size), m_Usage(usage) {}
+        using ByteVector = std::vector<uint8_t>;
+
+        BufferDataCommand(uint32_t target, std::shared_ptr<ByteVector> payload, uint32_t usage)
+            : m_Target(target), m_Payload(std::move(payload)), m_Size(m_Payload ? static_cast<uint64_t>(m_Payload->size()) : 0ull), m_Usage(usage) {}
 
         Result<void> Execute(GraphicsContext* context) override;
         std::string GetDebugName() const override { return "BufferData"; }
@@ -249,7 +253,7 @@ namespace Vortex
 
     private:
         uint32_t m_Target;
-        const void* m_Data;
+        std::shared_ptr<ByteVector> m_Payload;
         uint64_t m_Size;
         uint32_t m_Usage;
     };
