@@ -113,7 +113,33 @@ namespace Vortex
             a->second.assetPtr->ReleaseRef();
         if (it->second == 0)
         {
-            // TODO: Optionally schedule unload after delay taking dependencies into account
+            // Unload immediately when ref count hits zero (simple policy)
+            // In future, consider delayed unload and dependency tracking
+            if (a != m_Assets.end())
+            {
+                auto& entry = a->second;
+                if (entry.assetPtr)
+                {
+                    // If this is a shader asset, release GPU resources
+                    if (auto* shaderAsset = dynamic_cast<ShaderAsset*>(entry.assetPtr.get()))
+                    {
+                        if (auto& shaderRef = shaderAsset->GetShader())
+                        {
+                            shaderRef->Destroy();
+                        }
+                        shaderAsset->SetShader(nullptr);
+                        shaderAsset->SetReflection({});
+                        shaderAsset->SetIsFallback(false);
+                    }
+                    entry.assetPtr->SetState(AssetState::Unloaded);
+                    entry.assetPtr->SetProgress(0.0f);
+                }
+                // Remove from registries
+                m_NameToUUID.erase(entry.Name);
+                m_Assets.erase(a);
+                m_Refs.erase(it);
+                VX_CORE_TRACE("AssetSystem: Unloaded asset '{}'", entry.Name);
+            }
         }
     }
 

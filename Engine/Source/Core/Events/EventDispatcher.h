@@ -4,6 +4,7 @@
 #include "Core/Debug/Log.h"
 #include <shared_mutex>
 #include <typeindex>
+#include <functional>
 
 namespace Vortex
 {
@@ -152,7 +153,10 @@ namespace Vortex
             static_assert(std::is_base_of_v<Event, T>, "T must be derived from Event");
             
             std::lock_guard<std::mutex> lock(m_QueueMutex);
-            m_EventQueue.emplace_back(std::make_unique<T>(std::forward<T>(event)));
+            using Decayed = std::decay_t<T>;
+            m_EventQueue.emplace_back([evt = Decayed(std::forward<T>(event))](EventDispatcher& dispatcher) mutable {
+                dispatcher.DispatchImmediate(evt);
+            });
         }
 
         /**
@@ -332,7 +336,7 @@ namespace Vortex
         std::unordered_map<SubscriptionID, std::type_index> m_SubscriptionTypes;
         
         // Event queue for asynchronous dispatch
-        std::vector<std::unique_ptr<Event>> m_EventQueue;
+        std::vector<std::function<void(EventDispatcher&)>> m_EventQueue;
         
         // Subscription ID generation
         std::atomic<SubscriptionID> m_NextSubscriptionID{0};

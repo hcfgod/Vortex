@@ -57,7 +57,7 @@ namespace Vortex
     size_t EventDispatcher::ProcessQueuedEvents(size_t maxEvents)
     {
         // Move events from queue to processing list to minimize lock time
-        std::vector<std::unique_ptr<Event>> eventsToProcess;
+        std::vector<std::function<void(EventDispatcher&)>> eventsToProcess;
         
         {
             std::lock_guard<std::mutex> lock(m_QueueMutex);
@@ -79,28 +79,12 @@ namespace Vortex
         // Process events outside of the lock
         size_t processedCount = 0;
         
-        for (auto& eventPtr : eventsToProcess)
+        for (auto& thunk : eventsToProcess)
         {
-            if (eventPtr)
+            if (thunk)
             {
-                // We need to dispatch based on the actual event type
-                // This requires dynamic dispatch or virtual methods
-                // For now, we'll implement a basic dispatch mechanism
-                
-                // The challenge here is that we have a base Event* but need to dispatch
-                // to type-specific handlers. This requires either:
-                // 1. Virtual dispatch in the Event base class
-                // 2. A type registry/visitor pattern
-                // 3. Dynamic casting to known event types
-                
-                // Let's add a virtual Dispatch method to Event for this purpose
-                // For now, we'll log that we received the event
-                
-                // Process queued event silently
-                
-                // TODO: Implement proper dynamic dispatch
-                // eventPtr->DispatchTo(*this);
-                
+                // Invoke the queued type-erased dispatcher thunk
+                thunk(*this);
                 processedCount++;
             }
         }

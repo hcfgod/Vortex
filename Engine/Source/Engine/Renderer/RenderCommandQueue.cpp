@@ -42,6 +42,9 @@ namespace Vortex
     bool RenderCommandQueue::Submit(std::unique_ptr<RenderCommand> command, bool executeImmediate) {
         if (!command) return false;
 
+        // Enforce that queued submissions happen on the render thread
+        VX_CORE_ASSERT(executeImmediate || IsOnRenderThread(), "Queued render command submitted from non-render thread; pass executeImmediate=true if intentional");
+
         if (executeImmediate || IsOnRenderThread()) {
             std::lock_guard<std::mutex> lock(m_ExecutionMutex);
             auto start = std::chrono::high_resolution_clock::now();
