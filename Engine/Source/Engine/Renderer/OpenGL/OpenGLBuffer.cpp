@@ -9,7 +9,7 @@ namespace Vortex
     // ------------------------- OpenGLVertexBuffer -------------------------
     OpenGLVertexBuffer::OpenGLVertexBuffer(uint32_t size, const void* data)
     {
-        glGenBuffers(1, &m_RendererID);
+        GetRenderCommandQueue().GenBuffers(1, &m_RendererID, true);
         // Upload data via render command queue (bind to ARRAY_BUFFER)
         GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), m_RendererID);
         if (data && size > 0)
@@ -23,7 +23,7 @@ namespace Vortex
     {
         if (m_RendererID)
         {
-            glDeleteBuffers(1, &m_RendererID);
+            GetRenderCommandQueue().DeleteBuffers(1, &m_RendererID, true);
             m_RendererID = 0;
         }
     }
@@ -49,7 +49,7 @@ namespace Vortex
     OpenGLIndexBuffer::OpenGLIndexBuffer(uint32_t* indices, uint32_t count)
         : m_Count(count)
     {
-        glGenBuffers(1, &m_RendererID);
+        GetRenderCommandQueue().GenBuffers(1, &m_RendererID, true);
         // Upload data via ARRAY_BUFFER to avoid VAO attachment here
         GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), m_RendererID);
         GetRenderCommandQueue().BufferData(static_cast<uint32_t>(BufferTarget::ArrayBuffer), indices,
@@ -60,7 +60,7 @@ namespace Vortex
     {
         if (m_RendererID)
         {
-            glDeleteBuffers(1, &m_RendererID);
+            GetRenderCommandQueue().DeleteBuffers(1, &m_RendererID, true);
             m_RendererID = 0;
         }
     }

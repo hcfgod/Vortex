@@ -67,8 +67,8 @@ int main(int argc, char** argv)
         app->Run(engine.get());
 
         // Clean up in reverse order (automatic with smart pointers)
+        // Application destructor will shutdown the Engine; avoid double shutdown here
         app.reset();
-        engine->Shutdown();
         engine.reset();
 
         VX_CORE_INFO("Vortex Engine shutdown complete");

@@ -52,19 +52,14 @@ namespace Vortex
 	if (s_Instance == this)
 		s_Instance = nullptr;
 	
-	// Clean up event subscriptions first
+	// Clean up event subscriptions before engine shutdown so EventSystem is valid
 	CleanupEventSubscriptions();
-
-	// Engine now manages layers
 	
-	// Ensure the renderer is shut down BEFORE destroying the window to avoid GL/SDL teardown issues
+	// Shut down the engine so layers/systems clean up while RenderSystem/queue are alive
 	if (m_Engine)
 	{
-		if (auto* renderSystem = m_Engine->GetSystemManager().GetSystem<RenderSystem>())
-		{
-			VX_CORE_INFO("Shutting down RenderSystem prior to window destruction");
-			renderSystem->Shutdown();
-		}
+		auto engShutdown = m_Engine->Shutdown();
+		VX_LOG_ERROR(engShutdown);
 	}
 		
 	#ifdef VX_USE_SDL
@@ -78,7 +73,7 @@ namespace Vortex
 			}
 	#endif
 		
-		// Destroy window after renderer shutdown
+		// Destroy window after engine shutdown
 		m_Window.reset();
 		
 		#ifdef VX_USE_SDL
@@ -153,8 +148,11 @@ namespace Vortex
 			}
 		}
 
-		// Dispatch application shutdown event
-		VX_DISPATCH_EVENT(ApplicationShutdownEvent());
+		// Dispatch application shutdown event (only if EventSystem still initialized)
+		if (EventSystem::IsInitialized())
+		{
+			VX_DISPATCH_EVENT(ApplicationShutdownEvent());
+		}
 		
 		Shutdown();
 

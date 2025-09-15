@@ -223,7 +223,10 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result)
     try
     {
         // Dispatch application shutdown event (Application::Run normally does this)
-        VX_DISPATCH_EVENT(Vortex::ApplicationShutdownEvent());
+        if (Vortex::EventSystem::IsInitialized())
+        {
+            VX_DISPATCH_EVENT(Vortex::ApplicationShutdownEvent());
+        }
         
         // Clean up in reverse order (automatic with smart pointers)
         if (Vortex::Internal::s_Application)
@@ -232,9 +235,9 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result)
             Vortex::Internal::s_Application.reset();
         }
 
+        // Application/Engine lifetimes: Application destructor will shutdown the Engine; avoid double shutdown
         if (Vortex::Internal::s_Engine)
         {
-            Vortex::Internal::s_Engine->Shutdown();
             Vortex::Internal::s_Engine.reset();
         }
         

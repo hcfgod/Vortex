@@ -37,7 +37,7 @@ namespace Vortex
     {
         if (m_RendererID)
         {
-            GetRenderCommandQueue().DeleteVertexArrays(1, &m_RendererID, true);
+            GetRenderCommandQueue().DeleteVertexArrays(1, &m_RendererID, false);
             m_RendererID = 0;
         }
     }

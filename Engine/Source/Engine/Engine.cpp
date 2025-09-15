@@ -72,8 +72,8 @@ namespace Vortex
 		
 		if (!m_Initialized)
 		{
-			VX_CORE_WARN("Engine not initialized, cannot shutdown!");
-			return Result<void>(ErrorCode::EngineNotInitialized, "Engine is not initialized");
+			VX_CORE_TRACE("Engine already shutdown");
+			return Result<void>();
 		}
 
 		VX_CORE_INFO("Shutting down Vortex Engine...");
@@ -173,6 +173,17 @@ namespace Vortex
 			return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register EventSystem");
 		}
 
+		// Register AssetSystem (Core priority) BEFORE RenderSystem so that on shutdown
+		// AssetSystem is torn down first and RenderSystem (and its command queue) last.
+		{
+			auto* assetSystem = m_SystemManager.RegisterSystem<AssetSystem>();
+			if (!assetSystem)
+			{
+				VX_CORE_ERROR("Failed to register AssetSystem");
+				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register AssetSystem");
+			}
+		}
+
 		// Register RenderSystem (Core priority)
 		{
 			auto* renderSystem = m_SystemManager.RegisterSystem<RenderSystem>();
@@ -180,16 +191,6 @@ namespace Vortex
 			{
 				VX_CORE_ERROR("Failed to register RenderSystem");
 				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register RenderSystem");
-			}
-		}
-
-		// Register AssetSystem (Core priority)
-		{
-			auto* assetSystem = m_SystemManager.RegisterSystem<AssetSystem>();
-			if (!assetSystem)
-			{
-				VX_CORE_ERROR("Failed to register AssetSystem");
-				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register AssetSystem");
 			}
 		}
 

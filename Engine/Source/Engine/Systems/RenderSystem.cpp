@@ -283,12 +283,20 @@ namespace Vortex
 
         // Shutdown ShaderManager first to free GPU resources
         GetShaderManager().Shutdown();
-        
-        // Shutdown render queue (flush commands)
-        auto rqsd = ShutdownGlobalRenderQueue();
-        VX_LOG_ERROR(rqsd);
 
-        // Shutdown RendererAPI first
+        // Ensure all queued commands (including deletes from shader shutdown) are executed
+        {
+            auto flushRes = GetRenderCommandQueue().FlushAll();
+            VX_LOG_ERROR(flushRes);
+        }
+
+        // Now shutdown the render command queue (as late as possible, while renderer/context still valid)
+        {
+            auto rqsd = ShutdownGlobalRenderQueue();
+            VX_LOG_ERROR(rqsd);
+        }
+
+        // Shutdown RendererAPI after the queue is torn down
         auto rshutdown = ShutdownRenderer();
         VX_LOG_ERROR(rshutdown);
 

@@ -120,6 +120,11 @@ namespace Vortex
             return stats;
         }
 
+        /**
+         * @brief Check if EventSystem is currently initialized
+         */
+        static bool IsInitialized() { return s_Instance != nullptr; }
+
     private:
         EventDispatcher m_Dispatcher;
         size_t m_ProcessedEventsThisFrame = 0;
