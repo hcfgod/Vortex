@@ -230,6 +230,9 @@ namespace Vortex
         if (!m_Ready)
             return Result<void>();
 
+        // Reset per-frame render command statistics at frame start
+        GetRenderCommandQueue().ResetStatistics();
+
         // Conditional clears based on settings and capabilities
         uint32_t flags = m_Settings.ClearFlags;
         if (m_GraphicsContext && m_GraphicsContext->GetInfo().StencilBits == 0)

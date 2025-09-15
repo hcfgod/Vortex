@@ -86,6 +86,7 @@ namespace Vortex
             uint32_t BlendDstFactor = 0; // GL_ZERO
             uint32_t BlendOp = 0; // GL_FUNC_ADD
             
+            bool CullEnabled = false; // GL_CULL_FACE disabled by default in OpenGL
             uint32_t CullMode = 0; // GL_BACK
             uint32_t FrontFace = 0; // GL_CCW
             

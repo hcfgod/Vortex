@@ -275,19 +275,38 @@ namespace Vortex
             return validateResult;
         }
 
-        // For now, we'll use glDrawElements. Full instanced rendering would need additional setup
+        // Compute index pointer including bound index buffer offset and firstIndex
         const GLenum glMode = ConvertPrimitiveTopology(primitiveTopology);
         const GLenum glIndexType = (m_CurrentState.CurrentIndexType == INDEX_TYPE_UINT16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-        const GLvoid* indicesPtr = reinterpret_cast<const void*>(static_cast<uintptr_t>(firstIndex * ((glIndexType == GL_UNSIGNED_SHORT) ? sizeof(uint16_t) : sizeof(uint32_t))));
+        const size_t indexSize = (glIndexType == GL_UNSIGNED_SHORT) ? sizeof(uint16_t) : sizeof(uint32_t);
+        const uintptr_t indexByteOffset = static_cast<uintptr_t>(m_CurrentState.IndexBufferOffset + static_cast<uint64_t>(firstIndex) * static_cast<uint64_t>(indexSize));
+        const GLvoid* indicesPtr = reinterpret_cast<const void*>(indexByteOffset);
+
+        // Use BaseVertex variants when baseVertex != 0
         if (instanceCount <= 1)
         {
-            glDrawElements(glMode, static_cast<GLsizei>(indexCount), glIndexType, indicesPtr);
+            if (baseVertex != 0 && (GLAD_GL_VERSION_3_2 || GLAD_GL_ARB_draw_elements_base_vertex))
+            {
+                glDrawElementsBaseVertex(glMode, static_cast<GLsizei>(indexCount), glIndexType, indicesPtr, static_cast<GLint>(baseVertex));
+            }
+            else
+            {
+                glDrawElements(glMode, static_cast<GLsizei>(indexCount), glIndexType, indicesPtr);
+            }
         }
         else
         {
-            glDrawElementsInstanced(glMode, static_cast<GLsizei>(indexCount), glIndexType,
-                                   indicesPtr,
-                                   static_cast<GLsizei>(instanceCount));
+            if (baseVertex != 0 && (GLAD_GL_VERSION_3_2 || GLAD_GL_ARB_draw_elements_base_vertex))
+            {
+                glDrawElementsInstancedBaseVertex(glMode, static_cast<GLsizei>(indexCount), glIndexType,
+                    indicesPtr, static_cast<GLsizei>(instanceCount), static_cast<GLint>(baseVertex));
+            }
+            else
+            {
+                glDrawElementsInstanced(glMode, static_cast<GLsizei>(indexCount), glIndexType,
+                                       indicesPtr,
+                                       static_cast<GLsizei>(instanceCount));
+            }
         }
 
         if (!CheckGLError("DrawIndexed"))
@@ -694,16 +713,15 @@ namespace Vortex
         uint32_t glCullMode = ConvertCullMode(cullMode);
         uint32_t glFrontFaceMode = ConvertFrontFace(frontFace);
 
-        // Update culling enable/disable
+        // Update culling enable/disable using tracked state to avoid extra GL calls
         bool cullEnabled = (cullMode != CULL_MODE_NONE);
-        bool currentCullEnabled = glIsEnabled(GL_CULL_FACE);
-        
-        if (cullEnabled != currentCullEnabled)
+        if (m_CurrentState.CullEnabled != cullEnabled)
         {
             if (cullEnabled)
                 glEnable(GL_CULL_FACE);
             else
                 glDisable(GL_CULL_FACE);
+            m_CurrentState.CullEnabled = cullEnabled;
         }
 
         if (cullEnabled)
