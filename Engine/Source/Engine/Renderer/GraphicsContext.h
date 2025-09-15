@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "Core/Debug/ErrorCodes.h"
 
 namespace Vortex

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "Engine/Systems/EngineSystem.h"
 #include "Time.h"
 

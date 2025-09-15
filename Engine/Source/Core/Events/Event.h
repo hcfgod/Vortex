@@ -1,6 +1,7 @@
 #pragma once
 
-#include "vxpch.h"
+#include <string>
+#include <functional>
 
 namespace Vortex
 {

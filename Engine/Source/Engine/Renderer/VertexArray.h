@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "Buffer.h"
 
 namespace Vortex

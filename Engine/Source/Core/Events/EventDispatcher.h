@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "Event.h"
 #include "Core/Debug/Log.h"
 #include <shared_mutex>

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "RenderCommand.h"
 #include "RendererAPI.h"
 #include "RenderTypes.h"

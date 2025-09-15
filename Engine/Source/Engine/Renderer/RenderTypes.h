@@ -1,7 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
-
 namespace Vortex
 {
     // API-agnostic render enums used across the engine
@@ -45,5 +43,3 @@ namespace Vortex
         TriangleFan = 6
     };
 }
-
-

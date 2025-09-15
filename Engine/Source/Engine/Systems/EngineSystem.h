@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "SystemPriority.h"
 #include "Core/Debug/ErrorCodes.h"
 #include "Core/Debug/Assert.h"

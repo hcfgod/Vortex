@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "Events/EventSystem.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/WindowEvent.h"

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "Core/Configuration.h"
 #include "Core/Window.h"
 #include "Engine/Renderer/GraphicsContext.h"

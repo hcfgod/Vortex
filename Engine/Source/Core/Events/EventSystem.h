@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "EventDispatcher.h"
 #include "Engine/Systems/EngineSystem.h"
 

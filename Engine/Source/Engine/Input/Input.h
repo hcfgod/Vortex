@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "Engine/Input/KeyCodes.h"
 #include "Engine/Input/MouseCodes.h"
 

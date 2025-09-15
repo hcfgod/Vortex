@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
 #include "SDL3/SDL.h"
 
 namespace Vortex

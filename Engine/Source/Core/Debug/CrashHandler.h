@@ -1,7 +1,5 @@
 #pragma once
 
-#include "vxpch.h"
-
 #ifdef VX_PLATFORM_WINDOWS
 	#include <Windows.h>
 	#include <DbgHelp.h>
