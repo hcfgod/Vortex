@@ -27,7 +27,10 @@ namespace Vortex
             m_Config.WorkerThreadCount = std::max(1u, std::thread::hardware_concurrency() - 1);
         }
         
-        VX_CORE_INFO("CoroutineScheduler created with {} worker threads", m_Config.WorkerThreadCount);
+        if (Log::IsInitialized())
+        {
+            VX_CORE_INFO("CoroutineScheduler created with {} worker threads", m_Config.WorkerThreadCount);
+        }
     }
 
     CoroutineScheduler::~CoroutineScheduler()
@@ -65,13 +68,19 @@ namespace Vortex
                     m_WorkerThreads.push_back(std::move(thread));
                 }
                 
-                VX_CORE_INFO("Started {} worker threads", m_Config.WorkerThreadCount);
+                if (Log::IsInitialized())
+                {
+                    VX_CORE_INFO("Started {} worker threads", m_Config.WorkerThreadCount);
+                }
             }
 
             m_FrameStartTime = std::chrono::steady_clock::now();
             m_LastFrameTime = m_FrameStartTime;
             
-            VX_CORE_INFO("CoroutineScheduler initialized successfully");
+            if (Log::IsInitialized())
+            {
+                VX_CORE_INFO("CoroutineScheduler initialized successfully");
+            }
             return Result<void>();
         }
         catch (const std::exception& e)
@@ -89,7 +98,10 @@ namespace Vortex
             return Result<void>();
         }
 
-        VX_CORE_INFO("Shutting down CoroutineScheduler...");
+        if (Log::IsInitialized())
+        {
+            VX_CORE_INFO("Shutting down CoroutineScheduler...");
+        }
         
         // Signal shutdown
         m_ShouldShutdown.store(true);
@@ -160,11 +172,17 @@ namespace Vortex
         
         if (totalDestroyed > 0)
         {
-            VX_CORE_WARN("Destroyed {} unfinished coroutines during shutdown", totalDestroyed);
+            if (Log::IsInitialized())
+            {
+                VX_CORE_WARN("Destroyed {} unfinished coroutines during shutdown", totalDestroyed);
+            }
         }
         
         m_IsRunning.store(false);
-        VX_CORE_INFO("CoroutineScheduler shutdown complete");
+        if (Log::IsInitialized())
+        {
+            VX_CORE_INFO("CoroutineScheduler shutdown complete");
+        }
         
         return Result<void>();
     }
@@ -177,7 +195,10 @@ namespace Vortex
     {
         if (!m_IsRunning.load())
         {
-            VX_CORE_WARN("Attempt to schedule coroutine on inactive scheduler");
+            if (Log::IsInitialized())
+            {
+                VX_CORE_WARN("Attempt to schedule coroutine on inactive scheduler");
+            }
             return;
         }
 
@@ -195,7 +216,10 @@ namespace Vortex
             // Check queue size limit
             if (m_PriorityQueues[priorityIndex].size() >= m_Config.MaxQueueSizePerPriority)
             {
-                VX_CORE_WARN("Priority queue {} is full, dropping coroutine", priorityIndex);
+                if (Log::IsInitialized())
+                {
+                    VX_CORE_WARN("Priority queue {} is full, dropping coroutine", priorityIndex);
+                }
                 handle.destroy();
                 return;
             }
@@ -207,7 +231,7 @@ namespace Vortex
         // Notify worker threads
         m_WorkerCondition.notify_one();
         
-        if (m_Config.LogSchedulingEvents)
+        if (m_Config.LogSchedulingEvents && Log::IsInitialized())
         {
             VX_CORE_TRACE("Scheduled coroutine with priority {}", static_cast<int>(priority));
         }
@@ -230,7 +254,7 @@ namespace Vortex
             m_Stats.DelayedCoroutines.store(m_DelayedQueue.size());
         }
         
-        if (m_Config.LogSchedulingEvents)
+        if (m_Config.LogSchedulingEvents && Log::IsInitialized())
         {
             VX_CORE_TRACE("Scheduled coroutine with {}ms delay", delay.count());
         }
@@ -266,7 +290,7 @@ namespace Vortex
             m_WorkerCondition.notify_all();
         }
         
-        if (m_Config.LogSchedulingEvents)
+        if (m_Config.LogSchedulingEvents && Log::IsInitialized())
         {
             VX_CORE_TRACE("Scheduled coroutine on specific thread");
         }
@@ -437,7 +461,10 @@ namespace Vortex
 
     void CoroutineScheduler::WorkerThreadLoop(size_t threadIndex)
     {
-        VX_CORE_TRACE("Worker thread {} started", threadIndex);
+        if (Log::IsInitialized())
+        {
+            VX_CORE_TRACE("Worker thread {} started", threadIndex);
+        }
         
         while (!m_ShouldShutdown.load())
         {
@@ -467,7 +494,10 @@ namespace Vortex
             m_Stats.ActiveWorkerThreads.store(m_WorkerThreads.size());
         }
         
-        VX_CORE_TRACE("Worker thread {} stopped", threadIndex);
+        if (Log::IsInitialized())
+        {
+            VX_CORE_TRACE("Worker thread {} stopped", threadIndex);
+        }
     }
 
     void CoroutineScheduler::ProcessDelayedCoroutines()
@@ -543,7 +573,10 @@ namespace Vortex
         }
         catch (const std::exception& e)
         {
-            VX_CORE_ERROR("Exception in coroutine execution: {}", e.what());
+            if (Log::IsInitialized())
+            {
+                VX_CORE_ERROR("Exception in coroutine execution: {}", e.what());
+            }
             
             // Destroy the coroutine to prevent further issues
             if (coroutine.Handle && !coroutine.Handle.done())
@@ -650,7 +683,10 @@ namespace Vortex
     {
         if (s_GlobalSchedulerInstance)
         {
-            VX_CORE_WARN("Global coroutine scheduler already initialized");
+            if (Log::IsInitialized())
+            {
+                VX_CORE_WARN("Global coroutine scheduler already initialized");
+            }
             return Result<void>();
         }
 
@@ -667,7 +703,10 @@ namespace Vortex
                 return result;
             }
             
-            VX_CORE_INFO("Global coroutine scheduler initialized successfully");
+            if (Log::IsInitialized())
+            {
+                VX_CORE_INFO("Global coroutine scheduler initialized successfully");
+            }
             return Result<void>();
         }
         catch (const std::exception& e)
@@ -688,7 +727,10 @@ namespace Vortex
         s_GlobalSchedulerInstance.reset();
         CoroutineScheduler::SetGlobal(nullptr);
         
-        VX_CORE_INFO("Global coroutine scheduler shutdown complete");
+        if (Log::IsInitialized())
+        {
+            VX_CORE_INFO("Global coroutine scheduler shutdown complete");
+        }
         return result;
     }
 

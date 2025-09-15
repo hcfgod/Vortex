@@ -82,9 +82,13 @@ namespace Vortex
 			return;
 		}
 
-		// Log final timing statistics
-		VX_CORE_INFO("Runtime: {:.2f}s | Frames: {} | Avg FPS: {:.1f}", 
-			s_UnscaledTime, s_FrameCount, s_FrameCount / s_UnscaledTime);
+		// Log final timing statistics if logging is initialized (avoid test crashes)
+		if (Log::IsInitialized())
+		{
+			float avgFps = (s_UnscaledTime > 0.0f) ? static_cast<float>(s_FrameCount) / s_UnscaledTime : 0.0f;
+			VX_CORE_INFO("Runtime: {:.2f}s | Frames: {} | Avg FPS: {:.1f}", 
+				s_UnscaledTime, s_FrameCount, avgFps);
+		}
 
 		s_Initialized = false;
 	}
