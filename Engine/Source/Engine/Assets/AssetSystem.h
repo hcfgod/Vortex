@@ -9,6 +9,8 @@
 #include "Core/Async/Coroutine.h"
 #include "Core/Debug/Log.h"
 #include <unordered_map>
+#include <queue>
+#include <deque>
 #include <mutex>
 #include <filesystem>
 
@@ -79,8 +81,20 @@ namespace Vortex
             std::string Name; // for name lookup
         };
 
+        struct PendingUnload
+        {
+            UUID Id;
+            double UnloadAtSeconds = 0.0; // absolute engine time when eligible
+        };
+
         UUID RegisterAsset(const std::shared_ptr<Asset>& asset);
         void UnregisterAsset(const UUID& id);
+
+        // Internal helpers for unload policy
+        void ScheduleUnload(const UUID& id);
+        void CancelScheduledUnload(const UUID& id);
+        bool CanUnloadNow_NoLock(const UUID& id) const; // assumes m_Mutex locked
+        void PerformUnload_NoLock(const UUID& id);
 
         Task<void> CompileShaderTask(UUID id,
             std::string name,
@@ -98,6 +112,11 @@ namespace Vortex
         std::unordered_map<std::string, UUID> m_NameToUUID;
         std::unordered_map<UUID, uint32_t> m_Refs;
         std::vector<Task<void>> m_PendingTasks;
+
+        // Delayed unload policy and state
+        std::deque<PendingUnload> m_PendingUnloads;
+        std::unordered_map<UUID, double> m_IdToScheduledTime;
+        double m_UnloadGracePeriodSeconds = 5.0; // default grace window
 
         std::filesystem::path m_AssetsRoot;
         ShaderRef m_FallbackShader;

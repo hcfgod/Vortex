@@ -2,6 +2,7 @@
 #include "AssetSystem.h"
 #include "Core/FileSystem.h"
 #include "Core/EngineConfig.h"
+#include "Engine/Time/Time.h"
 #include "Engine/Renderer/Shader/ShaderReflection.h"
 #include "Engine/Renderer/RendererAPI.h"
 #include <nlohmann/json.hpp>
@@ -58,7 +59,7 @@ namespace Vortex
             }
         }
 
-        // Clean up finished tasks
+        // Clean up finished tasks and process pending unloads
         std::lock_guard<std::mutex> lock(m_Mutex);
         auto it = m_PendingTasks.begin();
         while (it != m_PendingTasks.end())
@@ -67,6 +68,36 @@ namespace Vortex
                 it = m_PendingTasks.erase(it);
             else
                 ++it;
+        }
+
+        // Process delayed unloads respecting grace period and dependencies
+        const double now = Time::GetUnscaledTime();
+        auto unloadIt = m_PendingUnloads.begin();
+        while (unloadIt != m_PendingUnloads.end())
+        {
+            const UUID id = unloadIt->Id;
+            const double when = unloadIt->UnloadAtSeconds;
+            // If rescheduled or removed, ensure we consult the authoritative map
+            auto timeIt = m_IdToScheduledTime.find(id);
+            if (timeIt == m_IdToScheduledTime.end())
+            {
+                unloadIt = m_PendingUnloads.erase(unloadIt);
+                continue;
+            }
+            // Only act when the front item reaches time
+            if (now < when)
+            {
+                ++unloadIt;
+                continue;
+            }
+            // Only unload if still at zero refs and no dependents require it
+            if (CanUnloadNow_NoLock(id))
+            {
+                PerformUnload_NoLock(id);
+            }
+            // Remove from queue regardless; if still not unloadable it can be rescheduled on next release
+            m_IdToScheduledTime.erase(id);
+            unloadIt = m_PendingUnloads.erase(unloadIt);
         }
         return Result<void>();
     }
@@ -99,6 +130,8 @@ namespace Vortex
         auto it = m_Assets.find(id);
         if (it != m_Assets.end() && it->second.assetPtr)
             it->second.assetPtr->AddRef();
+        // Cancel pending unload if any
+        CancelScheduledUnload(id);
     }
 
     void AssetSystem::Release(const UUID& id)
@@ -113,33 +146,8 @@ namespace Vortex
             a->second.assetPtr->ReleaseRef();
         if (it->second == 0)
         {
-            // Unload immediately when ref count hits zero (simple policy)
-            // In future, consider delayed unload and dependency tracking
-            if (a != m_Assets.end())
-            {
-                auto& entry = a->second;
-                if (entry.assetPtr)
-                {
-                    // If this is a shader asset, release GPU resources
-                    if (auto* shaderAsset = dynamic_cast<ShaderAsset*>(entry.assetPtr.get()))
-                    {
-                        if (auto& shaderRef = shaderAsset->GetShader())
-                        {
-                            shaderRef->Destroy();
-                        }
-                        shaderAsset->SetShader(nullptr);
-                        shaderAsset->SetReflection({});
-                        shaderAsset->SetIsFallback(false);
-                    }
-                    entry.assetPtr->SetState(AssetState::Unloaded);
-                    entry.assetPtr->SetProgress(0.0f);
-                }
-                // Remove from registries
-                m_NameToUUID.erase(entry.Name);
-                m_Assets.erase(a);
-                m_Refs.erase(it);
-                VX_CORE_TRACE("AssetSystem: Unloaded asset '{}'", entry.Name);
-            }
+            // Schedule delayed unload instead of immediate
+            ScheduleUnload(id);
         }
     }
 
@@ -178,6 +186,7 @@ namespace Vortex
             m_NameToUUID.erase(it->second.Name);
             m_Assets.erase(it);
             m_Refs.erase(id);
+            CancelScheduledUnload(id);
         }
     }
 
@@ -495,5 +504,92 @@ namespace Vortex
             m_FallbackShader = std::shared_ptr<GPUShader>(std::move(shader));
             VX_CORE_INFO("AssetSystem: Fallback shader created");
         }
+    }
+
+    void AssetSystem::ScheduleUnload(const UUID& id)
+    {
+        // If already scheduled, push the deadline out
+        const double deadline = Time::GetUnscaledTime() + m_UnloadGracePeriodSeconds;
+        auto it = m_IdToScheduledTime.find(id);
+        if (it != m_IdToScheduledTime.end())
+        {
+            it->second = deadline;
+            // Update the deque entry lazily; processing consults the map for truth
+            return;
+        }
+        m_IdToScheduledTime[id] = deadline;
+        m_PendingUnloads.push_back(PendingUnload{ id, deadline });
+    }
+
+    void AssetSystem::CancelScheduledUnload(const UUID& id)
+    {
+        auto it = m_IdToScheduledTime.find(id);
+        if (it == m_IdToScheduledTime.end()) return;
+        m_IdToScheduledTime.erase(it);
+        // Do not scan/erase from deque here to keep O(1); Update() will skip stale entries
+    }
+
+    bool AssetSystem::CanUnloadNow_NoLock(const UUID& id) const
+    {
+        // Preconditions: mutex held
+        // Must still exist, refcount must be zero, and no loaded asset depends on it with refs
+        auto refIt = m_Refs.find(id);
+        if (refIt != m_Refs.end() && refIt->second != 0)
+            return false;
+        auto a = m_Assets.find(id);
+        if (a == m_Assets.end())
+            return false;
+
+        // Check reverse dependencies by scanning assets (small counts, OK). If scale increases, maintain reverse map.
+        for (const auto& [otherId, entry] : m_Assets)
+        {
+            if (!entry.assetPtr)
+                continue;
+            if (otherId == id)
+                continue;
+            // If other asset is loaded (or loading) and has refs, and depends on id, do not unload
+            const auto state = entry.assetPtr->GetState();
+            if (state != AssetState::Loaded && state != AssetState::Loading)
+                continue;
+            auto refsIt = m_Refs.find(otherId);
+            const uint32_t otherRefs = refsIt == m_Refs.end() ? 0u : refsIt->second;
+            if (otherRefs == 0)
+                continue;
+            for (const auto& dep : entry.assetPtr->GetDependencies())
+            {
+                if (dep == id)
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    void AssetSystem::PerformUnload_NoLock(const UUID& id)
+    {
+        auto it = m_Assets.find(id);
+        if (it == m_Assets.end())
+            return;
+
+        auto& entry = it->second;
+        if (entry.assetPtr)
+        {
+            if (auto* shaderAsset = dynamic_cast<ShaderAsset*>(entry.assetPtr.get()))
+            {
+                if (auto& shaderRef = shaderAsset->GetShader())
+                {
+                    shaderRef->Destroy();
+                }
+                shaderAsset->SetShader(nullptr);
+                shaderAsset->SetReflection({});
+                shaderAsset->SetIsFallback(false);
+            }
+            entry.assetPtr->SetState(AssetState::Unloaded);
+            entry.assetPtr->SetProgress(0.0f);
+        }
+        m_NameToUUID.erase(entry.Name);
+        // Remove ref entry last
+        m_Refs.erase(id);
+        m_Assets.erase(it);
+        VX_CORE_TRACE("AssetSystem: Unloaded asset '{}' (timed)", entry.Name);
     }
 }

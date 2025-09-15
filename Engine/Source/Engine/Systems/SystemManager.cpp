@@ -60,7 +60,7 @@ namespace Vortex
 		}
 
 		m_Initialized = true;
-		VX_CORE_INFO("Engine systems initialized successfully", m_Systems.size());
+		VX_CORE_INFO("Engine systems initialized successfully {}", m_Systems.size());
 		
 		return Result<void>();
 	}  
