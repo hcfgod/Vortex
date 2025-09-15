@@ -155,6 +155,38 @@ namespace Vortex
          */
         virtual Result<void> BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage) = 0;
 
+        // ============================================================================
+        // OBJECT LIFETIME (GEN/DELETE)
+        // ============================================================================
+
+        /**
+         * @brief Generate one or more buffer object names
+         * @param count Number of buffers to generate
+         * @param outBuffers Pointer to array to receive buffer IDs
+         */
+        virtual Result<void> GenBuffers(uint32_t count, uint32_t* outBuffers) = 0;
+
+        /**
+         * @brief Delete one or more buffer objects
+         * @param count Number of buffers to delete
+         * @param buffers Pointer to array of buffer IDs to delete
+         */
+        virtual Result<void> DeleteBuffers(uint32_t count, const uint32_t* buffers) = 0;
+
+        /**
+         * @brief Generate one or more vertex array object names
+         * @param count Number of vertex arrays to generate
+         * @param outArrays Pointer to array to receive VAO IDs
+         */
+        virtual Result<void> GenVertexArrays(uint32_t count, uint32_t* outArrays) = 0;
+
+        /**
+         * @brief Delete one or more vertex array objects
+         * @param count Number of vertex arrays to delete
+         * @param arrays Pointer to array of VAO IDs to delete
+         */
+        virtual Result<void> DeleteVertexArrays(uint32_t count, const uint32_t* arrays) = 0;
+
         /**
          * @brief Define an array of generic vertex attribute data
          */

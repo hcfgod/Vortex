@@ -30,14 +30,14 @@ namespace Vortex
 
     OpenGLVertexArray::OpenGLVertexArray()
     {
-        glGenVertexArrays(1, &m_RendererID);
+		GetRenderCommandQueue().GenVertexArrays(1, &m_RendererID, false);
     }
 
     OpenGLVertexArray::~OpenGLVertexArray()
     {
         if (m_RendererID)
         {
-            glDeleteVertexArrays(1, &m_RendererID);
+            GetRenderCommandQueue().DeleteVertexArrays(1, &m_RendererID, true);
             m_RendererID = 0;
         }
     }

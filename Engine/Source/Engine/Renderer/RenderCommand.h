@@ -312,6 +312,70 @@ namespace Vortex
         uint32_t m_VAO;
     };
 
+    // ============================================================================
+    // OBJECT LIFETIME COMMANDS
+    // ============================================================================
+
+    class GenBuffersCommand : public RenderCommand
+    {
+    public:
+        GenBuffersCommand(uint32_t count, uint32_t* outBuffers)
+            : m_Count(count), m_OutBuffers(outBuffers) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "GenBuffers"; }
+        float GetEstimatedCost() const override { return 0.01f * m_Count; }
+
+    private:
+        uint32_t m_Count;
+        uint32_t* m_OutBuffers;
+    };
+
+    class DeleteBuffersCommand : public RenderCommand
+    {
+    public:
+        DeleteBuffersCommand(uint32_t count, const uint32_t* buffers)
+            : m_Count(count), m_Buffers(buffers) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "DeleteBuffers"; }
+        float GetEstimatedCost() const override { return 0.01f * m_Count; }
+
+    private:
+        uint32_t m_Count;
+        const uint32_t* m_Buffers;
+    };
+
+    class GenVertexArraysCommand : public RenderCommand
+    {
+    public:
+        GenVertexArraysCommand(uint32_t count, uint32_t* outArrays)
+            : m_Count(count), m_OutArrays(outArrays) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "GenVertexArrays"; }
+        float GetEstimatedCost() const override { return 0.01f * m_Count; }
+
+    private:
+        uint32_t m_Count;
+        uint32_t* m_OutArrays;
+    };
+
+    class DeleteVertexArraysCommand : public RenderCommand
+    {
+    public:
+        DeleteVertexArraysCommand(uint32_t count, const uint32_t* arrays)
+            : m_Count(count), m_Arrays(arrays) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "DeleteVertexArrays"; }
+        float GetEstimatedCost() const override { return 0.01f * m_Count; }
+
+    private:
+        uint32_t m_Count;
+        const uint32_t* m_Arrays;
+    };
+
     /**
      * @brief Command to bind a shader program
      */

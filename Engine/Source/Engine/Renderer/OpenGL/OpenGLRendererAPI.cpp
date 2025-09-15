@@ -404,6 +404,78 @@ namespace Vortex
         return Result<void>();
     }
 
+    Result<void> OpenGLRendererAPI::GenBuffers(uint32_t count, uint32_t* outBuffers)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        glGenBuffers(static_cast<GLsizei>(count), reinterpret_cast<GLuint*>(outBuffers));
+
+        if (!CheckGLError("GenBuffers"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to generate buffers");
+        }
+
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::DeleteBuffers(uint32_t count, const uint32_t* buffers)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        glDeleteBuffers(static_cast<GLsizei>(count), reinterpret_cast<const GLuint*>(buffers));
+
+        if (!CheckGLError("DeleteBuffers"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to delete buffers");
+        }
+
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::GenVertexArrays(uint32_t count, uint32_t* outArrays)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        glGenVertexArrays(static_cast<GLsizei>(count), reinterpret_cast<GLuint*>(outArrays));
+
+        if (!CheckGLError("GenVertexArrays"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to generate vertex arrays");
+        }
+
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::DeleteVertexArrays(uint32_t count, const uint32_t* arrays)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        glDeleteVertexArrays(static_cast<GLsizei>(count), reinterpret_cast<const GLuint*>(arrays));
+
+        if (!CheckGLError("DeleteVertexArrays"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to delete vertex arrays");
+        }
+
+        return Result<void>();
+    }
+
     Result<void> OpenGLRendererAPI::VertexAttribPointer(uint32_t index, int32_t size, uint32_t type,
                                                         bool normalized, uint64_t stride, uint64_t pointer)
     {

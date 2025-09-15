@@ -55,6 +55,12 @@ namespace Vortex
                                          bool normalized, uint64_t stride, uint64_t pointer) override;
         Result<void> EnableVertexAttribArray(uint32_t index, bool enabled) override;
 
+        // Object lifetime
+        Result<void> GenBuffers(uint32_t count, uint32_t* outBuffers) override;
+        Result<void> DeleteBuffers(uint32_t count, const uint32_t* buffers) override;
+        Result<void> GenVertexArrays(uint32_t count, uint32_t* outArrays) override;
+        Result<void> DeleteVertexArrays(uint32_t count, const uint32_t* arrays) override;
+
         // Render state
         Result<void> SetDepthState(bool testEnabled, bool writeEnabled, uint32_t compareFunc) override;
         Result<void> SetBlendState(bool enabled, uint32_t srcFactor, uint32_t dstFactor, uint32_t blendOp) override;

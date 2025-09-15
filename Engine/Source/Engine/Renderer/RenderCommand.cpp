@@ -166,4 +166,33 @@ namespace Vortex
         return renderer->PopDebugGroup();
     }
 
+    // --------------------------- Object lifetime ---------------------------
+    Result<void> GenBuffersCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->GenBuffers(m_Count, m_OutBuffers);
+    }
+
+    Result<void> DeleteBuffersCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->DeleteBuffers(m_Count, m_Buffers);
+    }
+
+    Result<void> GenVertexArraysCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->GenVertexArrays(m_Count, m_OutArrays);
+    }
+
+    Result<void> DeleteVertexArraysCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->DeleteVertexArrays(m_Count, m_Arrays);
+    }
+
 } // namespace Vortex

@@ -261,6 +261,27 @@ namespace Vortex
             return Submit(std::make_unique<EnableVertexAttribArrayCommand>(index, enabled), executeImmediate);
         }
 
+        // Object lifetime helpers
+        bool GenBuffers(uint32_t count, uint32_t* outBuffers, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<GenBuffersCommand>(count, outBuffers), executeImmediate);
+        }
+
+        bool DeleteBuffers(uint32_t count, const uint32_t* buffers, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<DeleteBuffersCommand>(count, buffers), executeImmediate);
+        }
+
+        bool GenVertexArrays(uint32_t count, uint32_t* outArrays, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<GenVertexArraysCommand>(count, outArrays), executeImmediate);
+        }
+
+        bool DeleteVertexArrays(uint32_t count, const uint32_t* arrays, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<DeleteVertexArraysCommand>(count, arrays), executeImmediate);
+        }
+
         /**
          * @brief Push a debug group for profiling
          * @param name Debug group name

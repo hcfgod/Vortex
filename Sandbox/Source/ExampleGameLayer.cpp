@@ -1,5 +1,4 @@
 #include "ExampleGameLayer.h"
-#include <glad/gl.h>
 
 namespace 
 {
