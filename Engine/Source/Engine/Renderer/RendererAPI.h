@@ -275,6 +275,9 @@ namespace Vortex
          */
         virtual std::string GetDebugInfo() const = 0;
 
+        // Public read-only access to underlying graphics context
+        GraphicsContext* GetContext() const { return m_GraphicsContext; }
+
         // ============================================================================
         // FACTORY METHODS
         // ============================================================================
@@ -365,6 +368,13 @@ namespace Vortex
      * @return Pointer to current renderer API, nullptr if not initialized
      */
     RendererAPI* GetRenderer();
+
+    // Helper to expose GraphicsContext from renderer for systems that need caps
+    inline GraphicsContext* GetGraphicsContextFromRenderer()
+    {
+        if (auto* r = GetRenderer()) return r->GetContext();
+        return nullptr;
+    }
 
     /**
      * @brief Initialize the global renderer API

@@ -312,6 +312,29 @@ namespace Vortex
             glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maxVertexAttribs);
             const_cast<GraphicsContextInfo&>(m_Info).MaxVertexAttributes = static_cast<uint32_t>(maxVertexAttribs);
 
+            GLint maxTextureUnits = 0;
+            glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
+            const_cast<GraphicsContextInfo&>(m_Info).MaxCombinedTextureUnits = static_cast<uint32_t>(maxTextureUnits);
+
+            GLint maxSamples = 0;
+            glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
+            const_cast<GraphicsContextInfo&>(m_Info).MaxSamples = static_cast<uint32_t>(maxSamples);
+
+            GLint maxUBOBindings = 0;
+            glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &maxUBOBindings);
+            const_cast<GraphicsContextInfo&>(m_Info).MaxUniformBufferBindings = static_cast<uint32_t>(maxUBOBindings);
+
+            GLint maxUBOSize = 0;
+            glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &maxUBOSize);
+            const_cast<GraphicsContextInfo&>(m_Info).MaxUniformBlockSize = static_cast<uint32_t>(maxUBOSize);
+
+            if (GLAD_GL_VERSION_4_3)
+            {
+                GLint maxSSBOBindings = 0;
+                glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxSSBOBindings);
+                const_cast<GraphicsContextInfo&>(m_Info).MaxSSBOBindings = static_cast<uint32_t>(maxSSBOBindings);
+            }
+
             // Default framebuffer bits and samples (use SDL for depth/stencil to avoid GL enum availability issues)
             int depthAttr = 0, stencilAttr = 0;
             SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &depthAttr);
@@ -330,6 +353,22 @@ namespace Vortex
             // Check for shader support
             const_cast<GraphicsContextInfo&>(m_Info).SupportsGeometryShaders = (GLAD_GL_VERSION_3_2 != 0);
             const_cast<GraphicsContextInfo&>(m_Info).SupportsComputeShaders = (GLAD_GL_VERSION_4_3 != 0);
+
+            // Multi draw indirect support
+            const_cast<GraphicsContextInfo&>(m_Info).SupportsMultiDrawIndirect = (GLAD_GL_ARB_multi_draw_indirect != 0) || (GLAD_GL_VERSION_4_3 != 0);
+
+            // Extensions list (optional)
+            std::vector<std::string> extensions;
+            GLint numExtensions = 0;
+            glGetIntegerv(GL_NUM_EXTENSIONS, &numExtensions);
+            extensions.reserve(static_cast<size_t>(numExtensions));
+            for (GLint i = 0; i < numExtensions; ++i)
+            {
+                const GLubyte* ext = glGetStringi(GL_EXTENSIONS, i);
+                if (ext)
+                    extensions.emplace_back(reinterpret_cast<const char*>(ext));
+            }
+            const_cast<GraphicsContextInfo&>(m_Info).Extensions = std::move(extensions);
         }
         
         return m_Info;

@@ -5,6 +5,7 @@
 #include "Engine/Renderer/RendererAPI.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
 #include "Engine/Renderer/Shader/ShaderManager.h"
+#include "Engine/Renderer/RenderPass.h"
 #include "Core/Window.h"
 #include "Core/Debug/ErrorCodes.h"
 
@@ -59,6 +60,11 @@ namespace Vortex
         bool m_Ready = false;
 
         RenderSettings m_Settings;
+
+        // Simple built-in passes
+        RenderPass m_Pass3D{ RenderPassDesc{ "3D", 0 } };
+        RenderPass m_Pass2D{ RenderPassDesc{ "2D", 0 } };
+        RenderPass m_PassUI{ RenderPassDesc{ "UI", 0 } };
 
         // Optional: subscribe to window resize events later if needed
     };

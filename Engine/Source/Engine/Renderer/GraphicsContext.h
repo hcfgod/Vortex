@@ -60,6 +60,10 @@ namespace Vortex
         uint32_t MaxVertexAttributes = 0;
         uint32_t MaxUniformBufferBindings = 0;
         uint32_t MaxColorAttachments = 0;
+        uint32_t MaxCombinedTextureUnits = 0;
+        uint32_t MaxSamples = 0;
+        uint32_t MaxUniformBlockSize = 0;
+        uint32_t MaxSSBOBindings = 0;
 
         // Default framebuffer info
         uint32_t DepthBits = 0;
@@ -71,6 +75,9 @@ namespace Vortex
         bool SupportsGeometryShaders = false;
         bool SupportsComputeShaders = false;
         bool SupportsMultiDrawIndirect = false;
+
+        // Extensions list (if available)
+        std::vector<std::string> Extensions;
     };
 
     /**

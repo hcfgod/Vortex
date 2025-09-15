@@ -224,6 +224,19 @@ namespace Vortex
         // Basic stub: compile and write SPIR-V blobs to outputDir for packaging
         ShaderCompiler compiler;
         ShaderCompileOptions options; // default or load from config
+        if (auto* renderer = GetRenderer())
+        {
+            if (auto* ctx = renderer->GetContext())
+            {
+                const auto& info = ctx->GetInfo();
+                options.HardwareCaps.MaxTextureUnits = info.MaxCombinedTextureUnits;
+                options.HardwareCaps.MaxSamples = std::max(info.SampleCount, info.MaxSamples);
+                options.HardwareCaps.SupportsGeometry = info.SupportsGeometryShaders;
+                options.HardwareCaps.SupportsCompute = info.SupportsComputeShaders;
+                options.HardwareCaps.SupportsMultiDrawIndirect = info.SupportsMultiDrawIndirect;
+                options.HardwareCaps.SRGBFramebufferCapable = info.SRGBFramebufferCapable;
+            }
+        }
         auto vs = compiler.CompileFromFile(vertexPath, options);
         auto fs = compiler.CompileFromFile(fragmentPath, options);
         if (!vs.IsSuccess() || !fs.IsSuccess())
@@ -418,6 +431,27 @@ namespace Vortex
 
         ShaderCompiler compiler;
         ShaderCompileOptions options; options.GenerateDebugInfo = false; options.TargetProfile = "opengl";
+        if (auto* renderer = GetRenderer())
+        {
+            // Map GraphicsContextInfo into options.HardwareCaps for fallback too
+            auto* ctx = renderer->GetContext();
+            if (ctx)
+            {
+                const auto& info = ctx->GetInfo();
+                options.HardwareCaps.MaxTextureUnits = info.MaxCombinedTextureUnits;
+                options.HardwareCaps.MaxSamples = std::max(info.SampleCount, info.MaxSamples);
+                options.HardwareCaps.SupportsGeometry = info.SupportsGeometryShaders;
+                options.HardwareCaps.SupportsCompute = info.SupportsComputeShaders;
+                options.HardwareCaps.SupportsMultiDrawIndirect = info.SupportsMultiDrawIndirect;
+                options.HardwareCaps.SRGBFramebufferCapable = info.SRGBFramebufferCapable;
+                // Provide commonly useful macros
+                options.Macros["VX_SUPPORTS_GEOMETRY"] = info.SupportsGeometryShaders ? "1" : "0";
+                options.Macros["VX_SUPPORTS_COMPUTE"] = info.SupportsComputeShaders ? "1" : "0";
+                options.Macros["VX_SUPPORTS_MDI"] = info.SupportsMultiDrawIndirect ? "1" : "0";
+                options.Macros["VX_MAX_TEX_UNITS"] = std::to_string(info.MaxCombinedTextureUnits);
+                options.Macros["VX_SRGB_FB"] = info.SRGBFramebufferCapable ? "1" : "0";
+            }
+        }
         auto vs = compiler.CompileFromSource(kVS, ShaderStage::Vertex, options, "Fallback.vert");
         auto fs = compiler.CompileFromSource(kFS, ShaderStage::Fragment, options, "Fallback.frag");
         if (!vs.IsSuccess() || !fs.IsSuccess())

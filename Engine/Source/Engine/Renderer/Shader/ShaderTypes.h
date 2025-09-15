@@ -229,6 +229,17 @@ namespace Vortex
         // Caching
         bool EnableCaching = true;
         std::string CacheDirectory = "cache/shaders/";
+
+        // Optional hardware capability hints to drive permutations or limits
+        struct Caps
+        {
+            uint32_t MaxTextureUnits = 0;
+            uint32_t MaxSamples = 0;
+            bool SupportsGeometry = false;
+            bool SupportsCompute = false;
+            bool SupportsMultiDrawIndirect = false;
+            bool SRGBFramebufferCapable = false;
+        } HardwareCaps;
     };
     
     // ============================================================================

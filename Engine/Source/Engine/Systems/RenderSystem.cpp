@@ -237,8 +237,15 @@ namespace Vortex
             flags &= ~Vortex::ClearCommand::Stencil;
         }
 
-        // Clear using current settings (color/depth/stencil)
-        GetRenderCommandQueue().Clear(flags, m_Settings.ClearColor, m_Settings.ClearDepth, m_Settings.ClearStencil);
+        // Configure built-in passes
+        m_Pass3D.SetDesc(RenderPassDesc{ "3D", flags, m_Settings.ClearColor, m_Settings.ClearDepth, m_Settings.ClearStencil, false });
+        m_Pass2D.SetDesc(RenderPassDesc{ "2D", 0, {}, 1.0f, 0, false });
+        m_PassUI.SetDesc(RenderPassDesc{ "UI", 0, {}, 1.0f, 0, false });
+
+        // Begin the frame with a 3D pass (clears buffers)
+        m_Pass2D.Begin();
+        m_Pass3D.Begin();
+		m_PassUI.Begin();
 
         return Result<void>();
     }
@@ -263,6 +270,11 @@ namespace Vortex
 
     Result<void> RenderSystem::PostRender()
     {
+        // End any active pass at end of frame
+        if (m_Pass3D.IsActive()) m_Pass3D.End();
+        if (m_Pass2D.IsActive()) m_Pass2D.End();
+        if (m_PassUI.IsActive()) m_PassUI.End();
+
         auto presentResult = m_GraphicsContext->Present();
         if (presentResult.IsError())
         {

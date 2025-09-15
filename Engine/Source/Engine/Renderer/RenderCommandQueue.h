@@ -319,6 +319,26 @@ namespace Vortex
             return Submit(std::make_unique<PopDebugGroupCommand>(), executeImmediate);
         }
 
+        // Lightweight helpers for pipeline state
+        bool SetDepthState(bool testEnabled, bool writeEnabled, SetDepthStateCommand::CompareFunction func = SetDepthStateCommand::Less, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<SetDepthStateCommand>(testEnabled, writeEnabled, func), executeImmediate);
+        }
+
+        bool SetBlendState(bool enabled,
+            SetBlendStateCommand::BlendFactor srcFactor = SetBlendStateCommand::SrcAlpha,
+            SetBlendStateCommand::BlendFactor dstFactor = SetBlendStateCommand::OneMinusSrcAlpha,
+            SetBlendStateCommand::BlendOperation op = SetBlendStateCommand::Add,
+            bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<SetBlendStateCommand>(enabled, srcFactor, dstFactor, op), executeImmediate);
+        }
+
+        bool SetCullState(SetCullStateCommand::CullMode mode, SetCullStateCommand::FrontFace face = SetCullStateCommand::CounterClockwise, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<SetCullStateCommand>(mode, face), executeImmediate);
+        }
+
     private:
         /**
          * @brief Execute a single command safely
@@ -409,4 +429,13 @@ namespace Vortex
 
 #define VX_RENDER_DEBUG_POP() \
         ::Vortex::GetRenderCommandQueue().PopDebugGroup()
+
+#define VX_RENDER_SET_DEPTH(test, write, func) \
+        ::Vortex::GetRenderCommandQueue().SetDepthState(test, write, func)
+
+#define VX_RENDER_SET_BLEND(enabled, src, dst, op) \
+        ::Vortex::GetRenderCommandQueue().SetBlendState(enabled, src, dst, op)
+
+#define VX_RENDER_SET_CULL(mode, face) \
+        ::Vortex::GetRenderCommandQueue().SetCullState(mode, face)
 }
