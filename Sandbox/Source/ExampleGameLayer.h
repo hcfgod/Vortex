@@ -63,4 +63,7 @@ private:
     unsigned int m_VBO = 0;
     unsigned int m_VAO = 0;
     unsigned int m_EBO = 0;
+
+    // High-level rendering objects
+    std::shared_ptr<VertexArray> m_VertexArray;
 };

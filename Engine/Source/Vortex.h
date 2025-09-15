@@ -51,6 +51,8 @@
 #include "Engine/Renderer/Shader/ShaderManager.h"
 #include "Engine/Renderer/Shader/ShaderReflection.h"
 #include "Engine/Renderer/RenderTypes.h"
+#include "Engine/Renderer/VertexArray.h"
+#include "Engine/Renderer/Buffer.h"
 
 // Assets
 #include "Engine/Assets/Asset.h"

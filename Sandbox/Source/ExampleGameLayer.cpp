@@ -56,58 +56,21 @@ void ExampleGameLayer::OnAttach()
     // Initialize the modern shader system
     SetupShaderSystem();
 
-    // Generate buffers and arrays
-    glGenVertexArrays(1, &m_VAO);
-    glGenBuffers(1, &m_VBO);
-    glGenBuffers(1, &m_EBO);
+    // Create VAO/VBO/EBO via high-level API
+    m_VertexArray = VertexArray::Create();
+    auto vbo = VertexBuffer::Create(sizeof(kVertices), kVertices);
+    vbo->SetLayout({
+        { ShaderDataType::Vec3, "a_Position" },
+        { ShaderDataType::Vec2, "a_TexCoord" },
+        { ShaderDataType::Vec3, "a_Normal" },
+        { ShaderDataType::Vec3, "a_Tangent" },
+    });
+    auto ebo = IndexBuffer::Create(const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(kIndices)), 3);
 
-    // Bind and set up vertex and element buffers via RenderCommandQueue
-    GetRenderCommandQueue().BindVertexArray(m_VAO);
-    GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), m_VBO);
-    GetRenderCommandQueue().BufferData(
-        static_cast<uint32_t>(BufferTarget::ArrayBuffer),
-        kVertices,
-        sizeof(kVertices),
-        static_cast<uint32_t>(BufferUsage::StaticDraw)
-    );
-    GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ElementArrayBuffer), m_EBO);
-    GetRenderCommandQueue().BufferData(
-        static_cast<uint32_t>(BufferTarget::ElementArrayBuffer),
-        kIndices,
-        sizeof(kIndices),
-        static_cast<uint32_t>(BufferUsage::StaticDraw)
-    );
-
-    // Vertex attributes: position (3 floats) + texcoord (2 floats) + normal (3 floats) + tangent (3 floats) = stride of 11 floats
-    const int stride = 11 * sizeof(float);
-    
-    // Position attribute (location = 0)
-    GetRenderCommandQueue().VertexAttribPointer(
-        0, 3, static_cast<uint32_t>(DataType::Float), false, stride, 0
-    );
-    GetRenderCommandQueue().EnableVertexAttribArray(0, true);
-    
-    // Texture coordinate attribute (location = 1)
-    GetRenderCommandQueue().VertexAttribPointer(
-        1, 2, static_cast<uint32_t>(DataType::Float), false, stride, (3 * sizeof(float))
-    );
-    GetRenderCommandQueue().EnableVertexAttribArray(1, true);
-    
-    // Normal attribute (location = 2)
-    GetRenderCommandQueue().VertexAttribPointer(
-        2, 3, static_cast<uint32_t>(DataType::Float), false, stride, (5 * sizeof(float))
-    );
-    GetRenderCommandQueue().EnableVertexAttribArray(2, true);
-    
-    // Tangent attribute (location = 3)
-    GetRenderCommandQueue().VertexAttribPointer(
-        3, 3, static_cast<uint32_t>(DataType::Float), false, stride, (8 * sizeof(float))
-    );
-    GetRenderCommandQueue().EnableVertexAttribArray(3, true);
-
-    // Unbind for safety
-    GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), 0);
-    GetRenderCommandQueue().BindVertexArray(0);
+    m_VertexArray->Bind();
+    m_VertexArray->AddVertexBuffer(vbo);
+    m_VertexArray->SetIndexBuffer(ebo);
+    m_VertexArray->Unbind();
 }
 
 void ExampleGameLayer::OnDetach()
@@ -296,7 +259,7 @@ void ExampleGameLayer::OnRender()
         return;
     }
 
-    if (m_VAO != 0)
+    if (m_VertexArray)
     {
         // Set matrix uniforms for advanced shader
         glm::mat4 viewProjection = glm::mat4(1.0f);
@@ -358,10 +321,11 @@ void ExampleGameLayer::OnRender()
         m_ShaderManager->SetUniform("u_RimColor", rimColor);
         m_ShaderManager->SetUniform("u_FresnelStrength", 0.3f);
         
-        // Bind vertex array and draw
-		GetRenderCommandQueue().BindVertexArray(m_VAO);
-        GetRenderCommandQueue().DrawIndexed(3);
-        GetRenderCommandQueue().BindVertexArray(0);
+        // Bind VAO and draw
+        GetRenderCommandQueue().BindVertexArray(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(nullptr))); // no-op to ensure context
+        m_VertexArray->Bind();
+        GetRenderCommandQueue().DrawIndexed(3, 1, 0, 0, 0, static_cast<uint32_t>(PrimitiveTopology::Triangles));
+        m_VertexArray->Unbind();
     }
 
     // Unbind shader through ShaderManager
@@ -437,7 +401,7 @@ void ExampleGameLayer::SetupInputActions()
         return;
     }
     
-	auto* inputSystem = m_SystemManager->GetSystem<InputSystem>();
+    auto* inputSystem = m_SystemManager->GetSystem<InputSystem>();
     if (!inputSystem)
     {
         VX_WARN("InputSystem not available for ExampleGameLayer");
