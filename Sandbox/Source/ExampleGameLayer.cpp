@@ -58,29 +58,24 @@ void ExampleGameLayer::OnAttach()
 
     // Create VAO/VBO/EBO via high-level API
     m_VertexArray = VertexArray::Create();
-    auto vbo = VertexBuffer::Create(sizeof(kVertices), kVertices);
-    vbo->SetLayout({
+    m_VertexBuffer = VertexBuffer::Create(sizeof(kVertices), kVertices);
+    m_VertexBuffer->SetLayout({
         { ShaderDataType::Vec3, "a_Position" },
         { ShaderDataType::Vec2, "a_TexCoord" },
         { ShaderDataType::Vec3, "a_Normal" },
         { ShaderDataType::Vec3, "a_Tangent" },
     });
-    auto ebo = IndexBuffer::Create(const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(kIndices)), 3);
+    m_IndexBuffer = IndexBuffer::Create(const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(kIndices)), 3);
 
     m_VertexArray->Bind();
-    m_VertexArray->AddVertexBuffer(vbo);
-    m_VertexArray->SetIndexBuffer(ebo);
+    m_VertexArray->AddVertexBuffer(m_VertexBuffer);
+    m_VertexArray->SetIndexBuffer(m_IndexBuffer);
     m_VertexArray->Unbind();
 }
 
 void ExampleGameLayer::OnDetach()
 {
     VX_INFO("ExampleGameLayer detached - Final Score: {}", m_Score);
-
-    // Cleanup GL resources
-    if (m_VAO) { glDeleteVertexArrays(1, &m_VAO); m_VAO = 0; }
-    if (m_VBO) { glDeleteBuffers(1, &m_VBO); m_VBO = 0; }
-    if (m_EBO) { glDeleteBuffers(1, &m_EBO); m_EBO = 0; }
 }
 
 void ExampleGameLayer::OnUpdate()

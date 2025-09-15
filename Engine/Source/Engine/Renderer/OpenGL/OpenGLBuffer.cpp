@@ -1,6 +1,8 @@
 #include "vxpch.h"
 #include "OpenGLBuffer.h"
 #include <glad/gl.h>
+#include "Engine/Renderer/RenderCommandQueue.h"
+#include "Engine/Renderer/RenderTypes.h"
 
 namespace Vortex
 {
@@ -8,8 +10,13 @@ namespace Vortex
     OpenGLVertexBuffer::OpenGLVertexBuffer(uint32_t size, const void* data)
     {
         glGenBuffers(1, &m_RendererID);
-        glBindBuffer(GL_ARRAY_BUFFER, m_RendererID);
-        glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
+        // Upload data via render command queue (bind to ARRAY_BUFFER)
+        GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), m_RendererID);
+        if (data && size > 0)
+        {
+            GetRenderCommandQueue().BufferData(static_cast<uint32_t>(BufferTarget::ArrayBuffer), data, size,
+                static_cast<uint32_t>(BufferUsage::StaticDraw));
+        }
     }
 
     OpenGLVertexBuffer::~OpenGLVertexBuffer()
@@ -23,18 +30,19 @@ namespace Vortex
 
     void OpenGLVertexBuffer::Bind() const
     {
-        glBindBuffer(GL_ARRAY_BUFFER, m_RendererID);
+        GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), m_RendererID);
     }
 
     void OpenGLVertexBuffer::Unbind() const
     {
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), 0);
     }
 
     void OpenGLVertexBuffer::SetData(const void* data, uint32_t size)
     {
-        glBindBuffer(GL_ARRAY_BUFFER, m_RendererID);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, size, data);
+        GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), m_RendererID);
+        GetRenderCommandQueue().BufferData(static_cast<uint32_t>(BufferTarget::ArrayBuffer), data, size,
+            static_cast<uint32_t>(BufferUsage::DynamicDraw));
     }
 
     // ------------------------- OpenGLIndexBuffer -------------------------
@@ -42,8 +50,10 @@ namespace Vortex
         : m_Count(count)
     {
         glGenBuffers(1, &m_RendererID);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_RendererID);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, count * sizeof(uint32_t), indices, GL_STATIC_DRAW);
+        // Upload data via ARRAY_BUFFER to avoid VAO attachment here
+        GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), m_RendererID);
+        GetRenderCommandQueue().BufferData(static_cast<uint32_t>(BufferTarget::ArrayBuffer), indices,
+            count * sizeof(uint32_t), static_cast<uint32_t>(BufferUsage::StaticDraw));
     }
 
     OpenGLIndexBuffer::~OpenGLIndexBuffer()
@@ -57,12 +67,12 @@ namespace Vortex
 
     void OpenGLIndexBuffer::Bind() const
     {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_RendererID);
+        GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ElementArrayBuffer), m_RendererID);
     }
 
     void OpenGLIndexBuffer::Unbind() const
     {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ElementArrayBuffer), 0);
     }
 }
 

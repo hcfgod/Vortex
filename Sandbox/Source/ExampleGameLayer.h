@@ -66,4 +66,6 @@ private:
 
     // High-level rendering objects
     std::shared_ptr<VertexArray> m_VertexArray;
+	std::shared_ptr<VertexBuffer> m_VertexBuffer;
+	std::shared_ptr<IndexBuffer> m_IndexBuffer;
 };
