@@ -266,7 +266,8 @@ namespace Vortex
     // ============================================================================
 
     Result<void> OpenGLRendererAPI::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, 
-                                                uint32_t firstIndex, int32_t baseVertex, uint32_t baseInstance)
+                                                uint32_t firstIndex, int32_t baseVertex, uint32_t baseInstance,
+                                                uint32_t primitiveTopology)
     {
         auto validateResult = ValidateContext();
         if (!validateResult.IsSuccess())
@@ -275,14 +276,15 @@ namespace Vortex
         }
 
         // For now, we'll use glDrawElements. Full instanced rendering would need additional setup
+        const GLenum glMode = ConvertPrimitiveTopology(primitiveTopology);
         if (instanceCount <= 1)
         {
-            glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indexCount), GL_UNSIGNED_INT, 
+            glDrawElements(glMode, static_cast<GLsizei>(indexCount), GL_UNSIGNED_INT, 
                           reinterpret_cast<void*>(static_cast<uintptr_t>(firstIndex * sizeof(uint32_t))));
         }
         else
         {
-            glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(indexCount), GL_UNSIGNED_INT,
+            glDrawElementsInstanced(glMode, static_cast<GLsizei>(indexCount), GL_UNSIGNED_INT,
                                    reinterpret_cast<void*>(static_cast<uintptr_t>(firstIndex * sizeof(uint32_t))),
                                    static_cast<GLsizei>(instanceCount));
         }
@@ -296,7 +298,8 @@ namespace Vortex
     }
 
     Result<void> OpenGLRendererAPI::DrawArrays(uint32_t vertexCount, uint32_t instanceCount,
-                                              uint32_t firstVertex, uint32_t baseInstance)
+                                              uint32_t firstVertex, uint32_t baseInstance,
+                                              uint32_t primitiveTopology)
     {
         auto validateResult = ValidateContext();
         if (!validateResult.IsSuccess())
@@ -304,13 +307,14 @@ namespace Vortex
             return validateResult;
         }
 
+        const GLenum glMode = ConvertPrimitiveTopology(primitiveTopology);
         if (instanceCount <= 1)
         {
-            glDrawArrays(GL_TRIANGLES, static_cast<GLint>(firstVertex), static_cast<GLsizei>(vertexCount));
+            glDrawArrays(glMode, static_cast<GLint>(firstVertex), static_cast<GLsizei>(vertexCount));
         }
         else
         {
-            glDrawArraysInstanced(GL_TRIANGLES, static_cast<GLint>(firstVertex), 
+            glDrawArraysInstanced(glMode, static_cast<GLint>(firstVertex), 
                                  static_cast<GLsizei>(vertexCount), static_cast<GLsizei>(instanceCount));
         }
 
@@ -359,6 +363,80 @@ namespace Vortex
         if (!CheckGLError("BindIndexBuffer"))
         {
             return Result<void>(ErrorCode::RendererInitFailed, "Failed to bind index buffer");
+        }
+
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::BindBuffer(uint32_t target, uint32_t buffer)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        glBindBuffer(ConvertBufferTarget(target), buffer);
+
+        if (!CheckGLError("BindBuffer"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to bind buffer");
+        }
+
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        glBufferData(ConvertBufferTarget(target), static_cast<GLsizeiptr>(size), data, ConvertBufferUsage(usage));
+
+        if (!CheckGLError("BufferData"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to upload buffer data");
+        }
+
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::VertexAttribPointer(uint32_t index, int32_t size, uint32_t type,
+                                                        bool normalized, uint64_t stride, uint64_t pointer)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        glVertexAttribPointer(index, size, ConvertDataType(type), normalized ? GL_TRUE : GL_FALSE,
+                              static_cast<GLsizei>(stride), reinterpret_cast<const void*>(static_cast<uintptr_t>(pointer)));
+
+        if (!CheckGLError("VertexAttribPointer"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to set vertex attrib pointer");
+        }
+
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::EnableVertexAttribArray(uint32_t index, bool enabled)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        if (enabled) glEnableVertexAttribArray(index); else glDisableVertexAttribArray(index);
+
+        if (!CheckGLError("EnableVertexAttribArray"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to toggle vertex attrib array");
         }
 
         return Result<void>();
@@ -754,5 +832,60 @@ namespace Vortex
             return false;
         }
         return true;
+    }
+
+    uint32_t OpenGLRendererAPI::ConvertBufferTarget(uint32_t target) const
+    {
+        switch (static_cast<BufferTarget>(target))
+        {
+            case BufferTarget::ArrayBuffer:          return GL_ARRAY_BUFFER;
+            case BufferTarget::ElementArrayBuffer:   return GL_ELEMENT_ARRAY_BUFFER;
+            case BufferTarget::UniformBuffer:        return GL_UNIFORM_BUFFER;
+            case BufferTarget::ShaderStorageBuffer:  return GL_SHADER_STORAGE_BUFFER;
+            default:                                  return GL_ARRAY_BUFFER;
+        }
+    }
+
+    uint32_t OpenGLRendererAPI::ConvertBufferUsage(uint32_t usage) const
+    {
+        switch (static_cast<BufferUsage>(usage))
+        {
+            case BufferUsage::StaticDraw:  return GL_STATIC_DRAW;
+            case BufferUsage::DynamicDraw: return GL_DYNAMIC_DRAW;
+            case BufferUsage::StreamDraw:  return GL_STREAM_DRAW;
+            default:                       return GL_STATIC_DRAW;
+        }
+    }
+
+    uint32_t OpenGLRendererAPI::ConvertDataType(uint32_t type) const
+    {
+        switch (static_cast<DataType>(type))
+        {
+            case DataType::Byte:          return GL_BYTE;
+            case DataType::UnsignedByte:  return GL_UNSIGNED_BYTE;
+            case DataType::Short:         return GL_SHORT;
+            case DataType::UnsignedShort: return GL_UNSIGNED_SHORT;
+            case DataType::Int:           return GL_INT;
+            case DataType::UnsignedInt:   return GL_UNSIGNED_INT;
+            case DataType::HalfFloat:     return GL_HALF_FLOAT;
+            case DataType::Float:         return GL_FLOAT;
+            case DataType::DoubleType:    return GL_DOUBLE;
+            default:                      return GL_FLOAT;
+        }
+    }
+
+    uint32_t OpenGLRendererAPI::ConvertPrimitiveTopology(uint32_t topology) const
+    {
+        switch (static_cast<PrimitiveTopology>(topology))
+        {
+            case PrimitiveTopology::Points:         return GL_POINTS;
+            case PrimitiveTopology::Lines:          return GL_LINES;
+            case PrimitiveTopology::LineStrip:      return GL_LINE_STRIP;
+            case PrimitiveTopology::LineLoop:       return GL_LINE_LOOP;
+            case PrimitiveTopology::Triangles:      return GL_TRIANGLES;
+            case PrimitiveTopology::TriangleStrip:  return GL_TRIANGLE_STRIP;
+            case PrimitiveTopology::TriangleFan:    return GL_TRIANGLE_FAN;
+            default:                                return GL_TRIANGLES;
+        }
     }
 }

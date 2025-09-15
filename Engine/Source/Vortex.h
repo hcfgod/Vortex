@@ -50,6 +50,7 @@
 #include "Engine/Renderer/Shader/ShaderCompiler.h"
 #include "Engine/Renderer/Shader/ShaderManager.h"
 #include "Engine/Renderer/Shader/ShaderReflection.h"
+#include "Engine/Renderer/RenderTypes.h"
 
 // Assets
 #include "Engine/Assets/Asset.h"

@@ -61,35 +61,53 @@ void ExampleGameLayer::OnAttach()
     glGenBuffers(1, &m_VBO);
     glGenBuffers(1, &m_EBO);
 
-    // Bind and set up vertex and element buffers
-    glBindVertexArray(m_VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(kVertices), kVertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(kIndices), kIndices, GL_STATIC_DRAW);
+    // Bind and set up vertex and element buffers via RenderCommandQueue
+    GetRenderCommandQueue().BindVertexArray(m_VAO);
+    GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), m_VBO);
+    GetRenderCommandQueue().BufferData(
+        static_cast<uint32_t>(BufferTarget::ArrayBuffer),
+        kVertices,
+        sizeof(kVertices),
+        static_cast<uint32_t>(BufferUsage::StaticDraw)
+    );
+    GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ElementArrayBuffer), m_EBO);
+    GetRenderCommandQueue().BufferData(
+        static_cast<uint32_t>(BufferTarget::ElementArrayBuffer),
+        kIndices,
+        sizeof(kIndices),
+        static_cast<uint32_t>(BufferUsage::StaticDraw)
+    );
 
     // Vertex attributes: position (3 floats) + texcoord (2 floats) + normal (3 floats) + tangent (3 floats) = stride of 11 floats
     const int stride = 11 * sizeof(float);
     
     // Position attribute (location = 0)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
-    glEnableVertexAttribArray(0);
+    GetRenderCommandQueue().VertexAttribPointer(
+        0, 3, static_cast<uint32_t>(DataType::Float), false, stride, 0
+    );
+    GetRenderCommandQueue().EnableVertexAttribArray(0, true);
     
     // Texture coordinate attribute (location = 1)
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+    GetRenderCommandQueue().VertexAttribPointer(
+        1, 2, static_cast<uint32_t>(DataType::Float), false, stride, (3 * sizeof(float))
+    );
+    GetRenderCommandQueue().EnableVertexAttribArray(1, true);
     
     // Normal attribute (location = 2)
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void*)(5 * sizeof(float)));
-    glEnableVertexAttribArray(2);
+    GetRenderCommandQueue().VertexAttribPointer(
+        2, 3, static_cast<uint32_t>(DataType::Float), false, stride, (5 * sizeof(float))
+    );
+    GetRenderCommandQueue().EnableVertexAttribArray(2, true);
     
     // Tangent attribute (location = 3)
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)(8 * sizeof(float)));
-    glEnableVertexAttribArray(3);
+    GetRenderCommandQueue().VertexAttribPointer(
+        3, 3, static_cast<uint32_t>(DataType::Float), false, stride, (8 * sizeof(float))
+    );
+    GetRenderCommandQueue().EnableVertexAttribArray(3, true);
 
     // Unbind for safety
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), 0);
+    GetRenderCommandQueue().BindVertexArray(0);
 }
 
 void ExampleGameLayer::OnDetach()
@@ -341,9 +359,9 @@ void ExampleGameLayer::OnRender()
         m_ShaderManager->SetUniform("u_FresnelStrength", 0.3f);
         
         // Bind vertex array and draw
-        glBindVertexArray(m_VAO);
-        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
+		GetRenderCommandQueue().BindVertexArray(m_VAO);
+        GetRenderCommandQueue().DrawIndexed(3);
+        GetRenderCommandQueue().BindVertexArray(0);
     }
 
     // Unbind shader through ShaderManager

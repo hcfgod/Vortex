@@ -2,6 +2,8 @@
 
 #include "vxpch.h"
 #include "RenderCommand.h"
+#include "RendererAPI.h"
+#include "RenderTypes.h"
 #include "Core/Debug/ErrorCodes.h"
 #include <atomic>
 #include <mutex>
@@ -202,9 +204,20 @@ namespace Vortex
             uint32_t firstIndex = 0,
             int32_t baseVertex = 0,
             uint32_t baseInstance = 0,
+            uint32_t primitiveTopology = static_cast<uint32_t>(PrimitiveTopology::Triangles),
             bool executeImmediate = false)
         {
-            return Submit(std::make_unique<DrawIndexedCommand>(indexCount, instanceCount, firstIndex, baseVertex, baseInstance), executeImmediate);
+            return Submit(std::make_unique<DrawIndexedCommand>(indexCount, instanceCount, firstIndex, baseVertex, baseInstance, primitiveTopology), executeImmediate);
+        }
+
+        bool DrawArrays(uint32_t vertexCount,
+            uint32_t instanceCount = 1,
+            uint32_t firstVertex = 0,
+            uint32_t baseInstance = 0,
+            uint32_t primitiveTopology = static_cast<uint32_t>(PrimitiveTopology::Triangles),
+            bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<DrawArraysCommand>(vertexCount, instanceCount, firstVertex, baseInstance, primitiveTopology), executeImmediate);
         }
 
         /**
@@ -224,6 +237,28 @@ namespace Vortex
         bool BindVertexArray(uint32_t vao, bool executeImmediate = false)
         {
             return Submit(std::make_unique<BindVertexArrayCommand>(vao), executeImmediate);
+        }
+
+        // Generic buffer and vertex attribute helpers
+        bool BindBuffer(uint32_t target, uint32_t buffer, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BindBufferCommand>(target, buffer), executeImmediate);
+        }
+
+        bool BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BufferDataCommand>(target, data, size, usage), executeImmediate);
+        }
+
+        bool VertexAttribPointer(uint32_t index, int32_t size, uint32_t type, bool normalized,
+                                 uint64_t stride, uint64_t pointer, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<VertexAttribPointerCommand>(index, size, type, normalized, stride, pointer), executeImmediate);
+        }
+
+        bool EnableVertexAttribArray(uint32_t index, bool enabled, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<EnableVertexAttribArrayCommand>(index, enabled), executeImmediate);
         }
 
         /**
@@ -322,8 +357,11 @@ namespace Vortex
 #define VX_RENDER_VIEWPORT(x, y, w, h) \
         ::Vortex::GetRenderCommandQueue().SetViewport(x, y, w, h)
 
-#define VX_RENDER_DRAW_INDEXED(indexCount, instanceCount) \
-        ::Vortex::GetRenderCommandQueue().DrawIndexed(indexCount, instanceCount)
+#define VX_RENDER_DRAW_INDEXED(indexCount, instanceCount, topology) \
+        ::Vortex::GetRenderCommandQueue().DrawIndexed(indexCount, instanceCount, 0, 0, 0, topology)
+
+#define VX_RENDER_DRAW_ARRAYS(vertexCount, instanceCount, topology) \
+        ::Vortex::GetRenderCommandQueue().DrawArrays(vertexCount, instanceCount, 0, 0, topology)
 
 #define VX_RENDER_BIND_SHADER(program) \
         ::Vortex::GetRenderCommandQueue().BindShader(program)

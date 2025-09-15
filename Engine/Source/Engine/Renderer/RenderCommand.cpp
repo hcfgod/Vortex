@@ -32,14 +32,14 @@ namespace Vortex
     Result<void> DrawIndexedCommand::Execute(GraphicsContext* /*context*/) {
         auto* renderer = GetRenderer();
         if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
-        return renderer->DrawIndexed(m_IndexCount, m_InstanceCount, m_FirstIndex, m_BaseVertex, m_BaseInstance);
+        return renderer->DrawIndexed(m_IndexCount, m_InstanceCount, m_FirstIndex, m_BaseVertex, m_BaseInstance, m_PrimitiveTopology);
     }
 
     // ------------------------- DrawArraysCommand -------------------------
     Result<void> DrawArraysCommand::Execute(GraphicsContext* /*context*/) {
         auto* renderer = GetRenderer();
         if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
-        return renderer->DrawArrays(m_VertexCount, m_InstanceCount, m_FirstVertex, m_BaseInstance);
+        return renderer->DrawArrays(m_VertexCount, m_InstanceCount, m_FirstVertex, m_BaseInstance, m_PrimitiveTopology);
     }
 
     // ---------------------- BindVertexBufferCommand ----------------------
@@ -55,6 +55,38 @@ namespace Vortex
         if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
         uint32_t type = (m_IndexType == IndexType::UInt16) ? 0u : 1u; // matches OpenGLRendererAPI mapping
         return renderer->BindIndexBuffer(m_Buffer, type, m_Offset);
+    }
+
+    // --------------------------- BindBufferCommand -----------------------
+    Result<void> BindBufferCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->BindBuffer(m_Target, m_Buffer);
+    }
+
+    // --------------------------- BufferDataCommand -----------------------
+    Result<void> BufferDataCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->BufferData(m_Target, m_Data, m_Size, m_Usage);
+    }
+
+    // --------------------- VertexAttribPointerCommand --------------------
+    Result<void> VertexAttribPointerCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->VertexAttribPointer(m_Index, m_Size, m_Type, m_Normalized, m_Stride, m_Pointer);
+    }
+
+    // ----------------- EnableVertexAttribArrayCommand --------------------
+    Result<void> EnableVertexAttribArrayCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->EnableVertexAttribArray(m_Index, m_Enabled);
     }
 
     // ----------------------- BindVertexArrayCommand ----------------------

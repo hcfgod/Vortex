@@ -2,6 +2,7 @@
 
 #include "vxpch.h"
 #include "Core/Debug/ErrorCodes.h"
+#include "RenderTypes.h"
 #include <glm/glm.hpp>
 
 namespace Vortex
@@ -122,9 +123,11 @@ namespace Vortex
     {
     public:
         DrawIndexedCommand(uint32_t indexCount, uint32_t instanceCount = 1, 
-                          uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t baseInstance = 0)
+                          uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t baseInstance = 0,
+                          uint32_t primitiveTopology = static_cast<uint32_t>(PrimitiveTopology::Triangles))
             : m_IndexCount(indexCount), m_InstanceCount(instanceCount)
-            , m_FirstIndex(firstIndex), m_BaseVertex(baseVertex), m_BaseInstance(baseInstance) {}
+            , m_FirstIndex(firstIndex), m_BaseVertex(baseVertex), m_BaseInstance(baseInstance)
+            , m_PrimitiveTopology(primitiveTopology) {}
 
         Result<void> Execute(GraphicsContext* context) override;
         std::string GetDebugName() const override { return "DrawIndexed"; }
@@ -136,6 +139,7 @@ namespace Vortex
         uint32_t m_FirstIndex;
         int32_t m_BaseVertex;
         uint32_t m_BaseInstance;
+        uint32_t m_PrimitiveTopology;
     };
 
     /**
@@ -145,9 +149,11 @@ namespace Vortex
     {
     public:
         DrawArraysCommand(uint32_t vertexCount, uint32_t instanceCount = 1, 
-                         uint32_t firstVertex = 0, uint32_t baseInstance = 0)
+                         uint32_t firstVertex = 0, uint32_t baseInstance = 0,
+                         uint32_t primitiveTopology = static_cast<uint32_t>(PrimitiveTopology::Triangles))
             : m_VertexCount(vertexCount), m_InstanceCount(instanceCount)
-            , m_FirstVertex(firstVertex), m_BaseInstance(baseInstance) {}
+            , m_FirstVertex(firstVertex), m_BaseInstance(baseInstance)
+            , m_PrimitiveTopology(primitiveTopology) {}
 
         Result<void> Execute(GraphicsContext* context) override;
         std::string GetDebugName() const override { return "DrawArrays"; }
@@ -158,6 +164,7 @@ namespace Vortex
         uint32_t m_InstanceCount;
         uint32_t m_FirstVertex;
         uint32_t m_BaseInstance;
+        uint32_t m_PrimitiveTopology;
     };
 
     // ============================================================================
@@ -207,6 +214,86 @@ namespace Vortex
         uint32_t m_Buffer;
         IndexType m_IndexType;
         uint64_t m_Offset;
+    };
+
+    /**
+     * @brief Command to bind a buffer to a target
+     */
+    class BindBufferCommand : public RenderCommand
+    {
+    public:
+        BindBufferCommand(uint32_t target, uint32_t buffer)
+            : m_Target(target), m_Buffer(buffer) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "BindBuffer"; }
+        float GetEstimatedCost() const override { return 0.01f; }
+
+    private:
+        uint32_t m_Target;
+        uint32_t m_Buffer;
+    };
+
+    /**
+     * @brief Command to upload data to a buffer
+     */
+    class BufferDataCommand : public RenderCommand
+    {
+    public:
+        BufferDataCommand(uint32_t target, const void* data, uint64_t size, uint32_t usage)
+            : m_Target(target), m_Data(data), m_Size(size), m_Usage(usage) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "BufferData"; }
+        float GetEstimatedCost() const override { return static_cast<float>(m_Size) * 1e-9f; }
+
+    private:
+        uint32_t m_Target;
+        const void* m_Data;
+        uint64_t m_Size;
+        uint32_t m_Usage;
+    };
+
+    /**
+     * @brief Command to set vertex attribute pointer
+     */
+    class VertexAttribPointerCommand : public RenderCommand
+    {
+    public:
+        VertexAttribPointerCommand(uint32_t index, int32_t size, uint32_t type, bool normalized,
+                                   uint64_t stride, uint64_t pointer)
+            : m_Index(index), m_Size(size), m_Type(type), m_Normalized(normalized),
+              m_Stride(stride), m_Pointer(pointer) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "VertexAttribPointer"; }
+        float GetEstimatedCost() const override { return 0.01f; }
+
+    private:
+        uint32_t m_Index;
+        int32_t m_Size;
+        uint32_t m_Type;
+        bool m_Normalized;
+        uint64_t m_Stride;
+        uint64_t m_Pointer;
+    };
+
+    /**
+     * @brief Command to enable/disable vertex attribute array
+     */
+    class EnableVertexAttribArrayCommand : public RenderCommand
+    {
+    public:
+        EnableVertexAttribArrayCommand(uint32_t index, bool enabled)
+            : m_Index(index), m_Enabled(enabled) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "EnableVertexAttribArray"; }
+        float GetEstimatedCost() const override { return 0.005f; }
+
+    private:
+        uint32_t m_Index;
+        bool m_Enabled;
     };
 
     /**

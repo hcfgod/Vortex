@@ -3,10 +3,12 @@
 #include "vxpch.h"
 #include "GraphicsContext.h"
 #include "RenderCommand.h"
+#include "RenderTypes.h"
 #include "Core/Debug/ErrorCodes.h"
 
 namespace Vortex
 {
+    // Enums moved to RenderTypes.h
     /**
      * @brief Abstract renderer API interface
      * 
@@ -100,10 +102,12 @@ namespace Vortex
          * @param firstIndex Offset into the index buffer
          * @param baseVertex Vertex offset added to each index
          * @param baseInstance Instance offset
+         * @param primitiveTopology Primitive topology to use (triangles, lines, etc.)
          * @return Success/failure result
          */
-        virtual Result<void> DrawIndexed(uint32_t indexCount, uint32_t instanceCount, 
-                                        uint32_t firstIndex, int32_t baseVertex, uint32_t baseInstance) = 0;
+        virtual Result<void> DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
+                                         uint32_t firstIndex, int32_t baseVertex, uint32_t baseInstance,
+                                         uint32_t primitiveTopology) = 0;
 
         /**
          * @brief Draw non-indexed geometry
@@ -111,10 +115,12 @@ namespace Vortex
          * @param instanceCount Number of instances to draw
          * @param firstVertex First vertex to draw
          * @param baseInstance Instance offset
+         * @param primitiveTopology Primitive topology to use (triangles, lines, etc.)
          * @return Success/failure result
          */
         virtual Result<void> DrawArrays(uint32_t vertexCount, uint32_t instanceCount,
-                                       uint32_t firstVertex, uint32_t baseInstance) = 0;
+                                        uint32_t firstVertex, uint32_t baseInstance,
+                                        uint32_t primitiveTopology) = 0;
 
         // ============================================================================
         // RESOURCE BINDING
@@ -138,6 +144,27 @@ namespace Vortex
          * @return Success/failure result
          */
         virtual Result<void> BindIndexBuffer(uint32_t buffer, uint32_t indexType, uint64_t offset) = 0;
+
+        /**
+         * @brief Bind a buffer to a target (generic)
+         */
+        virtual Result<void> BindBuffer(uint32_t target, uint32_t buffer) = 0;
+
+        /**
+         * @brief Upload data to a buffer target
+         */
+        virtual Result<void> BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage) = 0;
+
+        /**
+         * @brief Define an array of generic vertex attribute data
+         */
+        virtual Result<void> VertexAttribPointer(uint32_t index, int32_t size, uint32_t type,
+                                                 bool normalized, uint64_t stride, uint64_t pointer) = 0;
+
+        /**
+         * @brief Enable or disable a generic vertex attribute array
+         */
+        virtual Result<void> EnableVertexAttribArray(uint32_t index, bool enabled) = 0;
 
         /**
          * @brief Bind a vertex array object

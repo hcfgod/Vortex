@@ -35,9 +35,11 @@ namespace Vortex
 
         // Drawing operations
         Result<void> DrawIndexed(uint32_t indexCount, uint32_t instanceCount, 
-                                uint32_t firstIndex, int32_t baseVertex, uint32_t baseInstance) override;
+                                uint32_t firstIndex, int32_t baseVertex, uint32_t baseInstance,
+                                uint32_t primitiveTopology) override;
         Result<void> DrawArrays(uint32_t vertexCount, uint32_t instanceCount,
-                               uint32_t firstVertex, uint32_t baseInstance) override;
+                               uint32_t firstVertex, uint32_t baseInstance,
+                               uint32_t primitiveTopology) override;
 
         // Resource binding
         Result<void> BindVertexBuffer(uint32_t binding, uint32_t buffer, uint64_t offset, uint64_t stride) override;
@@ -45,6 +47,13 @@ namespace Vortex
         Result<void> BindShader(uint32_t program) override;
         Result<void> BindTexture(uint32_t slot, uint32_t texture, uint32_t sampler) override;
         Result<void> BindVertexArray(uint32_t vao) override;
+
+        // Generic buffer and vertex attrib
+        Result<void> BindBuffer(uint32_t target, uint32_t buffer) override;
+        Result<void> BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage) override;
+        Result<void> VertexAttribPointer(uint32_t index, int32_t size, uint32_t type,
+                                         bool normalized, uint64_t stride, uint64_t pointer) override;
+        Result<void> EnableVertexAttribArray(uint32_t index, bool enabled) override;
 
         // Render state
         Result<void> SetDepthState(bool testEnabled, bool writeEnabled, uint32_t compareFunc) override;
@@ -132,5 +141,11 @@ namespace Vortex
          * @return True if no errors, false if errors were found
          */
         bool CheckGLError(const std::string& operation) const;
+
+        // Converters from engine enums to GL
+        uint32_t ConvertBufferTarget(uint32_t target) const;
+        uint32_t ConvertBufferUsage(uint32_t usage) const;
+        uint32_t ConvertDataType(uint32_t type) const;
+        uint32_t ConvertPrimitiveTopology(uint32_t topology) const;
     };
 }
