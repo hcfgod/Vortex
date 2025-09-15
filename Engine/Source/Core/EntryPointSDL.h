@@ -119,6 +119,23 @@ SDL_AppResult SDL_AppIterate(void* appstate)
 
     try
     {
+        // Hot-reload configuration and apply updates
+        if (Vortex::EngineConfig::Get().ReloadChangedConfigs())
+        {
+            // Apply window changes
+            Vortex::EngineConfig::Get().ApplyWindowSettings(Vortex::Internal::s_Application->GetWindow());
+
+            // Apply renderer changes
+            if (auto* rs = Vortex::Internal::s_Engine->GetSystemManager().GetSystem<Vortex::RenderSystem>())
+            {
+                Vortex::EngineConfig::Get().ApplyRenderSettings(rs);
+                if (auto* wnd = Vortex::Internal::s_Application->GetWindow())
+                {
+                    rs->OnWindowResized(static_cast<uint32_t>(wnd->GetWidth()), static_cast<uint32_t>(wnd->GetHeight()));
+                }
+            }
+        }
+
         // Check if engine is still running
         if (!Vortex::Internal::s_Engine->IsRunning())
         {

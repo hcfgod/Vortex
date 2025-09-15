@@ -2,6 +2,7 @@
 #include "Core/EngineConfig.h"
 #include "Core/Debug/Log.h"
 #include "Core/FileSystem.h"
+#include "Engine/Systems/RenderSystem.h"
 
 namespace Vortex
 {
@@ -153,6 +154,50 @@ namespace Vortex
         }
         
         return changed;
+    }
+
+    void EngineConfig::ApplyWindowSettings(Window* window)
+    {
+        if (!window)
+            return;
+
+        // Title
+        const std::string newTitle = GetWindowTitle();
+        if (window->GetTitle() != newTitle)
+            window->SetTitle(newTitle);
+
+        // Size (only if changed and not fullscreen)
+        if (!GetWindowFullscreen())
+        {
+            int curW = window->GetWidth();
+            int curH = window->GetHeight();
+            const int cfgW = GetWindowWidth();
+            const int cfgH = GetWindowHeight();
+            if (cfgW > 0 && cfgH > 0 && (cfgW != curW || cfgH != curH))
+                window->SetSize(cfgW, cfgH);
+        }
+
+        // Fullscreen
+        const bool cfgFullscreen = GetWindowFullscreen();
+        if (window->IsFullscreen() != cfgFullscreen)
+            window->SetFullscreen(cfgFullscreen);
+    }
+
+    void EngineConfig::ApplyRenderSettings(RenderSystem* renderSystem)
+    {
+        if (!renderSystem)
+            return;
+
+        auto settings = renderSystem->GetRenderSettings();
+
+        // VSync
+        settings.VSync = GetVSyncModeEnum();
+
+        // Clear color
+        const auto cc = GetClearColor();
+        settings.ClearColor = glm::vec4(cc.r, cc.g, cc.b, cc.a);
+
+        renderSystem->SetRenderSettings(settings);
     }
 
     WindowProperties EngineConfig::CreateWindowProperties() const

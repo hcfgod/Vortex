@@ -7,6 +7,7 @@
 
 namespace Vortex
 {
+    class RenderSystem; // forward declaration to avoid heavy include
     // Type-safe wrapper around the Configuration system for engine-specific settings
     class EngineConfig
     {
@@ -58,6 +59,10 @@ namespace Vortex
         
         // Check for config file changes and reload if necessary
         bool ReloadChangedConfigs();
+
+        // Apply current configuration values to live systems (after reload)
+        void ApplyWindowSettings(Window* window);
+        void ApplyRenderSettings(RenderSystem* renderSystem);
 
         // Query init state
         bool IsInitialized() const { return m_Initialized; }

@@ -237,6 +237,7 @@ namespace Vortex
             flags &= ~Vortex::ClearCommand::Stencil;
         }
 
+        // Clear using current settings (color/depth/stencil)
         GetRenderCommandQueue().Clear(flags, m_Settings.ClearColor, m_Settings.ClearDepth, m_Settings.ClearStencil);
 
         return Result<void>();

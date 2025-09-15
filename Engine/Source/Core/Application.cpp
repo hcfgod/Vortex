@@ -129,6 +129,19 @@ namespace Vortex
 				}
 			#endif
 
+			// Hot-reload configuration and apply updated settings
+			if (EngineConfig::Get().ReloadChangedConfigs())
+			{
+				// Apply window updates (title/size/fullscreen)
+				EngineConfig::Get().ApplyWindowSettings(m_Window.get());
+
+				// Apply renderer updates (VSync/clear color)
+				if (auto* rs = m_Engine->GetSystemManager().GetSystem<RenderSystem>())
+				{
+					EngineConfig::Get().ApplyRenderSettings(rs);
+				}
+			}
+
 			// Handle application-level SDL events (client override)
 			ProcessEvent(event);
 
