@@ -2,6 +2,7 @@
 
 #include "EngineSystem.h"
 #include "SystemPriority.h"
+#include <algorithm>
 #include "Core/Debug/ErrorCodes.h"
 #include "Core/Debug/Assert.h"
 
@@ -31,12 +32,12 @@ namespace Vortex
 			auto system = std::make_unique<T>(std::forward<Args>(args)...);
 			T* systemPtr = system.get();
 			
-			// Insert system in priority order
+			// Insert system in priority order; insert AFTER equal priority to keep registration stable
 			SystemPriority newSystemPriority = system->GetPriority();
-			auto insertPos = std::lower_bound(m_Systems.begin(), m_Systems.end(), newSystemPriority,
-				[](const std::unique_ptr<EngineSystem>& a, SystemPriority priority)
+			auto insertPos = std::upper_bound(m_Systems.begin(), m_Systems.end(), newSystemPriority,
+				[](SystemPriority priority, const std::unique_ptr<EngineSystem>& a)
 				{
-					return static_cast<uint32_t>(a->GetPriority()) < static_cast<uint32_t>(priority);
+					return static_cast<uint32_t>(priority) < static_cast<uint32_t>(a->GetPriority());
 				});
 			
 			m_Systems.insert(insertPos, std::move(system));
