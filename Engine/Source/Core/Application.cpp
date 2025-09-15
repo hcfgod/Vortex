@@ -298,6 +298,49 @@ namespace Vortex
 	}
 	
 	#ifdef VX_USE_SDL
+	// Minimal UTF-8 decoder to extract Unicode codepoints from SDL text input
+	static bool DecodeNextUTF8Codepoint(const char* text, size_t& index, uint32_t& outCodepoint)
+	{
+		unsigned char c = static_cast<unsigned char>(text[index]);
+		if (c == 0) return false;
+		if (c < 0x80)
+		{
+			outCodepoint = c;
+			index += 1;
+			return true;
+		}
+		if ((c >> 5) == 0x6)
+		{
+			unsigned char c1 = static_cast<unsigned char>(text[index + 1]);
+			if ((c1 & 0xC0) != 0x80) { outCodepoint = '?'; index += 1; return true; }
+			outCodepoint = ((c & 0x1F) << 6) | (c1 & 0x3F);
+			index += 2;
+			return true;
+		}
+		if ((c >> 4) == 0xE)
+		{
+			unsigned char c1 = static_cast<unsigned char>(text[index + 1]);
+			unsigned char c2 = static_cast<unsigned char>(text[index + 2]);
+			if (((c1 & 0xC0) != 0x80) || ((c2 & 0xC0) != 0x80)) { outCodepoint = '?'; index += 1; return true; }
+			outCodepoint = ((c & 0x0F) << 12) | ((c1 & 0x3F) << 6) | (c2 & 0x3F);
+			index += 3;
+			return true;
+		}
+		if ((c >> 3) == 0x1E)
+		{
+			unsigned char c1 = static_cast<unsigned char>(text[index + 1]);
+			unsigned char c2 = static_cast<unsigned char>(text[index + 2]);
+			unsigned char c3 = static_cast<unsigned char>(text[index + 3]);
+			if (((c1 & 0xC0) != 0x80) || ((c2 & 0xC0) != 0x80) || ((c3 & 0xC0) != 0x80)) { outCodepoint = '?'; index += 1; return true; }
+			outCodepoint = ((c & 0x07) << 18) | ((c1 & 0x3F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F);
+			index += 4;
+			return true;
+		}
+		outCodepoint = '?';
+		index += 1;
+		return true;
+	}
+
 	void Application::ConvertSDLEventToVortexEvent(const SDL_Event& sdlEvent)
 	{
 		// Convert SDL events to Vortex events and dispatch them
@@ -381,14 +424,23 @@ namespace Vortex
 				break;
 			}
 			
+			case SDL_EVENT_TEXT_EDITING:
+			{
+				// Composition update; ignore for now (clients can override ProcessEvent to handle)
+				break;
+			}
+			
 			case SDL_EVENT_TEXT_INPUT:
 			{
-				// SDL provides text as UTF-8 string, we'll use the first character
-				if (sdlEvent.text.text[0] != '\0')
+				const char* text = sdlEvent.text.text;
+				size_t idx = 0;
+				while (text[idx] != '\0')
 				{
-					uint32_t character = static_cast<uint32_t>(sdlEvent.text.text[0]);
-				KeyTypedEvent e(character);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
+					uint32_t codepoint = 0;
+					if (!DecodeNextUTF8Codepoint(text, idx, codepoint))
+						break;
+					KeyTypedEvent e(codepoint);
+					if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
