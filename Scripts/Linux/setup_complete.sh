@@ -359,6 +359,28 @@ else
     echo "GLM updated successfully!"
 fi
 
+# Setup doctest (header-only unit testing framework)
+echo "Setting up doctest..."
+if [ ! -d "Engine/Vendor/doctest" ]; then
+    echo "Cloning doctest..."
+    git clone --depth 1 https://github.com/doctest/doctest.git "Engine/Vendor/doctest"
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to clone doctest! Make sure git is installed."
+        exit 1
+    fi
+    
+    echo "doctest cloned successfully!"
+else
+    echo "Updating doctest..."
+    cd "Engine/Vendor/doctest"
+    git reset --hard HEAD
+    git clean -fd
+    git pull origin master
+    cd "$PROJECT_ROOT"
+    echo "doctest updated successfully!"
+fi
+
 # Setup nlohmann/json (JSON Library)
 echo "Setting up nlohmann/json..."
 if [ ! -d "Engine/Vendor/nlohmann_json" ]; then
@@ -829,6 +851,15 @@ if [ -f "Engine/Vendor/shaderc/install/lib/libshaderc.a" ] || [ -f "Engine/Vendo
     echo "✅ shaderc built"
 else
     echo "❌ shaderc missing"
+    exit 1
+fi
+
+# Check doctest
+echo "Checking doctest..."
+if [ -d "Engine/Vendor/doctest" ] && [ -f "Engine/Vendor/doctest/doctest/doctest.h" ] || [ -f "Engine/Vendor/doctest/doctest.h" ]; then
+    echo "✅ doctest found"
+else
+    echo "❌ doctest missing"
     exit 1
 fi
 

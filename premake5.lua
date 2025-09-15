@@ -22,3 +22,7 @@ group ""
 
 include "Engine"
 include "Sandbox"
+
+group "Tests"
+include "Tests"
+group ""

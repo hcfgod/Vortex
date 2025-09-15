@@ -129,7 +129,29 @@ if not exist "Engine\Vendor\glm" (
     echo GLM updated successfully!
 )
 
-:: Setup nlohmann/json (JSON Library)
+::: Setup doctest (header-only unit testing framework)
+echo Setting up doctest...
+if not exist "Engine\Vendor\doctest" (
+    echo Cloning doctest...
+    git clone --depth 1 https://github.com/doctest/doctest.git "Engine\Vendor\doctest"
+    
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to clone doctest! Make sure git is installed.
+        popd
+        pause
+        exit /b 1
+    )
+    
+    echo doctest cloned successfully!
+) else (
+    echo Updating doctest...
+    cd "Engine\Vendor\doctest"
+    git pull origin master
+    cd "..\..\.."
+    echo doctest updated successfully!
+)
+
+::: Setup nlohmann/json (JSON Library)
 echo Setting up nlohmann/json...
 if not exist "Engine\Vendor\nlohmann_json" (
     echo Cloning nlohmann/json...
