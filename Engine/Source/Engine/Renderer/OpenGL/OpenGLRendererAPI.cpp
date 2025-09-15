@@ -277,15 +277,16 @@ namespace Vortex
 
         // For now, we'll use glDrawElements. Full instanced rendering would need additional setup
         const GLenum glMode = ConvertPrimitiveTopology(primitiveTopology);
+        const GLenum glIndexType = (m_CurrentState.CurrentIndexType == INDEX_TYPE_UINT16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+        const GLvoid* indicesPtr = reinterpret_cast<const void*>(static_cast<uintptr_t>(firstIndex * ((glIndexType == GL_UNSIGNED_SHORT) ? sizeof(uint16_t) : sizeof(uint32_t))));
         if (instanceCount <= 1)
         {
-            glDrawElements(glMode, static_cast<GLsizei>(indexCount), GL_UNSIGNED_INT, 
-                          reinterpret_cast<void*>(static_cast<uintptr_t>(firstIndex * sizeof(uint32_t))));
+            glDrawElements(glMode, static_cast<GLsizei>(indexCount), glIndexType, indicesPtr);
         }
         else
         {
-            glDrawElementsInstanced(glMode, static_cast<GLsizei>(indexCount), GL_UNSIGNED_INT,
-                                   reinterpret_cast<void*>(static_cast<uintptr_t>(firstIndex * sizeof(uint32_t))),
+            glDrawElementsInstanced(glMode, static_cast<GLsizei>(indexCount), glIndexType,
+                                   indicesPtr,
                                    static_cast<GLsizei>(instanceCount));
         }
 
@@ -359,6 +360,10 @@ namespace Vortex
         }
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer);
+
+        // Track index type and offset for later DrawIndexed
+        m_CurrentState.CurrentIndexType = indexType; // 0=UInt16, 1=UInt32
+        m_CurrentState.IndexBufferOffset = offset;
 
         if (!CheckGLError("BindIndexBuffer"))
         {

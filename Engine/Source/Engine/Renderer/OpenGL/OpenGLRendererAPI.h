@@ -91,6 +91,10 @@ namespace Vortex
             
             uint32_t CurrentShaderProgram = 0;
             std::unordered_map<uint32_t, uint32_t> BoundTextures; // slot -> texture ID
+
+            // Index buffer tracking: 0 = UInt16, 1 = UInt32 (matches BindIndexBuffer mapping)
+            uint32_t CurrentIndexType = 1;
+            uint64_t IndexBufferOffset = 0;
         } m_CurrentState;
 
         /**
