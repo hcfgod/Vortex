@@ -341,6 +341,37 @@ namespace Vortex
             return Submit(std::make_unique<GenerateMipmapCommand>(target), executeImmediate);
         }
 
+        // ===================== Enum-friendly overloads =====================
+        // These remove the need for callers to static_cast enum values
+
+        bool BindTextureTarget(TextureTarget target, uint32_t texture, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BindTextureTargetCommand>(static_cast<uint32_t>(target), texture), executeImmediate);
+        }
+
+        bool TexImage2D(TextureTarget target, int32_t level, uint32_t internalFormat,
+                        uint32_t width, uint32_t height, uint32_t format, uint32_t type,
+                        const void* data, uint64_t sizeBytes, bool executeImmediate = false)
+        {
+            auto payload = std::make_shared<TexImage2DCommand::ByteVector>();
+            if (data && sizeBytes > 0)
+            {
+                payload->resize(static_cast<size_t>(sizeBytes));
+                std::memcpy(payload->data(), data, static_cast<size_t>(sizeBytes));
+            }
+            return Submit(std::make_unique<TexImage2DCommand>(static_cast<uint32_t>(target), level, internalFormat, width, height, format, type, std::move(payload)), executeImmediate);
+        }
+
+        bool TexParameteri(TextureTarget target, TextureParamName pname, int32_t param, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<TexParameteriCommand>(static_cast<uint32_t>(target), static_cast<uint32_t>(pname), param), executeImmediate);
+        }
+
+        bool GenerateMipmap(TextureTarget target, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<GenerateMipmapCommand>(static_cast<uint32_t>(target)), executeImmediate);
+        }
+
         /**
          * @brief Push a debug group for profiling
          * @param name Debug group name

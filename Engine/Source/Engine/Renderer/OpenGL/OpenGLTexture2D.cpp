@@ -45,6 +45,19 @@ namespace Vortex
         }
     }
 
+    static uint32_t ToGLMinFilter(TextureFilter f, bool useMips)
+    {
+        if (!useMips)
+            return ToGLFilter(f);
+        // Mipmapped variants
+        switch (f)
+        {
+            case TextureFilter::Nearest: return 0x2700; // GL_NEAREST_MIPMAP_NEAREST
+            case TextureFilter::Linear:  return 0x2703; // GL_LINEAR_MIPMAP_LINEAR
+            default: return 0x2703;
+        }
+    }
+
     static uint32_t ToGLTarget(TextureTarget target)
     {
         switch (target)
@@ -62,25 +75,24 @@ namespace Vortex
 
         // Create texture object
         GetRenderCommandQueue().GenTextures(1, &m_RendererID, true);
-        const uint32_t glTarget = static_cast<uint32_t>(TextureTarget::Texture2D);
-        GetRenderCommandQueue().BindTextureTarget(glTarget, m_RendererID, true); 
+        GetRenderCommandQueue().BindTextureTarget(TextureTarget::Texture2D, m_RendererID, true); 
 
         // Set parameters
-        GetRenderCommandQueue().TexParameteri(glTarget, 0x2801 /*GL_TEXTURE_MIN_FILTER*/, ToGLFilter(info.MinFilter), true);
-        GetRenderCommandQueue().TexParameteri(glTarget, 0x2800 /*GL_TEXTURE_MAG_FILTER*/, ToGLFilter(info.MagFilter), true);
-        GetRenderCommandQueue().TexParameteri(glTarget, 0x2802 /*GL_TEXTURE_WRAP_S*/, ToGLWrap(info.WrapS), true);
-        GetRenderCommandQueue().TexParameteri(glTarget, 0x2803 /*GL_TEXTURE_WRAP_T*/, ToGLWrap(info.WrapT), true);
+        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::MinFilter, ToGLMinFilter(info.MinFilter, info.GenerateMips), true);
+        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::MagFilter, ToGLFilter(info.MagFilter), true);
+        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::WrapS, ToGLWrap(info.WrapS), true);
+        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::WrapT, ToGLWrap(info.WrapT), true);
 
         // Allocate / upload data
         const uint32_t glInternal = ToGLInternalFormat(info.Format);
         const uint32_t glFormat = ToGLFormat(info.Format);
         const uint32_t glType = 0x1401; // GL_UNSIGNED_BYTE
-        GetRenderCommandQueue().TexImage2D(glTarget, 0, glInternal, m_Width, m_Height, glFormat, glType,
+        GetRenderCommandQueue().TexImage2D(TextureTarget::Texture2D, 0, glInternal, m_Width, m_Height, glFormat, glType,
                                            info.InitialData, info.InitialDataSize, true);
 
         if (info.GenerateMips)
         {
-            GetRenderCommandQueue().GenerateMipmap(glTarget, true);
+            GetRenderCommandQueue().GenerateMipmap(TextureTarget::Texture2D, true);
         }
     }
 
