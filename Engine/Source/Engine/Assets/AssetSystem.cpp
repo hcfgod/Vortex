@@ -412,6 +412,7 @@ namespace Vortex
         const std::string& filePath,
         ProgressCallback onProgress)
     {
+        VX_CORE_INFO("AssetSystem: Loading texture '{}' from '{}'", name, filePath);
         // Create placeholder asset
         auto texAsset = std::make_shared<TextureAsset>(name);
         texAsset->SetState(AssetState::Loading);
@@ -436,16 +437,60 @@ namespace Vortex
             uint32_t width = 0, height = 0;
             std::vector<uint8_t> pixels;
 
-            // Attempt to load using stb_image
+            // Attempt to load using stb_image (path-based)
             stbi_set_flip_vertically_on_load(1);
             int w = 0, h = 0, comp = 0;
             unsigned char* data = stbi_load(filePath.c_str(), &w, &h, &comp, 4);
+            if (!data || w <= 0 || h <= 0)
+            {
+                const char* reason = stbi_failure_reason();
+                if (reason) VX_CORE_WARN("AssetSystem: stbi_load failed for '{}': {}. Trying memory load...", filePath, reason);
+
+                // Try wide/UTF-8 safe path via std::filesystem::path and load from memory
+                try
+                {
+                    std::filesystem::path path(filePath);
+                    std::error_code fec;
+                    if (std::filesystem::exists(path, fec) && !std::filesystem::is_directory(path, fec))
+                    {
+                        std::ifstream fin(path, std::ios::binary);
+                        if (fin)
+                        {
+                            fin.seekg(0, std::ios::end);
+                            std::streamsize fsize = fin.tellg();
+                            fin.seekg(0, std::ios::beg);
+                            if (fsize > 0)
+                            {
+                                std::vector<unsigned char> fileBytes(static_cast<size_t>(fsize));
+                                fin.read(reinterpret_cast<char*>(fileBytes.data()), fsize);
+                                int mw = 0, mh = 0, mcomp = 0;
+                                unsigned char* mdata = stbi_load_from_memory(fileBytes.data(), static_cast<int>(fileBytes.size()), &mw, &mh, &mcomp, 4);
+                                if (mdata && mw > 0 && mh > 0)
+                                {
+                                    w = mw; h = mh; comp = 4; data = mdata;
+                                }
+                                else
+                                {
+                                    const char* mreason = stbi_failure_reason();
+                                    if (mreason) VX_CORE_WARN("AssetSystem: stbi_load_from_memory failed for '{}': {}", filePath, mreason);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (const std::exception& e)
+                {
+                    VX_CORE_WARN("AssetSystem: Exception loading image '{}': {}", filePath, e.what());
+                }
+            }
+
             if (data && w > 0 && h > 0)
             {
                 width = static_cast<uint32_t>(w);
                 height = static_cast<uint32_t>(h);
                 pixels.assign(data, data + (width * height * 4));
                 stbi_image_free(data);
+                VX_CORE_INFO("AssetSystem: Loaded image for '{}' ({}x{}, channels=4)", name, width, height);
             }
             else
             {
@@ -468,6 +513,7 @@ namespace Vortex
                         pixels[idx + 3] = a;
                     }
                 }
+                VX_CORE_WARN("AssetSystem: Failed to decode image '{}' from '{}', using procedural checkerboard", name, filePath);
             }
 
             setProgress(0.5f);
@@ -486,6 +532,10 @@ namespace Vortex
             ci.InitialDataSize = static_cast<uint64_t>(pixels.size());
 
             auto texture = Texture2D::Create(ci);
+            if (!texture)
+            {
+                VX_CORE_ERROR("AssetSystem: Failed to create GPU texture for '{}' ({}x{})", name, width, height);
+            }
 
             setProgress(0.9f);
 
@@ -501,6 +551,7 @@ namespace Vortex
                         t->SetTexture(texture);
                         t->SetState(AssetState::Loaded);
                         t->SetProgress(1.0f);
+                        VX_CORE_INFO("AssetSystem: Texture '{}' loaded and ready", name);
                     }
                 }
             }

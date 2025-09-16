@@ -61,7 +61,10 @@ void ExampleGameLayer::OnAttach()
         auto* assetSystem = m_SystemManager->GetSystem<AssetSystem>();
         if (assetSystem)
         {
-            m_TextureHandle = assetSystem->LoadAsset<TextureAsset>("Checker");
+            m_TextureHandle = assetSystem->LoadAsset<TextureAsset>(
+                "Checker",
+                [](float p){ VX_CORE_INFO("[AssetSystem] Texture loading progress: {:.1f}%", p * 100.0f); }
+            );
         }
     }
 
@@ -294,9 +297,10 @@ void ExampleGameLayer::OnRender()
             const TextureAsset* tex = m_TextureHandle.TryGet();
             if (tex && tex->IsReady() && tex->GetTexture())
             {
-                // Bind to slot 0 and set uniform
+                // Bind texture on render thread via command queue, then set sampler uniforms
                 tex->GetTexture()->Bind(0);
                 m_ShaderManager->SetTexture("u_AlbedoTexture", tex->GetTexture()->GetRendererID(), 0);
+                m_ShaderManager->SetUniform("u_AlbedoTexture", 0);
                 m_ShaderManager->SetUniform("u_UseAlbedoTexture", 1);
             }
             else

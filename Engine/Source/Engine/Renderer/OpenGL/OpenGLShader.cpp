@@ -190,7 +190,8 @@ namespace Vortex
             return;
         }
 
-		GetRenderCommandQueue().BindShader(m_ProgramId, false);
+		// Bind immediately so subsequent uniform/texture calls in this frame target this program
+		GetRenderCommandQueue().BindShader(m_ProgramId, true);
     }
 
     void OpenGLShader::Unbind()

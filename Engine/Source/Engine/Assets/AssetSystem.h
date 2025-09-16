@@ -226,12 +226,30 @@ namespace Vortex
         {
             fs::path abs = assetsRoot / p;
             if (fs::exists(abs, ec))
-                return LoadTextureAsync(p.filename().string(), abs.string(), std::move(onProgress));
+            {
+                if (fs::is_regular_file(abs, ec))
+                    return LoadTextureAsync(p.filename().string(), abs.string(), std::move(onProgress));
+                if (fs::is_directory(abs, ec))
+                {
+                    fs::path found = FindTextureRecursive(abs, p.filename().string());
+                    if (!found.empty())
+                        return LoadTextureAsync(found.filename().string(), found.string(), std::move(onProgress));
+                }
+            }
             if (m_DevAssetsAvailable)
             {
                 fs::path absDev = m_DevAssetsRoot / p;
                 if (fs::exists(absDev, ec))
-                    return LoadTextureAsync(p.filename().string(), absDev.string(), std::move(onProgress));
+                {
+                    if (fs::is_regular_file(absDev, ec))
+                        return LoadTextureAsync(p.filename().string(), absDev.string(), std::move(onProgress));
+                    if (fs::is_directory(absDev, ec))
+                    {
+                        fs::path found = FindTextureRecursive(absDev, p.filename().string());
+                        if (!found.empty())
+                            return LoadTextureAsync(found.filename().string(), found.string(), std::move(onProgress));
+                    }
+                }
             }
         }
 
@@ -243,7 +261,16 @@ namespace Vortex
         for (const auto& c : candidates)
         {
             if (fs::exists(c, ec))
-                return LoadTextureAsync(p.filename().string(), c.string(), std::move(onProgress));
+            {
+                if (fs::is_regular_file(c, ec))
+                    return LoadTextureAsync(p.filename().string(), c.string(), std::move(onProgress));
+                if (fs::is_directory(c, ec))
+                {
+                    fs::path found = FindTextureRecursive(c, p.filename().string());
+                    if (!found.empty())
+                        return LoadTextureAsync(found.filename().string(), found.string(), std::move(onProgress));
+                }
+            }
         }
 
         // 3) Recursively search DevAssets first (if available), then packaged Assets
