@@ -494,18 +494,17 @@ namespace Vortex
             }
             else
             {
-                // Fallback checkerboard
+                // Fallback solid magenta error texture
                 width = 256; height = 256;
                 pixels.resize(width * height * 4);
                 for (uint32_t y = 0; y < height; ++y)
                 {
                     for (uint32_t x = 0; x < width; ++x)
                     {
-                        bool check = (((x / 32) + (y / 32)) % 2) == 0;
-                        uint8_t r = check ? 255 : 30;
-                        uint8_t g = check ? 255 : 30;
-                        uint8_t b = check ? 255 : 30;
-                        uint8_t a = 255;
+                        uint8_t r = 255; // Magenta red
+                        uint8_t g = 0;   // Magenta green
+                        uint8_t b = 255; // Magenta blue
+                        uint8_t a = 255; // Full alpha
                         size_t idx = static_cast<size_t>(y) * width * 4ull + static_cast<size_t>(x) * 4ull;
                         pixels[idx + 0] = r;
                         pixels[idx + 1] = g;
@@ -513,7 +512,7 @@ namespace Vortex
                         pixels[idx + 3] = a;
                     }
                 }
-                VX_CORE_WARN("AssetSystem: Failed to decode image '{}' from '{}', using procedural checkerboard", name, filePath);
+                VX_CORE_WARN("AssetSystem: Failed to decode image '{}' from '{}', using solid magenta error texture", name, filePath);
             }
 
             setProgress(0.5f);
