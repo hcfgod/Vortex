@@ -6,6 +6,9 @@ project "Sandbox"
 
     targetdir ("%{wks.location}/Build/" .. outputdir .. "/%{prj.name}")
     objdir ("%{wks.location}/Build/Intermediates/" .. outputdir .. "/%{prj.name}")
+    
+    -- Ensure VS debugger uses the built output directory as Working Directory
+    debugdir "%{cfg.targetdir}"
 
     -- Global files
     files
