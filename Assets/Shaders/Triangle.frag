@@ -7,7 +7,7 @@ layout(location = 0) in vec2 v_TexCoord;
 layout(location = 0) out vec4 FragColor;
 
 // Uniforms for color and animation
-layout(location = 3) uniform vec3 u_Color = vec3(1.0, 0.5, 0.2); // Default orange
+layout(location = 3) uniform vec3 u_Color = vec3(1.0, 0.2, 0.2); // Default orange
 layout(location = 2) uniform float u_Time = 0.0;
 layout(location = 4) uniform float u_Alpha = 1.0;
 

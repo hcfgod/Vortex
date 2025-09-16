@@ -261,8 +261,7 @@ void ExampleGameLayer::OnRender()
         glm::mat4 model = glm::mat4(1.0f);
         glm::mat3 normalMatrix = glm::mat3(1.0f);
         
-        // Set uniforms for animation
-        float timeValue = m_IsPaused ? 0.0f : m_GameTime;
+        // Animation disabled; time not used
         
         // === Matrix uniforms (required by advanced shader) ===
         m_ShaderManager->SetUniform("u_ViewProjection", viewProjection);
@@ -271,24 +270,23 @@ void ExampleGameLayer::OnRender()
         m_ShaderManager->SetUniform("u_NormalMatrix", normalMatrix);
         
         // === Animation and time ===
-        m_ShaderManager->SetUniform("u_Time", timeValue);
+        // No time uniform set; shader ignores u_Time
         
         // === Camera position ===
         glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
         m_ShaderManager->SetUniform("u_CameraPos", cameraPos);
         
         // === Material properties ===
-        glm::vec3 albedo(0.7f, 0.3f, 0.1f); // Reddish-orange material
+        // Use a solid color albedo; keep PBR lighting
+        glm::vec3 albedo(0.2f, 0.6f, 0.9f); // Solid sky-blue color
         m_ShaderManager->SetUniform("u_Albedo", albedo);
         m_ShaderManager->SetUniform("u_Metallic", 0.2f);
         m_ShaderManager->SetUniform("u_Roughness", 0.4f);
         m_ShaderManager->SetUniform("u_AO", 1.0f);
         m_ShaderManager->SetUniform("u_Alpha", 1.0f);
         
-        // Emission for some glow effect
-        float emissionStrength = (sin(timeValue * 2.0f) * 0.5f + 0.5f) * 0.1f;
-        glm::vec3 emission(emissionStrength, emissionStrength * 0.5f, 0.0f);
-        m_ShaderManager->SetUniform("u_Emission", emission);
+        // Disable emission for solid color
+        m_ShaderManager->SetUniform("u_Emission", glm::vec3(0.0f));
         
         // === Lighting ===
         glm::vec3 lightPos(2.0f, 2.0f, 2.0f);
@@ -299,15 +297,14 @@ void ExampleGameLayer::OnRender()
         
         // === Transform uniforms for vertex animation ===
         glm::vec3 translation(0.0f, 0.0f, 0.0f);
-        glm::vec3 rotation(0.0f, timeValue * 0.2f, 0.0f); // Slow Y rotation
+        glm::vec3 rotation(0.0f, 0.0f, 0.0f); // No rotation animation
         glm::vec3 scale(1.0f, 1.0f, 1.0f);
         m_ShaderManager->SetUniform("u_Translation", translation);
         m_ShaderManager->SetUniform("u_Rotation", rotation);
         m_ShaderManager->SetUniform("u_Scale", scale);
         
         // === Wind animation parameters ===
-        float windStrength = (sin(timeValue * 1.5f) * 0.5f + 0.5f) * 0.05f;
-        m_ShaderManager->SetUniform("u_WindStrength", windStrength);
+        // Wind effect disabled; no wind uniforms set
 
         // === Rim lighting effect ===
         m_ShaderManager->SetUniform("u_RimPower", 2.0f);

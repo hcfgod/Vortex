@@ -12,7 +12,7 @@ layout(location = 5) in vec3 v_Bitangent;
 layout(location = 0) out vec4 FragColor;
 
 // Animation and shared uniforms (must match vertex shader where shared)
-layout(location = 15) uniform float u_Time;       // matches VS
+layout(location = 15) uniform float u_Time;       // kept for compatibility (not used)
 layout(location = 16) uniform vec3  u_CameraPos;  // matches VS
 
 // Material uniforms (fragment-only)
@@ -191,9 +191,7 @@ void main()
     // Add emission
     color += emission;
     
-    // Animated color effect based on time
-    float pulse = sin(u_Time * 1.5) * 0.1 + 0.9;
-    color *= pulse;
+    // Removed time-based color modulation for solid color output
     
     // HDR tonemapping (simple Reinhard)
     color = color / (color + vec3(1.0));

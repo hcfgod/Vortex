@@ -35,6 +35,36 @@ namespace Vortex
         else
             m_AssetsRoot = std::filesystem::path("Assets");
 
+        // Try to detect repository-level Assets directory for development hot reload
+        m_DevAssetsAvailable = false;
+        m_DevAssetsRoot.clear();
+        try
+        {
+            namespace fs = std::filesystem;
+            fs::path probe = exeDir.has_value() ? exeDir.value() : fs::current_path();
+            // Walk up to 5 levels up looking for an 'Assets' directory
+            for (int i = 0; i < 5; ++i)
+            {
+                fs::path candidate = probe / "Assets";
+                std::error_code ec;
+                if (fs::exists(candidate, ec) && fs::is_directory(candidate, ec))
+                {
+                    m_DevAssetsRoot = candidate;
+                    m_DevAssetsAvailable = true;
+                    break;
+                }
+                if (probe.has_parent_path()) probe = probe.parent_path(); else break;
+            }
+            if (m_DevAssetsAvailable)
+            {
+                VX_CORE_INFO("AssetSystem: Dev Assets detected at: {}", m_DevAssetsRoot.string());
+            }
+        }
+        catch (const std::exception& e)
+        {
+            VX_CORE_WARN("AssetSystem: Dev assets detection failed: {}", e.what());
+        }
+
         // Defer fallback shader creation until a graphics context exists (after RenderSystem initializes)
         m_FallbackInitialized = false;
 
@@ -59,45 +89,61 @@ namespace Vortex
             }
         }
 
-        // Clean up finished tasks and process pending unloads
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        auto it = m_PendingTasks.begin();
-        while (it != m_PendingTasks.end())
+        // Clean up finished tasks
         {
-            if (it->IsCompleted())
-                it = m_PendingTasks.erase(it);
-            else
-                ++it;
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            auto it = m_PendingTasks.begin();
+            while (it != m_PendingTasks.end())
+            {
+                if (it->IsCompleted())
+                    it = m_PendingTasks.erase(it);
+                else
+                    ++it;
+            }
+        }
+
+        // Periodic shader hot-reload polling
+        if (m_ShaderHotReloadEnabled)
+        {
+            const double now = Time::GetUnscaledTime();
+            if (now - m_LastHotReloadCheckTime >= m_HotReloadIntervalSeconds)
+            {
+                m_LastHotReloadCheckTime = now;
+                CheckForShaderHotReloads();
+            }
         }
 
         // Process delayed unloads respecting grace period and dependencies
-        const double now = Time::GetUnscaledTime();
-        auto unloadIt = m_PendingUnloads.begin();
-        while (unloadIt != m_PendingUnloads.end())
         {
-            const UUID id = unloadIt->Id;
-            const double when = unloadIt->UnloadAtSeconds;
-            // If rescheduled or removed, ensure we consult the authoritative map
-            auto timeIt = m_IdToScheduledTime.find(id);
-            if (timeIt == m_IdToScheduledTime.end())
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            const double now = Time::GetUnscaledTime();
+            auto unloadIt = m_PendingUnloads.begin();
+            while (unloadIt != m_PendingUnloads.end())
             {
+                const UUID id = unloadIt->Id;
+                const double when = unloadIt->UnloadAtSeconds;
+                // If rescheduled or removed, ensure we consult the authoritative map
+                auto timeIt = m_IdToScheduledTime.find(id);
+                if (timeIt == m_IdToScheduledTime.end())
+                {
+                    unloadIt = m_PendingUnloads.erase(unloadIt);
+                    continue;
+                }
+                // Only act when the front item reaches time
+                if (now < when)
+                {
+                    ++unloadIt;
+                    continue;
+                }
+                // Only unload if still at zero refs and no dependents require it
+                if (CanUnloadNow_NoLock(id))
+                {
+                    PerformUnload_NoLock(id);
+                }
+                // Remove from queue regardless; if still not unloadable it can be rescheduled on next release
+                m_IdToScheduledTime.erase(id);
                 unloadIt = m_PendingUnloads.erase(unloadIt);
-                continue;
             }
-            // Only act when the front item reaches time
-            if (now < when)
-            {
-                ++unloadIt;
-                continue;
-            }
-            // Only unload if still at zero refs and no dependents require it
-            if (CanUnloadNow_NoLock(id))
-            {
-                PerformUnload_NoLock(id);
-            }
-            // Remove from queue regardless; if still not unloadable it can be rescheduled on next release
-            m_IdToScheduledTime.erase(id);
-            unloadIt = m_PendingUnloads.erase(unloadIt);
         }
         return Result<void>();
     }
@@ -203,10 +249,37 @@ namespace Vortex
         UUID id = RegisterAsset(shaderAsset);
 
         // Kick off compile coroutine and keep task alive in pending list
-        auto task = CompileShaderTask(id, name, vertexPath, fragmentPath, options, std::move(onProgress));
+        auto task = CompileShaderTask(id, name, vertexPath, fragmentPath, options, std::move(onProgress), false);
         {
             std::lock_guard<std::mutex> lock(m_Mutex);
             m_PendingTasks.emplace_back(std::move(task));
+            // Track for hot-reload
+            ShaderSourceInfo info{};
+            info.VertexPath = vertexPath;
+            info.FragmentPath = fragmentPath;
+            info.Options = options;
+            // Initialize last write times now to avoid duplicate reload during initial compile
+            std::error_code ec;
+            namespace fs = std::filesystem;
+            auto strip_assets_prefix = [](const fs::path& p) -> fs::path {
+                if (p.empty()) return p;
+                auto it = p.begin();
+                if (it != p.end() && it->string() == "Assets")
+                {
+                    ++it;
+                    fs::path acc;
+                    for (; it != p.end(); ++it) acc /= *it;
+                    return acc;
+                }
+                return p;
+            };
+            fs::path vpRel = strip_assets_prefix(fs::path(vertexPath));
+            fs::path fpRel = strip_assets_prefix(fs::path(fragmentPath));
+            fs::path vpAbs = (m_DevAssetsAvailable ? (m_DevAssetsRoot / vpRel) : (m_AssetsRoot / vpRel));
+            fs::path fpAbs = (m_DevAssetsAvailable ? (m_DevAssetsRoot / fpRel) : (m_AssetsRoot / fpRel));
+            if (!vpAbs.empty() && fs::exists(vpAbs, ec)) info.VertexLastWrite = fs::last_write_time(vpAbs, ec);
+            if (!fpAbs.empty() && fs::exists(fpAbs, ec)) info.FragmentLastWrite = fs::last_write_time(fpAbs, ec);
+            m_ShaderSources[id] = std::move(info);
         }
 
         return AssetHandle<ShaderAsset>(this, id);
@@ -293,7 +366,8 @@ namespace Vortex
         std::string vertexPath,
         std::string fragmentPath,
         ShaderCompileOptions options,
-        ProgressCallback progress)
+        ProgressCallback progress,
+        bool isReload)
     {
         // Small staged progress model: 0.0-0.1 read, 0.1-0.8 compile, 0.8-1.0 create
         auto setProgress = [&](float p) {
@@ -309,6 +383,7 @@ namespace Vortex
         setProgress(0.05f);
 
         ShaderCompiler compiler;
+        // Keep caching enabled so reloads update on-disk cache with fresh SPIR-V
         compiler.SetCachingEnabled(true, (m_AssetsRoot / "Cache/Shaders").string());
 
         setProgress(0.10f);
@@ -338,7 +413,11 @@ namespace Vortex
                 if (vp.is_relative())
                 {
                     vp = strip_assets_prefix(vp);
-                    resolvedVS = (m_AssetsRoot / vp).string();
+                    // Prefer dev assets root when available for hot-reload
+                    if (m_DevAssetsAvailable)
+                        resolvedVS = (m_DevAssetsRoot / vp).string();
+                    else
+                        resolvedVS = (m_AssetsRoot / vp).string();
                 }
             }
             if (!fragmentPath.empty())
@@ -347,7 +426,10 @@ namespace Vortex
                 if (fp.is_relative())
                 {
                     fp = strip_assets_prefix(fp);
-                    resolvedFS = (m_AssetsRoot / fp).string();
+                    if (m_DevAssetsAvailable)
+                        resolvedFS = (m_DevAssetsRoot / fp).string();
+                    else
+                        resolvedFS = (m_AssetsRoot / fp).string();
                 }
             }
         }
@@ -356,7 +438,8 @@ namespace Vortex
             VX_CORE_WARN("AssetSystem: Exception while resolving shader paths: {}", e.what());
         }
 
-        VX_CORE_INFO("AssetSystem: Compiling shader '{}'\n  VS: {}\n  FS: {}", name, resolvedVS, resolvedFS);
+        VX_CORE_INFO("AssetSystem: %s shader '%s'\n  VS: %s\n  FS: %s",
+            isReload ? "Recompiling" : "Compiling", name.c_str(), resolvedVS.c_str(), resolvedFS.c_str());
 
         // Compile asynchronously (run concurrently)
         auto vsTask = compiler.CompileFromFileAsync(resolvedVS, options, CoroutinePriority::Low);
@@ -380,7 +463,7 @@ namespace Vortex
             if (it != m_Assets.end())
             {
                 auto* shaderAsset = dynamic_cast<ShaderAsset*>(it->second.assetPtr.get());
-                if (shaderAsset && m_FallbackShader && m_FallbackShader->IsValid())
+                if (!isReload && shaderAsset && m_FallbackShader && m_FallbackShader->IsValid())
                 {
                     shaderAsset->SetShader(m_FallbackShader);
                     shaderAsset->SetReflection({});
@@ -389,12 +472,14 @@ namespace Vortex
                     shaderAsset->SetProgress(1.0f);
                     VX_CORE_WARN("AssetSystem: Using fallback shader for '{}'", name);
                 }
-                else
+                else if (!isReload)
                 {
                     it->second.assetPtr->SetState(AssetState::Failed);
                     it->second.assetPtr->SetProgress(1.0f);
                 }
+                // On reload failure, keep existing shader and state as-is
             }
+            m_ShaderReloading.erase(id);
             co_return;
         }
 
@@ -416,9 +501,14 @@ namespace Vortex
             auto it = m_Assets.find(id);
             if (it != m_Assets.end())
             {
-                it->second.assetPtr->SetState(AssetState::Failed);
-                it->second.assetPtr->SetProgress(1.0f);
+                if (!isReload)
+                {
+                    it->second.assetPtr->SetState(AssetState::Failed);
+                    it->second.assetPtr->SetProgress(1.0f);
+                }
+                // On reload failure, keep previous good shader
             }
+            m_ShaderReloading.erase(id);
             co_return;
         }
 
@@ -432,10 +522,24 @@ namespace Vortex
                 auto* shaderAsset = dynamic_cast<ShaderAsset*>(it->second.assetPtr.get());
                 if (shaderAsset)
                 {
+                    // Swap-in the newly created program
                     shaderAsset->SetShader(std::shared_ptr<GPUShader>(std::move(shader)));
                     shaderAsset->SetReflection(reflection);
                     shaderAsset->SetState(AssetState::Loaded);
                     shaderAsset->SetProgress(1.0f);
+
+                    // Update tracked last-write times after successful (re)compile
+                    auto srcIt = m_ShaderSources.find(id);
+                    if (srcIt != m_ShaderSources.end())
+                    {
+                        std::error_code ec;
+                        if (!resolvedVS.empty() && std::filesystem::exists(resolvedVS, ec))
+                            srcIt->second.VertexLastWrite = std::filesystem::last_write_time(resolvedVS, ec);
+                        if (!resolvedFS.empty() && std::filesystem::exists(resolvedFS, ec))
+                            srcIt->second.FragmentLastWrite = std::filesystem::last_write_time(resolvedFS, ec);
+                    }
+                    // Mark reloading done
+                    m_ShaderReloading.erase(id);
                 }
             }
         }
@@ -503,6 +607,71 @@ namespace Vortex
         {
             m_FallbackShader = std::shared_ptr<GPUShader>(std::move(shader));
             VX_CORE_INFO("AssetSystem: Fallback shader created");
+        }
+    }
+
+    void AssetSystem::CheckForShaderHotReloads()
+    {
+        // Collect candidates without holding the mutex while doing filesystem IO
+        std::vector<std::tuple<UUID, std::string, std::string, ShaderCompileOptions>> toReload;
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            for (const auto& [id, srcInfo] : m_ShaderSources)
+            {
+                if (m_ShaderReloading.find(id) != m_ShaderReloading.end())
+                    continue;
+
+                std::error_code ec1, ec2;
+                std::filesystem::path vp = srcInfo.VertexPath;
+                std::filesystem::path fp = srcInfo.FragmentPath;
+
+                // Resolve relative paths; prefer DevAssets root when available to match editing location
+                if (vp.is_relative()) vp = (m_DevAssetsAvailable ? (m_DevAssetsRoot / vp) : (m_AssetsRoot / vp));
+                if (fp.is_relative()) fp = (m_DevAssetsAvailable ? (m_DevAssetsRoot / fp) : (m_AssetsRoot / fp));
+
+                bool vsChanged = false, fsChanged = false;
+                if (!vp.empty() && std::filesystem::exists(vp, ec1))
+                {
+                    auto cur = std::filesystem::last_write_time(vp, ec1);
+                    if (!ec1 && (srcInfo.VertexLastWrite == std::filesystem::file_time_type{} || cur > srcInfo.VertexLastWrite))
+                        vsChanged = true;
+                }
+                if (!fp.empty() && std::filesystem::exists(fp, ec2))
+                {
+                    auto cur = std::filesystem::last_write_time(fp, ec2);
+                    if (!ec2 && (srcInfo.FragmentLastWrite == std::filesystem::file_time_type{} || cur > srcInfo.FragmentLastWrite))
+                        fsChanged = true;
+                }
+
+                if (vsChanged || fsChanged)
+                {
+                    // Lookup name for nice logging
+                    auto it = m_Assets.find(id);
+                    std::string name = (it != m_Assets.end() && it->second.assetPtr) ? it->second.assetPtr->GetName() : std::string("Shader");
+                    toReload.emplace_back(id, srcInfo.VertexPath, srcInfo.FragmentPath, srcInfo.Options);
+                    m_ShaderReloading.insert(id);
+                    VX_CORE_INFO("AssetSystem: Detected shader source change for '%s' (VS changed=%d, FS changed=%d)", name.c_str(), vsChanged ? 1 : 0, fsChanged ? 1 : 0);
+                }
+            }
+        }
+
+        // Schedule recompiles
+        for (auto& item : toReload)
+        {
+            UUID id; std::string vs, fs; ShaderCompileOptions opts;
+            std::tie(id, vs, fs, opts) = std::move(item);
+
+            std::string name;
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                auto it = m_Assets.find(id);
+                if (it != m_Assets.end() && it->second.assetPtr)
+                    name = it->second.assetPtr->GetName();
+            }
+
+            auto task = CompileShaderTask(id, name, vs, fs, opts, {}, true);
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            m_PendingTasks.emplace_back(std::move(task));
         }
     }
 
@@ -587,6 +756,9 @@ namespace Vortex
             entry.assetPtr->SetProgress(0.0f);
         }
         m_NameToUUID.erase(entry.Name);
+        // Stop hot-reload tracking for this shader if present
+        m_ShaderSources.erase(id);
+        m_ShaderReloading.erase(id);
         // Remove ref entry last
         m_Refs.erase(id);
         m_Assets.erase(it);

@@ -20,8 +20,7 @@ layout(location = 4)  uniform mat4 u_View;          // uses 4..7
 layout(location = 8)  uniform mat4 u_Model;         // uses 8..11
 layout(location = 12) uniform mat3 u_NormalMatrix;  // uses 12..14
 
-// Animation/uniforms shared across stages
-layout(location = 15) uniform float u_Time;
+layout(location = 15) uniform float u_Time; // kept for compatibility, not used
 layout(location = 16) uniform vec3  u_CameraPos;
 
 // Transform uniforms (vertex-only)
@@ -29,18 +28,16 @@ layout(location = 17) uniform vec3 u_Translation;
 layout(location = 18) uniform vec3 u_Rotation;
 layout(location = 19) uniform vec3 u_Scale;
 
-// Wind animation parameters (vertex-only)
-layout(location = 20) uniform float u_WindStrength;
-layout(location = 21) uniform vec2  u_WindDirection;
+// Wind animation uniforms removed; keep locations reserved for compatibility
+layout(location = 20) uniform float u_WindStrength; // unused
+layout(location = 21) uniform vec2  u_WindDirection; // unused
 
 void main()
 {
     // Apply local transformations
     vec3 position = a_Position * u_Scale;
     
-    // Apply wind effect (vertex animation)
-    float windEffect = sin(u_Time * 2.0 + position.x * 0.5) * u_WindStrength;
-    position.y += windEffect * a_TexCoord.y; // More wind effect at the top
+    // Wind effect removed to keep geometry stable
     
     // Rotation matrices
     float cosX = cos(u_Rotation.x), sinX = sin(u_Rotation.x);

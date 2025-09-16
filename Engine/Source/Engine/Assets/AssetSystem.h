@@ -13,6 +13,7 @@
 #include <deque>
 #include <mutex>
 #include <filesystem>
+#include <unordered_set>
 
 namespace Vortex
 {
@@ -75,6 +76,15 @@ namespace Vortex
             const std::filesystem::path& outputDir);
 
     private:
+        struct ShaderSourceInfo
+        {
+            std::string VertexPath;
+            std::string FragmentPath;
+            ShaderCompileOptions Options{};
+            std::filesystem::file_time_type VertexLastWrite{};
+            std::filesystem::file_time_type FragmentLastWrite{};
+        };
+
         struct AssetEntry
         {
             std::shared_ptr<Asset> assetPtr;
@@ -101,10 +111,14 @@ namespace Vortex
             std::string vertexPath,
             std::string fragmentPath,
             ShaderCompileOptions options,
-            ProgressCallback progress);
+            ProgressCallback progress,
+            bool isReload = false);
 
         // Simple built-in fallback shader
         void EnsureFallbackShader();
+
+        // Periodic shader hot-reload check
+        void CheckForShaderHotReloads();
 
     private:
         mutable std::mutex m_Mutex;
@@ -113,12 +127,21 @@ namespace Vortex
         std::unordered_map<UUID, uint32_t> m_Refs;
         std::vector<Task<void>> m_PendingTasks;
 
+        // Shader hot-reload tracking
+        std::unordered_map<UUID, ShaderSourceInfo> m_ShaderSources;
+        std::unordered_set<UUID> m_ShaderReloading;
+        double m_LastHotReloadCheckTime = 0.0;
+        double m_HotReloadIntervalSeconds = 0.5;
+        bool m_ShaderHotReloadEnabled = true;
+
         // Delayed unload policy and state
         std::deque<PendingUnload> m_PendingUnloads;
         std::unordered_map<UUID, double> m_IdToScheduledTime;
         double m_UnloadGracePeriodSeconds = 5.0; // default grace window
 
         std::filesystem::path m_AssetsRoot;
+        std::filesystem::path m_DevAssetsRoot; // Optional: repo-level Assets for development
+        bool m_DevAssetsAvailable = false;
         ShaderRef m_FallbackShader;
         bool m_FallbackInitialized = false;
         bool m_Initialized = false;

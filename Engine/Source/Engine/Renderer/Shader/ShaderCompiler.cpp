@@ -102,6 +102,8 @@ namespace Vortex
         // Cache
         mutable std::unordered_map<uint64_t, CompiledShader> m_ShaderCache;
         mutable std::shared_mutex m_CacheMutex;
+        // Map source-file+stage -> last stored hash to prune stale cache entries on edits
+        mutable std::unordered_map<std::string, uint64_t> m_SourceStageToHash;
 
         // Statistics
         mutable std::mutex m_StatsMutex;
@@ -300,10 +302,15 @@ namespace Vortex
                 outShader.SourceHash = hash;
                 outShader.SourceFile = sourceFile;
 
-                // Store in memory cache
+                // Store in memory cache and update source mapping
                 {
                     std::unique_lock<std::shared_mutex> lock(m_CacheMutex);
                     m_ShaderCache[hash] = outShader;
+                    if (!outShader.SourceFile.empty())
+                    {
+                        std::string sourceKey = outShader.SourceFile + "|" + std::to_string(static_cast<int>(outShader.Stage));
+                        m_SourceStageToHash[sourceKey] = hash;
+                    }
                 }
 
                 VX_CORE_TRACE("Loaded SPIR-V shader from cache: {0}", cacheFile);
@@ -321,10 +328,19 @@ namespace Vortex
             if (!m_CachingEnabled)
                 return;
 
-            // Save to memory cache
+            // Save to memory cache and update source mapping
+            uint64_t prevHashForSource = 0;
+            std::string sourceKey;
             {
                 std::unique_lock<std::shared_mutex> lock(m_CacheMutex);
                 m_ShaderCache[hash] = shader;
+                if (!shader.SourceFile.empty())
+                {
+                    sourceKey = shader.SourceFile + "|" + std::to_string(static_cast<int>(shader.Stage));
+                    auto it = m_SourceStageToHash.find(sourceKey);
+                    if (it != m_SourceStageToHash.end()) prevHashForSource = it->second;
+                    m_SourceStageToHash[sourceKey] = hash;
+                }
             }
 
             // Save to disk cache
@@ -366,6 +382,30 @@ namespace Vortex
             catch (const std::exception& e)
             {
                 VX_CORE_ERROR("Failed to save shader to cache: {0}", e.what());
+            }
+
+            // Prune stale cache entry for the same source+stage (if any and different hash)
+            if (prevHashForSource != 0 && prevHashForSource != hash)
+            {
+                try
+                {
+                    std::string oldCache = GetCacheFilePath(prevHashForSource, shader.Stage);
+                    std::string oldInfo = GetCacheInfoPath(prevHashForSource, shader.Stage);
+                    std::error_code ec;
+                    if (std::filesystem::exists(oldCache, ec)) std::filesystem::remove(oldCache, ec);
+                    if (std::filesystem::exists(oldInfo, ec)) std::filesystem::remove(oldInfo, ec);
+
+                    // Also drop old entry from memory cache
+                    {
+                        std::unique_lock<std::shared_mutex> lock(m_CacheMutex);
+                        m_ShaderCache.erase(prevHashForSource);
+                    }
+                    VX_CORE_TRACE("Pruned stale shader cache for source '{0}' (old hash {1})", shader.SourceFile, prevHashForSource);
+                }
+                catch (const std::exception& e)
+                {
+                    VX_CORE_WARN("Failed to prune old shader cache entries: {0}", e.what());
+                }
             }
         }
     };
@@ -509,6 +549,11 @@ return Result<CompiledShader>(ErrorCode::InvalidParameter, "Could not determine 
             // Store file path for hot-reload
             CompiledShader& shader = const_cast<CompiledShader&>(result.GetValue());
             shader.SourceFile = filePath;
+            // Ensure cache mapping is updated as soon as we have a compiled shader
+            if (m_Impl->m_CachingEnabled)
+            {
+                m_Impl->SaveToCache(shader.SourceHash, shader);
+            }
         }
 
         return result;

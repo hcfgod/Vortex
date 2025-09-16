@@ -104,7 +104,8 @@ namespace Vortex
             executableDir / configPath,                                         // Same dir as exe
             executableDir.parent_path() / configPath,                          // Parent dir
             executableDir.parent_path().parent_path() / configPath,            // Grandparent
-            executableDir.parent_path().parent_path().parent_path() / configPath // Great-grandparent
+            executableDir.parent_path().parent_path().parent_path() / configPath, // Great-grandparent
+            executableDir.parent_path().parent_path().parent_path().parent_path() / configPath // Great-great-grandparent
         };
 
         for (const auto& path : searchPaths) {
