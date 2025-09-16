@@ -61,7 +61,7 @@ void ExampleGameLayer::OnAttach()
         auto* assetSystem = m_SystemManager->GetSystem<AssetSystem>();
         if (assetSystem)
         {
-            m_TextureHandle = assetSystem->LoadAsset<TextureAsset>("Checkerboard.png");
+            m_TextureHandle = assetSystem->LoadAsset<TextureAsset>("Checker");
         }
     }
 
@@ -382,21 +382,13 @@ void ExampleGameLayer::SetupShaderSystem()
             return;
         }
 
-        ShaderCompileOptions options; options.GenerateDebugInfo = true; options.TargetProfile = "opengl";
         // Request async load with progress callback for logging and window title updates
-        m_ShaderHandle = assetSystem->LoadShaderAsync(
-            "AdvancedTriangleShader",
-            (std::filesystem::path("Shaders") / "AdvancedTriangle.vert").string(),
-            (std::filesystem::path("Shaders") / "AdvancedTriangle.frag").string(),
-            options,
+        m_ShaderHandle = assetSystem->LoadAsset<ShaderAsset>(
+            "AdvancedTriangle",
             [this](float progress)
             {
                 m_ShaderProgress = progress;
-
-                // Always log progress
                 VX_CORE_INFO("[AssetSystem] Shader loading progress: {:.1f}%", progress * 100.0f);
-
-                // Update window title with loading progress
                 std::string title = "Vortex Sandbox - Loading Shaders: " + std::to_string(static_cast<int>(progress * 100)) + "%";
                 if (progress >= 1.0f)
                 {
@@ -406,7 +398,7 @@ void ExampleGameLayer::SetupShaderSystem()
                 }
                 m_Application->GetWindow()->SetTitle(title);
             }
-        ); 
+        );
     }
     catch (const std::exception& e)
     {

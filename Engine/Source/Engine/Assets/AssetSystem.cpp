@@ -9,6 +9,8 @@
 #include <stb_image.h>
 #include <fstream>
 #include <random>
+#include <algorithm>
+#include <cctype>
 
 namespace Vortex
 {
@@ -168,6 +170,88 @@ namespace Vortex
         std::lock_guard<std::mutex> lock(m_Mutex);
         m_AssetsRoot = root;
         VX_CORE_INFO("AssetSystem assets root set to: {}", m_AssetsRoot.string());
+    }
+
+    // ===== Recursive helpers =====
+    std::filesystem::path AssetSystem::FindFirstFileRecursive(const std::filesystem::path& root, const std::string& fileName) const
+    {
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        if (!fs::exists(root, ec) || !fs::is_directory(root, ec))
+            return {};
+
+        auto toLower = [](std::string s)
+        {
+            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            return s;
+        };
+
+        const std::string targetLower = toLower(fileName);
+        for (fs::recursive_directory_iterator it(root, ec), end; it != end; it.increment(ec))
+        {
+            if (ec) { ec.clear(); continue; }
+            if (!it->is_regular_file(ec)) { if (ec) ec.clear(); continue; }
+            const std::string fname = it->path().filename().string();
+            if (toLower(fname) == targetLower)
+                return it->path();
+        }
+        return {};
+    }
+
+    bool AssetSystem::FindShaderPairRecursive(const std::filesystem::path& root, const std::string& baseName, std::filesystem::path& outVertexPath, std::filesystem::path& outFragmentPath) const
+    {
+        auto endsWithNoCase = [](const std::string& str, const std::string& suffix)
+        {
+            if (suffix.size() > str.size()) return false;
+            return std::equal(suffix.rbegin(), suffix.rend(), str.rbegin(), [](char a, char b){ return std::tolower(a) == std::tolower(b); });
+        };
+
+        // Try exact base name first
+        std::filesystem::path vs = FindFirstFileRecursive(root, baseName + ".vert");
+        std::filesystem::path fs = FindFirstFileRecursive(root, baseName + ".frag");
+        if (!vs.empty() && !fs.empty())
+        {
+            outVertexPath = std::move(vs);
+            outFragmentPath = std::move(fs);
+            return true;
+        }
+
+        // Heuristic: strip trailing "Shader" if present
+        std::string stripped = baseName;
+        if (endsWithNoCase(stripped, "Shader"))
+            stripped.erase(stripped.size() - 6);
+        if (!stripped.empty())
+        {
+            vs = FindFirstFileRecursive(root, stripped + ".vert");
+            fs = FindFirstFileRecursive(root, stripped + ".frag");
+            if (!vs.empty() && !fs.empty())
+            {
+                outVertexPath = std::move(vs);
+                outFragmentPath = std::move(fs);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::filesystem::path AssetSystem::FindTextureRecursive(const std::filesystem::path& root, const std::string& baseNameOrFile) const
+    {
+        namespace fs = std::filesystem;
+        fs::path p(baseNameOrFile);
+        if (p.has_extension())
+        {
+            return FindFirstFileRecursive(root, p.filename().string());
+        }
+
+        static const char* exts[] = { "png", "jpg", "jpeg", "bmp", "tga", "ktx", "dds" };
+        for (const char* ext : exts)
+        {
+            std::string candidate = baseNameOrFile + "." + ext;
+            fs::path found = FindFirstFileRecursive(root, candidate);
+            if (!found.empty())
+                return found;
+        }
+        return {};
     }
 
     void AssetSystem::Acquire(const UUID& id)
