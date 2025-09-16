@@ -28,6 +28,9 @@ project "Engine"
     {
         "Source/**.h",
         "Source/**.cpp",
+        -- ensure stb_image TU is compiled when present
+        "Vendor/stb/stb_image.h",
+        "Vendor/stb/stb_image.cpp",
         "Vendor/GLAD/generated/src/gl.c",
         -- SPIRV-Cross core + GLSL backend + required support files
         "Vendor/SPIRV-Cross/spirv_cross.cpp",

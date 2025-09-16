@@ -6,13 +6,13 @@
 #include "Engine/Renderer/Shader/ShaderReflection.h"
 #include "Engine/Renderer/RendererAPI.h"
 #include <nlohmann/json.hpp>
+#include <stb_image.h>
 #include <fstream>
 #include <random>
 
 namespace Vortex
 {
-    AssetSystem::AssetSystem()
-        : EngineSystem("AssetSystem", SystemPriority::Core)
+    AssetSystem::AssetSystem() : EngineSystem("AssetSystem", SystemPriority::Core)
     {
     }
 
@@ -334,9 +334,8 @@ namespace Vortex
         texAsset->SetProgress(0.0f);
         UUID id = RegisterAsset(texAsset);
 
-        // For now, generate a simple checkerboard/procedural texture to avoid external deps
-        // 256x256 RGBA8, optional future: load from disk when image loader available
-        Task<void> task = [this, id, name, onProgress]() -> Task<void>
+        // Load from disk using stb_image if available; fallback to procedural checkerboard
+        Task<void> task = [this, id, name, filePath, onProgress]() -> Task<void>
         {
             auto setProgress = [&](float p)
             {
@@ -350,24 +349,40 @@ namespace Vortex
 
             setProgress(0.1f);
 
-            const uint32_t width = 256, height = 256;
-            std::vector<uint8_t> pixels(width * height * 4);
+            uint32_t width = 0, height = 0;
+            std::vector<uint8_t> pixels;
 
-            // Checkerboard
-            for (uint32_t y = 0; y < height; ++y)
+            // Attempt to load using stb_image
+            stbi_set_flip_vertically_on_load(1);
+            int w = 0, h = 0, comp = 0;
+            unsigned char* data = stbi_load(filePath.c_str(), &w, &h, &comp, 4);
+            if (data && w > 0 && h > 0)
             {
-                for (uint32_t x = 0; x < width; ++x)
+                width = static_cast<uint32_t>(w);
+                height = static_cast<uint32_t>(h);
+                pixels.assign(data, data + (width * height * 4));
+                stbi_image_free(data);
+            }
+            else
+            {
+                // Fallback checkerboard
+                width = 256; height = 256;
+                pixels.resize(width * height * 4);
+                for (uint32_t y = 0; y < height; ++y)
                 {
-                    bool check = (((x / 32) + (y / 32)) % 2) == 0;
-                    uint8_t r = check ? 255 : 30;
-                    uint8_t g = check ? 255 : 30;
-                    uint8_t b = check ? 255 : 30;
-                    uint8_t a = 255;
-                    size_t idx = static_cast<size_t>(y) * width * 4ull + static_cast<size_t>(x) * 4ull;
-                    pixels[idx + 0] = r;
-                    pixels[idx + 1] = g;
-                    pixels[idx + 2] = b;
-                    pixels[idx + 3] = a;
+                    for (uint32_t x = 0; x < width; ++x)
+                    {
+                        bool check = (((x / 32) + (y / 32)) % 2) == 0;
+                        uint8_t r = check ? 255 : 30;
+                        uint8_t g = check ? 255 : 30;
+                        uint8_t b = check ? 255 : 30;
+                        uint8_t a = 255;
+                        size_t idx = static_cast<size_t>(y) * width * 4ull + static_cast<size_t>(x) * 4ull;
+                        pixels[idx + 0] = r;
+                        pixels[idx + 1] = g;
+                        pixels[idx + 2] = b;
+                        pixels[idx + 3] = a;
+                    }
                 }
             }
 
