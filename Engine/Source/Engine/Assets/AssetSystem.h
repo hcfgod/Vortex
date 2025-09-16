@@ -4,6 +4,7 @@
 #include "Engine/Assets/Asset.h"
 #include "Engine/Assets/AssetHandle.h"
 #include "Engine/Assets/ShaderAsset.h"
+#include "Engine/Assets/TextureAsset.h"
 #include "Engine/Renderer/Shader/ShaderCompiler.h"
 #include "Core/Async/Task.h"
 #include "Core/Async/Coroutine.h"
@@ -55,6 +56,11 @@ namespace Vortex
             ProgressCallback onProgress = {});
         AssetHandle<ShaderAsset> LoadShaderFromManifestAsync(const std::string& manifestPath,
             const ShaderCompileOptions& defaultOptions = {},
+            ProgressCallback onProgress = {});
+
+        // Load texture (simple async loader with procedural fallback)
+        AssetHandle<TextureAsset> LoadTextureAsync(const std::string& name,
+            const std::string& filePath,
             ProgressCallback onProgress = {});
 
         // Ref management used by AssetHandle (friend)
@@ -133,6 +139,8 @@ namespace Vortex
         double m_LastHotReloadCheckTime = 0.0;
         double m_HotReloadIntervalSeconds = 0.5;
         bool m_ShaderHotReloadEnabled = true;
+
+        // Basic texture loader does not hot-reload yet
 
         // Delayed unload policy and state
         std::deque<PendingUnload> m_PendingUnloads;

@@ -12,7 +12,8 @@ namespace Vortex
     {
         Unknown = 0,
         Shader  = 1,
-        // Texture, Mesh, Material, Audio, ... (future)
+        Texture = 2,
+        // Mesh, Material, Audio, ... (future)
     };
 
     enum class AssetState : uint32_t

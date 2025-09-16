@@ -196,4 +196,48 @@ namespace Vortex
         return renderer->DeleteVertexArrays(m_Count, m_Arrays);
     }
 
+    // ----------------------------- Texture commands -----------------------------
+    Result<void> GenTexturesCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->GenTextures(m_Count, m_OutTextures);
+    }
+
+    Result<void> DeleteTexturesCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->DeleteTextures(m_Count, m_Textures);
+    }
+
+    Result<void> BindTextureTargetCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->BindTextureTarget(m_Target, m_Texture);
+    }
+
+    Result<void> TexImage2DCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        const void* dataPtr = (m_Payload && !m_Payload->empty()) ? static_cast<const void*>(m_Payload->data()) : nullptr;
+        return renderer->TexImage2D(m_Target, m_Level, m_InternalFormat, m_Width, m_Height, m_Format, m_Type, dataPtr);
+    }
+
+    Result<void> TexParameteriCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->TexParameteri(m_Target, m_PName, m_Param);
+    }
+
+    Result<void> GenerateMipmapCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->GenerateMipmap(m_Target);
+    }
+
 } // namespace Vortex

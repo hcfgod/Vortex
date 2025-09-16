@@ -221,6 +221,42 @@ namespace Vortex
         virtual Result<void> BindTexture(uint32_t slot, uint32_t texture, uint32_t sampler) = 0;
 
         // ============================================================================
+        // TEXTURE OPERATIONS
+        // ============================================================================
+
+        /**
+         * @brief Generate one or more texture object names
+         */
+        virtual Result<void> GenTextures(uint32_t count, uint32_t* outTextures) = 0;
+
+        /**
+         * @brief Delete one or more textures
+         */
+        virtual Result<void> DeleteTextures(uint32_t count, const uint32_t* textures) = 0;
+
+        /**
+         * @brief Bind a texture to a target (e.g., 2D)
+         */
+        virtual Result<void> BindTextureTarget(uint32_t target, uint32_t texture) = 0;
+
+        /**
+         * @brief Specify a two-dimensional texture image
+         */
+        virtual Result<void> TexImage2D(uint32_t target, int32_t level, uint32_t internalFormat,
+                                        uint32_t width, uint32_t height, uint32_t format, uint32_t type,
+                                        const void* data) = 0;
+
+        /**
+         * @brief Set integer parameter for the texture target
+         */
+        virtual Result<void> TexParameteri(uint32_t target, uint32_t pname, int32_t param) = 0;
+
+        /**
+         * @brief Generate mipmaps for the texture bound to target
+         */
+        virtual Result<void> GenerateMipmap(uint32_t target) = 0;
+
+        // ============================================================================
         // RENDER STATE
         // ============================================================================
 

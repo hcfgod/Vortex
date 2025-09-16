@@ -55,6 +55,16 @@ void ExampleGameLayer::OnAttach()
     // Initialize the modern shader system
     SetupShaderSystem();
 
+    // Load a texture asset (procedural checkerboard for now)
+    if (m_SystemManager)
+    {
+        auto* assetSystem = m_SystemManager->GetSystem<AssetSystem>();
+        if (assetSystem)
+        {
+            m_TextureHandle = assetSystem->LoadTextureAsync("Checkerboard", (std::filesystem::path("Textures") / "Checkerboard.png").string());
+        }
+    }
+
     // Create VAO/VBO/EBO via high-level API
     m_VertexArray = VertexArray::Create();
     m_VertexBuffer = VertexBuffer::Create(sizeof(kVertices), kVertices);
@@ -277,8 +287,29 @@ void ExampleGameLayer::OnRender()
         m_ShaderManager->SetUniform("u_CameraPos", cameraPos);
         
         // === Material properties ===
-        // Use a solid color albedo; keep PBR lighting
-        glm::vec3 albedo(0.2f, 0.6f, 0.9f); // Solid sky-blue color
+        // Use albedo texture if loaded, otherwise solid color
+        bool useTexture = m_TextureHandle.IsValid() && m_TextureHandle.IsLoaded();
+        if (useTexture)
+        {
+            const TextureAsset* tex = m_TextureHandle.TryGet();
+            if (tex && tex->IsReady() && tex->GetTexture())
+            {
+                // Bind to slot 0 and set uniform
+                tex->GetTexture()->Bind(0);
+                m_ShaderManager->SetTexture("u_AlbedoTexture", tex->GetTexture()->GetRendererID(), 0);
+                m_ShaderManager->SetUniform("u_UseAlbedoTexture", 1);
+            }
+            else
+            {
+                m_ShaderManager->SetUniform("u_UseAlbedoTexture", 0);
+            }
+        }
+        else
+        {
+            m_ShaderManager->SetUniform("u_UseAlbedoTexture", 0);
+        }
+
+        glm::vec3 albedo(0.9f, 0.9f, 0.9f); // base color when multiplied with texture
         m_ShaderManager->SetUniform("u_Albedo", albedo);
         m_ShaderManager->SetUniform("u_Metallic", 0.2f);
         m_ShaderManager->SetUniform("u_Roughness", 0.4f);

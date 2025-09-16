@@ -7,6 +7,7 @@
 #include "Engine/Renderer/RendererAPI.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <random>
 
 namespace Vortex
 {
@@ -321,6 +322,100 @@ namespace Vortex
         std::string vert = (m_AssetsRoot / manifest.VertexPath).string();
         std::string frag = (m_AssetsRoot / manifest.FragmentPath).string();
         return LoadShaderAsync(manifest.Name, vert, frag, options, std::move(onProgress));
+    }
+
+    AssetHandle<TextureAsset> AssetSystem::LoadTextureAsync(const std::string& name,
+        const std::string& filePath,
+        ProgressCallback onProgress)
+    {
+        // Create placeholder asset
+        auto texAsset = std::make_shared<TextureAsset>(name);
+        texAsset->SetState(AssetState::Loading);
+        texAsset->SetProgress(0.0f);
+        UUID id = RegisterAsset(texAsset);
+
+        // For now, generate a simple checkerboard/procedural texture to avoid external deps
+        // 256x256 RGBA8, optional future: load from disk when image loader available
+        Task<void> task = [this, id, name, onProgress]() -> Task<void>
+        {
+            auto setProgress = [&](float p)
+            {
+                {
+                    std::lock_guard<std::mutex> lock(m_Mutex);
+                    auto it = m_Assets.find(id);
+                    if (it != m_Assets.end()) it->second.assetPtr->SetProgress(p);
+                }
+                if (onProgress) onProgress(p);
+            };
+
+            setProgress(0.1f);
+
+            const uint32_t width = 256, height = 256;
+            std::vector<uint8_t> pixels(width * height * 4);
+
+            // Checkerboard
+            for (uint32_t y = 0; y < height; ++y)
+            {
+                for (uint32_t x = 0; x < width; ++x)
+                {
+                    bool check = (((x / 32) + (y / 32)) % 2) == 0;
+                    uint8_t r = check ? 255 : 30;
+                    uint8_t g = check ? 255 : 30;
+                    uint8_t b = check ? 255 : 30;
+                    uint8_t a = 255;
+                    size_t idx = static_cast<size_t>(y) * width * 4ull + static_cast<size_t>(x) * 4ull;
+                    pixels[idx + 0] = r;
+                    pixels[idx + 1] = g;
+                    pixels[idx + 2] = b;
+                    pixels[idx + 3] = a;
+                }
+            }
+
+            setProgress(0.5f);
+
+            // Create GPU texture
+            Texture2D::CreateInfo ci{};
+            ci.Width = width;
+            ci.Height = height;
+            ci.Format = TextureFormat::RGBA8;
+            ci.MinFilter = TextureFilter::Linear;
+            ci.MagFilter = TextureFilter::Linear;
+            ci.WrapS = TextureWrap::Repeat;
+            ci.WrapT = TextureWrap::Repeat;
+            ci.GenerateMips = true;
+            ci.InitialData = pixels.data();
+            ci.InitialDataSize = static_cast<uint64_t>(pixels.size());
+
+            auto texture = Texture2D::Create(ci);
+
+            setProgress(0.9f);
+
+            // Store into asset entry
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                auto it = m_Assets.find(id);
+                if (it != m_Assets.end())
+                {
+                    auto* t = dynamic_cast<TextureAsset*>(it->second.assetPtr.get());
+                    if (t)
+                    {
+                        t->SetTexture(texture);
+                        t->SetState(AssetState::Loaded);
+                        t->SetProgress(1.0f);
+                    }
+                }
+            }
+
+            setProgress(1.0f);
+            co_return;
+        }();
+
+        {
+            std::lock_guard<std::mutex> lock(m_Mutex);
+            m_PendingTasks.emplace_back(std::move(task));
+        }
+
+        return AssetHandle<TextureAsset>(this, id);
     }
 
 

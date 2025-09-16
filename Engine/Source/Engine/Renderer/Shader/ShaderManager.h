@@ -167,6 +167,11 @@ namespace Vortex
         Result<void> SetUniform(const std::string& name, const glm::mat3& value);
         Result<void> SetUniform(const std::string& name, const glm::mat4& value);
 
+        /**
+         * @brief Bind a texture uniform by name (sets sampler to slot and binds texture)
+         */
+        Result<void> SetTexture(const std::string& name, uint32_t textureId, uint32_t slot = 0);
+
         // ============================================================================
         // RESOURCE MANAGEMENT
         // ============================================================================

@@ -52,8 +52,9 @@ private:
     SmartRef<ShaderManager> m_ShaderManager;
     bool m_SystemsInitialized = false;
 
-    // Asset-system managed shader handle
+    // Asset-system managed handles
     AssetHandle<ShaderAsset> m_ShaderHandle;
+    AssetHandle<TextureAsset> m_TextureHandle;
 
     // Loading indicator state
     bool m_ShaderLoading = false;

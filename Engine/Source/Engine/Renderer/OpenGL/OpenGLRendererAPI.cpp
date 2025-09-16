@@ -608,6 +608,103 @@ namespace Vortex
     }
 
     // ============================================================================
+    // Texture Operations
+    // ============================================================================
+
+    Result<void> OpenGLRendererAPI::GenTextures(uint32_t count, uint32_t* outTextures)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glGenTextures(static_cast<GLsizei>(count), reinterpret_cast<GLuint*>(outTextures));
+        if (!CheckGLError("GenTextures"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to generate textures");
+        }
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::DeleteTextures(uint32_t count, const uint32_t* textures)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glDeleteTextures(static_cast<GLsizei>(count), reinterpret_cast<const GLuint*>(textures));
+        if (!CheckGLError("DeleteTextures"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to delete textures");
+        }
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::BindTextureTarget(uint32_t target, uint32_t texture)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glBindTexture(target, texture);
+        if (!CheckGLError("BindTextureTarget"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to bind texture target");
+        }
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::TexImage2D(uint32_t target, int32_t level, uint32_t internalFormat,
+                                               uint32_t width, uint32_t height, uint32_t format, uint32_t type,
+                                               const void* data)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glTexImage2D(target, level, static_cast<GLint>(internalFormat), static_cast<GLsizei>(width), static_cast<GLsizei>(height), 0,
+                     format, type, data);
+        if (!CheckGLError("TexImage2D"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to specify texture image");
+        }
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::TexParameteri(uint32_t target, uint32_t pname, int32_t param)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glTexParameteri(target, pname, param);
+        if (!CheckGLError("TexParameteri"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to set texture parameter");
+        }
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::GenerateMipmap(uint32_t target)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glGenerateMipmap(target);
+        if (!CheckGLError("GenerateMipmap"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to generate mipmaps");
+        }
+        return Result<void>();
+    }
+
+    // ============================================================================
     // Render State
     // ============================================================================
 

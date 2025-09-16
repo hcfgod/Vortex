@@ -265,6 +265,11 @@ namespace Vortex
             return Submit(std::make_unique<BufferDataCommand>(target, std::move(payload), usage), executeImmediate);
         }
 
+        bool BindTexture(uint32_t slot, uint32_t texture, uint32_t sampler = 0, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BindTextureCommand>(slot, texture, sampler), executeImmediate);
+        }
+
         bool VertexAttribPointer(uint32_t index, int32_t size, uint32_t type, bool normalized,
                                  uint64_t stride, uint64_t pointer, bool executeImmediate = false)
         {
@@ -295,6 +300,45 @@ namespace Vortex
         bool DeleteVertexArrays(uint32_t count, const uint32_t* arrays, bool executeImmediate = true)
         {
             return Submit(std::make_unique<DeleteVertexArraysCommand>(count, arrays), executeImmediate);
+        }
+
+        // Texture helpers
+        bool GenTextures(uint32_t count, uint32_t* outTextures, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<GenTexturesCommand>(count, outTextures), executeImmediate);
+        }
+
+        bool DeleteTextures(uint32_t count, const uint32_t* textures, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<DeleteTexturesCommand>(count, textures), executeImmediate);
+        }
+
+        bool BindTextureTarget(uint32_t target, uint32_t texture, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BindTextureTargetCommand>(target, texture), executeImmediate);
+        }
+
+        bool TexImage2D(uint32_t target, int32_t level, uint32_t internalFormat,
+                        uint32_t width, uint32_t height, uint32_t format, uint32_t type,
+                        const void* data, uint64_t sizeBytes, bool executeImmediate = false)
+        {
+            auto payload = std::make_shared<TexImage2DCommand::ByteVector>();
+            if (data && sizeBytes > 0)
+            {
+                payload->resize(static_cast<size_t>(sizeBytes));
+                std::memcpy(payload->data(), data, static_cast<size_t>(sizeBytes));
+            }
+            return Submit(std::make_unique<TexImage2DCommand>(target, level, internalFormat, width, height, format, type, std::move(payload)), executeImmediate);
+        }
+
+        bool TexParameteri(uint32_t target, uint32_t pname, int32_t param, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<TexParameteriCommand>(target, pname, param), executeImmediate);
+        }
+
+        bool GenerateMipmap(uint32_t target, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<GenerateMipmapCommand>(target), executeImmediate);
         }
 
         /**
@@ -437,4 +481,8 @@ namespace Vortex
 
 #define VX_RENDER_SET_CULL(mode, face) \
         ::Vortex::GetRenderCommandQueue().SetCullState(mode, face)
+
+    // Convenience wrapper for binding textures to slots
+#define VX_RENDER_BIND_TEXTURE(slot, texture, sampler) \
+        ::Vortex::GetRenderCommandQueue().Submit(std::make_unique<BindTextureCommand>(slot, texture, sampler))
 }

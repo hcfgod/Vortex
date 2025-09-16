@@ -55,11 +55,13 @@
 #include "Engine/Renderer/RenderTypes.h"
 #include "Engine/Renderer/VertexArray.h"
 #include "Engine/Renderer/Buffer.h"
+#include "Engine/Renderer/Texture.h"
 
 // Assets
 #include "Engine/Assets/Asset.h"
 #include "Engine/Assets/AssetHandle.h"
 #include "Engine/Assets/ShaderAsset.h"
+#include "Engine/Assets/TextureAsset.h"
 #include "Engine/Assets/AssetSystem.h"
 
 // ---Entry Point---------------------

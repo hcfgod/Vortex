@@ -517,6 +517,23 @@ namespace Vortex
         return asset->GetShader()->SetUniform(name, value);
     }
 
+    Result<void> ShaderManager::SetTexture(const std::string& name, uint32_t textureId, uint32_t slot)
+    {
+        std::lock_guard<std::mutex> lock(m_Impl->m_Mutex);
+        if (m_Impl->m_CurrentlyBound == 0)
+            return Result<void>(ErrorCode::InvalidState, "No shader currently bound");
+        auto it = m_Impl->m_Shaders.find(m_Impl->m_CurrentlyBound);
+        if (it == m_Impl->m_Shaders.end())
+            return Result<void>(ErrorCode::InvalidState, "Invalid bound shader");
+        const ShaderAsset* asset = it->second.Handle.TryGet();
+        if (!asset || !asset->GetShader())
+            return Result<void>(ErrorCode::InvalidState, "Shader asset not ready");
+
+        // Set the sampler uniform and bind texture via render command queue helper
+        auto res = asset->GetShader()->SetTexture(name, textureId, slot);
+        return res;
+    }
+
     // Stubs for other methods
     Result<void> ShaderManager::ReloadShader(const AssetHandle<ShaderAsset>& handle) { return Result<void>(ErrorCode::NotImplemented, "Not implemented"); }
     uint32_t ShaderManager::ReloadAllShaders() { return 0; }

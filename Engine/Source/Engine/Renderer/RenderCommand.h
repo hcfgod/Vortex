@@ -561,4 +561,133 @@ namespace Vortex
         std::string GetDebugName() const override { return "PopDebugGroup"; }
         float GetEstimatedCost() const override { return 0.001f; }
     };
+
+    // ============================================================================
+    // TEXTURE COMMANDS
+    // ============================================================================
+
+    /**
+     * @brief Generate one or more texture object names
+     */
+    class GenTexturesCommand : public RenderCommand
+    {
+    public:
+        GenTexturesCommand(uint32_t count, uint32_t* outTextures)
+            : m_Count(count), m_OutTextures(outTextures) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "GenTextures"; }
+        float GetEstimatedCost() const override { return 0.01f * m_Count; }
+
+    private:
+        uint32_t m_Count;
+        uint32_t* m_OutTextures;
+    };
+
+    /**
+     * @brief Delete one or more textures
+     */
+    class DeleteTexturesCommand : public RenderCommand
+    {
+    public:
+        DeleteTexturesCommand(uint32_t count, const uint32_t* textures)
+            : m_Count(count), m_Textures(textures) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "DeleteTextures"; }
+        float GetEstimatedCost() const override { return 0.01f * m_Count; }
+
+    private:
+        uint32_t m_Count;
+        const uint32_t* m_Textures;
+    };
+
+    /**
+     * @brief Bind a texture to a target (e.g., GL_TEXTURE_2D)
+     */
+    class BindTextureTargetCommand : public RenderCommand
+    {
+    public:
+        BindTextureTargetCommand(uint32_t target, uint32_t texture)
+            : m_Target(target), m_Texture(texture) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "BindTextureTarget"; }
+        float GetEstimatedCost() const override { return 0.01f; }
+
+    private:
+        uint32_t m_Target;
+        uint32_t m_Texture;
+    };
+
+    /**
+     * @brief Upload a 2D texture image
+     */
+    class TexImage2DCommand : public RenderCommand
+    {
+    public:
+        using ByteVector = std::vector<uint8_t>;
+
+        TexImage2DCommand(uint32_t target,
+                          int32_t level,
+                          uint32_t internalFormat,
+                          uint32_t width,
+                          uint32_t height,
+                          uint32_t format,
+                          uint32_t type,
+                          std::shared_ptr<ByteVector> payload)
+            : m_Target(target), m_Level(level), m_InternalFormat(internalFormat),
+              m_Width(width), m_Height(height), m_Format(format), m_Type(type),
+              m_Payload(std::move(payload)) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "TexImage2D"; }
+        float GetEstimatedCost() const override { return static_cast<float>(m_Width) * static_cast<float>(m_Height) * 1e-6f; }
+
+    private:
+        uint32_t m_Target;
+        int32_t m_Level;
+        uint32_t m_InternalFormat;
+        uint32_t m_Width;
+        uint32_t m_Height;
+        uint32_t m_Format;
+        uint32_t m_Type;
+        std::shared_ptr<ByteVector> m_Payload;
+    };
+
+    /**
+     * @brief Set integer texture parameter
+     */
+    class TexParameteriCommand : public RenderCommand
+    {
+    public:
+        TexParameteriCommand(uint32_t target, uint32_t pname, int32_t param)
+            : m_Target(target), m_PName(pname), m_Param(param) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "TexParameteri"; }
+        float GetEstimatedCost() const override { return 0.005f; }
+
+    private:
+        uint32_t m_Target;
+        uint32_t m_PName;
+        int32_t m_Param;
+    };
+
+    /**
+     * @brief Generate mipmaps for a texture target
+     */
+    class GenerateMipmapCommand : public RenderCommand
+    {
+    public:
+        explicit GenerateMipmapCommand(uint32_t target)
+            : m_Target(target) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "GenerateMipmap"; }
+        float GetEstimatedCost() const override { return 0.05f; }
+
+    private:
+        uint32_t m_Target;
+    };
 }

@@ -48,6 +48,16 @@ namespace Vortex
         Result<void> BindTexture(uint32_t slot, uint32_t texture, uint32_t sampler) override;
         Result<void> BindVertexArray(uint32_t vao) override;
 
+        // Textures
+        Result<void> GenTextures(uint32_t count, uint32_t* outTextures) override;
+        Result<void> DeleteTextures(uint32_t count, const uint32_t* textures) override;
+        Result<void> BindTextureTarget(uint32_t target, uint32_t texture) override;
+        Result<void> TexImage2D(uint32_t target, int32_t level, uint32_t internalFormat,
+                                uint32_t width, uint32_t height, uint32_t format, uint32_t type,
+                                const void* data) override;
+        Result<void> TexParameteri(uint32_t target, uint32_t pname, int32_t param) override;
+        Result<void> GenerateMipmap(uint32_t target) override;
+
         // Generic buffer and vertex attrib
         Result<void> BindBuffer(uint32_t target, uint32_t buffer) override;
         Result<void> BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage) override;

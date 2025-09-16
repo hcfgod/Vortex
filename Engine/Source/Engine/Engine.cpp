@@ -173,24 +173,24 @@ namespace Vortex
 			return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register EventSystem");
 		}
 
-		// Register AssetSystem (Core priority) BEFORE RenderSystem so that on shutdown
-		// AssetSystem is torn down first and RenderSystem (and its command queue) last.
-		{
-			auto* assetSystem = m_SystemManager.RegisterSystem<AssetSystem>();
-			if (!assetSystem)
-			{
-				VX_CORE_ERROR("Failed to register AssetSystem");
-				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register AssetSystem");
-			}
-		}
-
-		// Register RenderSystem (Core priority)
+		// Register RenderSystem (Core priority) BEFORE AssetSystem so that on shutdown
+		// AssetSystem is torn down first while the RenderSystem (and its command queue) stays alive.
 		{
 			auto* renderSystem = m_SystemManager.RegisterSystem<RenderSystem>();
 			if (!renderSystem)
 			{
 				VX_CORE_ERROR("Failed to register RenderSystem");
 				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register RenderSystem");
+			}
+		}
+
+		// Register AssetSystem (Core priority)
+		{
+			auto* assetSystem = m_SystemManager.RegisterSystem<AssetSystem>();
+			if (!assetSystem)
+			{
+				VX_CORE_ERROR("Failed to register AssetSystem");
+				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register AssetSystem");
 			}
 		}
 
