@@ -59,6 +59,7 @@ namespace Vortex
         // Try to detect repository-level Assets directory for development hot reload
         m_DevAssetsAvailable = false;
         m_DevAssetsRoot.clear();
+#if !defined(VX_DIST)
         try
         {
             namespace fs = std::filesystem;
@@ -85,6 +86,7 @@ namespace Vortex
         {
             VX_CORE_WARN("AssetSystem: Dev assets detection failed: {}", e.what());
         }
+#endif
 
         // Attempt to load packaged asset pack next to executable (Assets.vxpack)
         try
@@ -371,7 +373,7 @@ namespace Vortex
             return FindFirstFileRecursive(root, p.filename().string());
         }
 
-        static const char* exts[] = { "png", "jpg", "jpeg", "bmp", "tga", "ktx", "dds" };
+        static const char* exts[] = { "png", "jpg", "jpeg", "bmp", "tga", "ktx", "dds", "rgba" };
         for (const char* ext : exts)
         {
             std::string candidate = baseNameOrFile + "." + ext;
@@ -644,13 +646,49 @@ namespace Vortex
                     }
                     if (!key.empty())
                     {
-                        // Try typical locations if not already rooted
-                        if (!m_AssetPack.Read(key, packedBytes))
+                        // Build a small list of candidate keys to try in the pack
+                        std::vector<std::string> candidates;
+                        candidates.emplace_back(key);
                         {
-                            std::string alt1 = std::string("Textures/") + std::filesystem::path(key).filename().string();
-                            std::string alt2 = std::filesystem::path(key).filename().string();
-                            if (!m_AssetPack.Read(alt1, packedBytes))
-                                m_AssetPack.Read(alt2, packedBytes);
+                            std::string fname = fs::path(key).filename().generic_string();
+                            candidates.emplace_back(std::string("Textures/") + fname);
+                            candidates.emplace_back(fname);
+                        }
+
+                        // Try direct reads first
+                        for (const auto& k : candidates)
+                        {
+                            if (m_AssetPack.Read(k, packedBytes) && !packedBytes.empty())
+                                break;
+                        }
+
+                        // If not found and the key has no extension, try common image extensions
+                        if (packedBytes.empty())
+                        {
+                            static const char* kExts[] = { "png", "jpg", "jpeg", "bmp", "tga", "ktx", "dds" };
+                            fs::path keyPath(key);
+                            const bool hasExt = keyPath.has_extension();
+                            if (!hasExt)
+                            {
+                                std::string dir = keyPath.has_parent_path() ? keyPath.parent_path().generic_string() : std::string();
+                                std::string base = keyPath.filename().generic_string();
+                                for (const char* ext : kExts)
+                                {
+                                    std::vector<std::string> extCandidates;
+                                    if (!dir.empty())
+                                        extCandidates.emplace_back(dir + "/" + base + "." + ext);
+                                    extCandidates.emplace_back(std::string("Textures/") + base + "." + ext);
+                                    extCandidates.emplace_back(base + "." + ext);
+
+                                    for (const auto& k : extCandidates)
+                                    {
+                                        if (m_AssetPack.Read(k, packedBytes) && !packedBytes.empty())
+                                            break;
+                                    }
+                                    if (!packedBytes.empty())
+                                        break;
+                                }
+                            }
                         }
                         if (!packedBytes.empty())
                         {
@@ -896,7 +934,7 @@ namespace Vortex
                 {
                     auto ext = p.path().extension().string();
                     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tga")
+                    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tga" || ext == ".ktx" || ext == ".dds" || ext == ".rgba")
                     {
                         auto rel = fs::relative(p.path(), assetsRoot, ec).generic_string();
                         writer.AddFile(rel, p.path());
