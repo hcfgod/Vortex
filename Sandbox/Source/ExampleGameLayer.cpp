@@ -34,6 +34,7 @@ void ExampleGameLayer::OnAttach()
         VX_ERROR("AssetSystem not available!");
         return;
 	}
+    m_AssetSystem->SetWorkingDirectory(std::filesystem::current_path());
     
     SetupInputActions();
     

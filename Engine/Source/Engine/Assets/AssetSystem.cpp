@@ -39,6 +39,23 @@ namespace Vortex
         else
             m_AssetsRoot = std::filesystem::path("Assets");
 
+        // If no Assets directory exists and no pack is present, generate minimal defaults
+        try
+        {
+            namespace fs = std::filesystem;
+            std::error_code ec;
+            fs::path packCandidate = m_AssetsRoot.parent_path() / "Assets.vxpack";
+            bool haveAssetsDir = fs::exists(m_AssetsRoot, ec) && fs::is_directory(m_AssetsRoot, ec);
+            bool havePack = fs::exists(packCandidate, ec) && fs::is_regular_file(packCandidate, ec);
+            if (!haveAssetsDir && !havePack)
+            {
+                GenerateDefaultAssetsOnDisk(m_AssetsRoot);
+            }
+        }
+        catch (...)
+        {
+        }
+
         // Try to detect repository-level Assets directory for development hot reload
         m_DevAssetsAvailable = false;
         m_DevAssetsRoot.clear();
@@ -95,6 +112,97 @@ namespace Vortex
         VX_CORE_INFO("AssetSystem initialized. AssetsRoot: {}", m_AssetsRoot.string());
         MarkInitialized();
         return Result<void>();
+    }
+
+    void AssetSystem::SetWorkingDirectory(const std::filesystem::path& dir)
+    {
+        namespace fs = std::filesystem;
+        m_AssetsRoot = dir / "Assets";
+        m_AssetPackPath = dir / "Assets.vxpack";
+        std::error_code ec;
+        if (!fs::exists(m_AssetsRoot, ec) && !fs::exists(m_AssetPackPath, ec))
+        {
+            GenerateDefaultAssetsOnDisk(m_AssetsRoot);
+        }
+
+        // Reload pack if present
+        try
+        {
+            if (fs::exists(m_AssetPackPath, ec))
+            {
+                m_AssetPackAvailable = m_AssetPack.Load(m_AssetPackPath);
+            }
+        }
+        catch (...) {}
+    }
+
+    void AssetSystem::GenerateDefaultAssetsOnDisk(const std::filesystem::path& outAssetsRoot)
+    {
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        fs::create_directories(outAssetsRoot / "Shaders", ec);
+        fs::create_directories(outAssetsRoot / "Textures", ec);
+
+        // Write default shader sources and manifest
+        // Basic passthrough matching our EnsureFallbackShader uniforms and attributes
+        const char* vs = 
+        R"(#version 450 core
+            layout(location = 0) in vec3 aPos;
+            layout(location = 1) in vec2 aUV;
+            layout(location = 2) in vec3 aNormal;
+            layout(location = 3) in vec3 aTangent;
+            layout(location = 0) uniform mat4 u_ViewProjection;
+            layout(location = 4) uniform mat4 u_Model;
+            void main(){ gl_Position = u_ViewProjection * u_Model * vec4(aPos,1.0); }
+            )";
+            const char* fsSrc = R"(#version 450 core
+            layout(location = 0) out vec4 FragColor;
+            layout(location = 8) uniform vec4 u_Color;
+            void main(){ FragColor = u_Color; }
+        )";
+
+        try
+        {
+            std::ofstream vso(outAssetsRoot / "Shaders" / "Default.vert", std::ios::binary);
+            vso.write(vs, std::strlen(vs));
+            std::ofstream fso(outAssetsRoot / "Shaders" / "Default.frag", std::ios::binary);
+            fso.write(fsSrc, std::strlen(fsSrc));
+            std::ofstream mo(outAssetsRoot / "Shaders" / "Default.json", std::ios::binary);
+            const char* manifest = 
+            R"({
+                "name": "Default",
+                "vertex": "Shaders/Default.vert",
+                "fragment": "Shaders/Default.frag",
+                "options": { "TargetProfile": "opengl" }
+            })";
+                
+            mo.write(manifest, std::strlen(manifest));
+        }
+        catch (...) {}
+
+        // Write a tiny checker texture (procedurally generated)
+        try
+        {
+            const int w = 64, h = 64, check = 8;
+            std::vector<unsigned char> pixels(w * h * 4);
+            for (int y = 0; y < h; ++y)
+            {
+                for (int x = 0; x < w; ++x)
+                {
+                    bool c = ((x / check) % 2) ^ ((y / check) % 2);
+                    unsigned char v = c ? 255 : 50;
+                    size_t idx = (static_cast<size_t>(y) * w + x) * 4ull;
+                    pixels[idx+0] = v;
+                    pixels[idx+1] = v;
+                    pixels[idx+2] = v;
+                    pixels[idx+3] = 255;
+                }
+            }
+            // Write as raw .rgba to avoid additional encoders; loader path reads via stb anyway
+            std::ofstream to(outAssetsRoot / "Textures" / "Checker.rgba", std::ios::binary);
+            to.write(reinterpret_cast<const char*>(pixels.data()), pixels.size());
+        }
+        catch (...) {}
     }
 
     Result<void> AssetSystem::Update()
@@ -751,13 +859,7 @@ namespace Vortex
         // Optionally precompile shaders to Assets/Cache/Shaders
         fs::path shadersDir = assetsRoot / "Shaders";
         fs::path cacheDir   = assetsRoot / "Cache" / "Shaders";
-        // In Dist builds we expect precompiled shaders in the pack; skip precompile
-        #if defined(VX_DIST)
-            bool allowPrecompile = false;
-        #else
-            bool allowPrecompile = true;
-        #endif
-        if (options.PrecompileShaders && allowPrecompile && fs::exists(shadersDir, ec))
+        if (options.PrecompileShaders && fs::exists(shadersDir, ec))
         {
             fs::create_directories(cacheDir, ec);
             // Scan for vertex shaders and pair with fragment

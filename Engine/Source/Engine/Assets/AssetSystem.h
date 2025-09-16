@@ -83,6 +83,8 @@ namespace Vortex
         // Assets root directory (default resolves to Assets next to exe)
         void SetAssetsRoot(const std::filesystem::path& root);
         std::filesystem::path GetAssetsRoot() const { return m_AssetsRoot; }
+        // Optionally set working directory: adjusts Assets root and pack path to be under dir
+        void SetWorkingDirectory(const std::filesystem::path& dir);
 
         // Name and UUID lookup
         template<typename T>
@@ -129,6 +131,8 @@ namespace Vortex
         Result<std::filesystem::path> BuildAssetsPack(const BuildAssetsOptions& options = {});
 
     private:
+        // Generate a minimal default Assets layout on disk when no assets are found
+        void GenerateDefaultAssetsOnDisk(const std::filesystem::path& outAssetsRoot);
         struct ShaderSourceInfo
         {
             std::string VertexPath;
