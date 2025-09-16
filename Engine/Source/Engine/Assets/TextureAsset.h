@@ -22,5 +22,3 @@ namespace Vortex
 
     using TextureAssetRef = std::shared_ptr<TextureAsset>;
 }
-
-

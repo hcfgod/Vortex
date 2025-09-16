@@ -26,6 +26,46 @@ namespace Vortex
         std::string FragmentPath;
     };
 
+    struct TextureLoadOptions
+    {
+        int DesiredChannels = 4;  // 0=auto, 1=grayscale, 2=grayscale+alpha, 3=RGB, 4=RGBA
+        bool FlipVertically = true;  // Whether to flip texture vertically on load
+        TextureFormat Format = TextureFormat::RGBA8;  // Target GPU format
+        
+        // Default constructor provides sensible defaults
+        TextureLoadOptions() = default;
+        
+        // Convenience constructors for common use cases
+        static TextureLoadOptions LoadRGBA() { 
+            TextureLoadOptions opts;
+            opts.DesiredChannels = 4;
+            opts.FlipVertically = true;
+            opts.Format = TextureFormat::RGBA8;
+            return opts;
+        }
+        static TextureLoadOptions LoadRGB() { 
+            TextureLoadOptions opts;
+            opts.DesiredChannels = 3;
+            opts.FlipVertically = true;
+            opts.Format = TextureFormat::RGB8;
+            return opts;
+        }
+        static TextureLoadOptions LoadGrayscale() { 
+            TextureLoadOptions opts;
+            opts.DesiredChannels = 1;
+            opts.FlipVertically = true;
+            opts.Format = TextureFormat::RGB8;
+            return opts;
+        }
+        static TextureLoadOptions LoadGrayscaleAlpha() { 
+            TextureLoadOptions opts;
+            opts.DesiredChannels = 2;
+            opts.FlipVertically = true;
+            opts.Format = TextureFormat::RGBA8;
+            return opts;
+        }
+    };
+
     // Progress callback signature: 0..1
     using ProgressCallback = std::function<void(float)>;
 
@@ -69,6 +109,7 @@ namespace Vortex
         // Load texture (simple async loader with procedural fallback)
         AssetHandle<TextureAsset> LoadTextureAsync(const std::string& name,
             const std::string& filePath,
+            const TextureLoadOptions& options = {},
             ProgressCallback onProgress = {});
 
         // Ref management used by AssetHandle (friend)
@@ -218,7 +259,7 @@ namespace Vortex
         // 0) Absolute path provided
         if (p.is_absolute())
         {
-            return LoadTextureAsync(p.filename().string(), p.string(), std::move(onProgress));
+            return LoadTextureAsync(p.filename().string(), p.string(), {}, std::move(onProgress));
         }
 
         // 1) If name already includes subdirectories, try direct resolution first
@@ -228,12 +269,12 @@ namespace Vortex
             if (fs::exists(abs, ec))
             {
                 if (fs::is_regular_file(abs, ec))
-                    return LoadTextureAsync(p.filename().string(), abs.string(), std::move(onProgress));
+                    return LoadTextureAsync(p.filename().string(), abs.string(), {}, std::move(onProgress));
                 if (fs::is_directory(abs, ec))
                 {
                     fs::path found = FindTextureRecursive(abs, p.filename().string());
                     if (!found.empty())
-                        return LoadTextureAsync(found.filename().string(), found.string(), std::move(onProgress));
+                        return LoadTextureAsync(found.filename().string(), found.string(), {}, std::move(onProgress));
                 }
             }
             if (m_DevAssetsAvailable)
@@ -242,12 +283,13 @@ namespace Vortex
                 if (fs::exists(absDev, ec))
                 {
                     if (fs::is_regular_file(absDev, ec))
-                        return LoadTextureAsync(p.filename().string(), absDev.string(), std::move(onProgress));
+                        return LoadTextureAsync(p.filename().string(), absDev.string(), {}, std::move(onProgress));
+                    
                     if (fs::is_directory(absDev, ec))
                     {
                         fs::path found = FindTextureRecursive(absDev, p.filename().string());
                         if (!found.empty())
-                            return LoadTextureAsync(found.filename().string(), found.string(), std::move(onProgress));
+                            return LoadTextureAsync(found.filename().string(), found.string(), {}, std::move(onProgress));
                     }
                 }
             }
@@ -263,12 +305,12 @@ namespace Vortex
             if (fs::exists(c, ec))
             {
                 if (fs::is_regular_file(c, ec))
-                    return LoadTextureAsync(p.filename().string(), c.string(), std::move(onProgress));
+                    return LoadTextureAsync(p.filename().string(), c.string(), {}, std::move(onProgress));
                 if (fs::is_directory(c, ec))
                 {
                     fs::path found = FindTextureRecursive(c, p.filename().string());
                     if (!found.empty())
-                        return LoadTextureAsync(found.filename().string(), found.string(), std::move(onProgress));
+                        return LoadTextureAsync(found.filename().string(), found.string(), {}, std::move(onProgress));
                 }
             }
         }
@@ -278,18 +320,18 @@ namespace Vortex
         {
             fs::path found = FindTextureRecursive(m_DevAssetsRoot, p.has_filename() ? p.filename().string() : name);
             if (!found.empty())
-                return LoadTextureAsync(found.filename().string(), found.string(), std::move(onProgress));
+                return LoadTextureAsync(found.filename().string(), found.string(), {}, std::move(onProgress));
         }
         {
             fs::path found = FindTextureRecursive(m_AssetsRoot, p.has_filename() ? p.filename().string() : name);
             if (!found.empty())
-                return LoadTextureAsync(found.filename().string(), found.string(), std::move(onProgress));
+                return LoadTextureAsync(found.filename().string(), found.string(), {}, std::move(onProgress));
         }
 
         // 4) Fall back to Assets/Textures/<name> (may trigger procedural fallback if missing)
         fs::path rel = fs::path("Textures") / p;
         fs::path abs = assetsRoot / rel;
-        return LoadTextureAsync(p.filename().string(), abs.string(), std::move(onProgress));
+        return LoadTextureAsync(p.filename().string(), abs.string(), {}, std::move(onProgress));
     }
 
     // ShaderAsset specialization

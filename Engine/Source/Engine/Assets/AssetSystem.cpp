@@ -410,6 +410,7 @@ namespace Vortex
 
     AssetHandle<TextureAsset> AssetSystem::LoadTextureAsync(const std::string& name,
         const std::string& filePath,
+        const TextureLoadOptions& options,
         ProgressCallback onProgress)
     {
         VX_CORE_INFO("AssetSystem: Loading texture '{}' from '{}'", name, filePath);
@@ -419,8 +420,8 @@ namespace Vortex
         texAsset->SetProgress(0.0f);
         UUID id = RegisterAsset(texAsset);
 
-        // Load from disk using stb_image if available; fallback to procedural checkerboard
-        Task<void> task = [this, id, name, filePath, onProgress]() -> Task<void>
+        // Load from disk using stb_image if available; fallback to solid magenta error texture
+        Task<void> task = [this, id, name, filePath, options, onProgress]() -> Task<void>
         {
             auto setProgress = [&](float p)
             {
@@ -438,9 +439,9 @@ namespace Vortex
             std::vector<uint8_t> pixels;
 
             // Attempt to load using stb_image (path-based)
-            stbi_set_flip_vertically_on_load(1);
+            stbi_set_flip_vertically_on_load(options.FlipVertically ? 1 : 0);
             int w = 0, h = 0, comp = 0;
-            unsigned char* data = stbi_load(filePath.c_str(), &w, &h, &comp, 4);
+            unsigned char* data = stbi_load(filePath.c_str(), &w, &h, &comp, options.DesiredChannels);
             if (!data || w <= 0 || h <= 0)
             {
                 const char* reason = stbi_failure_reason();
@@ -464,7 +465,7 @@ namespace Vortex
                                 std::vector<unsigned char> fileBytes(static_cast<size_t>(fsize));
                                 fin.read(reinterpret_cast<char*>(fileBytes.data()), fsize);
                                 int mw = 0, mh = 0, mcomp = 0;
-                                unsigned char* mdata = stbi_load_from_memory(fileBytes.data(), static_cast<int>(fileBytes.size()), &mw, &mh, &mcomp, 4);
+                                unsigned char* mdata = stbi_load_from_memory(fileBytes.data(), static_cast<int>(fileBytes.size()), &mw, &mh, &mcomp, options.DesiredChannels);
                                 if (mdata && mw > 0 && mh > 0)
                                 {
                                     w = mw; h = mh; comp = 4; data = mdata;
@@ -488,9 +489,10 @@ namespace Vortex
             {
                 width = static_cast<uint32_t>(w);
                 height = static_cast<uint32_t>(h);
-                pixels.assign(data, data + (width * height * 4));
+                int actualChannels = options.DesiredChannels > 0 ? options.DesiredChannels : comp;
+                pixels.assign(data, data + (width * height * actualChannels));
                 stbi_image_free(data);
-                VX_CORE_INFO("AssetSystem: Loaded image for '{}' ({}x{}, channels=4)", name, width, height);
+                VX_CORE_INFO("AssetSystem: Loaded image for '{}' ({}x{}, channels={})", name, width, height, actualChannels);
             }
             else
             {
@@ -521,7 +523,7 @@ namespace Vortex
             Texture2D::CreateInfo ci{};
             ci.Width = width;
             ci.Height = height;
-            ci.Format = TextureFormat::RGBA8;
+            ci.Format = options.Format;
             ci.MinFilter = TextureFilter::Linear;
             ci.MagFilter = TextureFilter::Linear;
             ci.WrapS = TextureWrap::Repeat;
