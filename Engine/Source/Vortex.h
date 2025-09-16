@@ -64,6 +64,25 @@
 #include "Engine/Assets/TextureAsset.h"
 #include "Engine/Assets/AssetSystem.h"
 
+// Convenience engine-wide accessors for clients
+namespace Vortex
+{
+    inline Application* App() { return Application::Get(); }
+
+    inline Engine* Eng()
+    {
+        auto* a = Application::Get();
+        return a ? a->GetEngine() : nullptr;
+    }
+
+    template<typename T>
+    inline T* Sys()
+    {
+        auto* e = Eng();
+        return e ? e->GetSystem<T>() : nullptr;
+    }
+}
+
 // ---Entry Point---------------------
 // Only include EntryPoint when VX_IMPLEMENT_MAIN is defined
 // This prevents multiple main() function definitions

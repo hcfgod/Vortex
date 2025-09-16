@@ -26,6 +26,12 @@ namespace Vortex
 		/// </summary>
 		SystemManager& GetSystemManager() { return m_SystemManager; }
 		const SystemManager& GetSystemManager() const { return m_SystemManager; }
+
+		// Convenience typed system accessors
+		template<typename T>
+		T* GetSystem() { return m_SystemManager.GetSystem<T>(); }
+		template<typename T>
+		const T* GetSystem() const { return m_SystemManager.GetSystem<T>(); }
 	
 		// ===== Layer API (Engine manages LayerStack) =====
 		LayerStack& GetLayerStack() { return m_LayerStack; }

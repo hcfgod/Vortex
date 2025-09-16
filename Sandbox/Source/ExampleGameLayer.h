@@ -45,12 +45,7 @@ private:
     // Input action map
     std::shared_ptr<InputActionMap> m_GameplayActions;
 
-    // Cached system references for performance (using SmartRef for clean access)
-    SmartRef<Application> m_Application;
-    SmartRef<Engine> m_Engine;
-    SmartRef<SystemManager> m_SystemManager;
-    SmartRef<ShaderManager> m_ShaderManager;
-    bool m_SystemsInitialized = false;
+    // No engine/system caching fields; engine provides global helpers now
 
     // Asset-system managed handles
     AssetHandle<ShaderAsset> m_ShaderHandle;

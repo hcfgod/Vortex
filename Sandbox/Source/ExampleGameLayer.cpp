@@ -28,27 +28,12 @@ void ExampleGameLayer::OnAttach()
     VX_INFO("  - Mouse/Right Stick: Look around (Polling)");
     VX_INFO("  - PS5 Controller: Full support for buttons and sticks");
     
-    // Cache system references for performance (do this first!)
-    auto* app = Application::Get();
-    if (!app)
+    // Use engine-global helpers; no client caching needed
+    if (!App() || !Eng())
     {
-        VX_ERROR("Application instance not available!");
+        VX_ERROR("Application/Engine not available!");
         return;
     }
-    
-    auto* engine = app->GetEngine();
-    if (!engine)
-    {
-        VX_ERROR("Engine instance not available!");
-        return;
-    }
-    
-    // Initialize SmartRef wrappers for clean modern C++ access
-    m_Application.Reset(*app);
-    m_Engine.Reset(*engine);
-    m_SystemManager.Reset(engine->GetSystemManager());
-    m_ShaderManager.Reset(GetShaderManager());
-    m_SystemsInitialized = true;
     
     SetupInputActions();
     
@@ -56,16 +41,12 @@ void ExampleGameLayer::OnAttach()
     SetupShaderSystem();
 
     // Load a texture asset using generic loader (name-based)
-    if (m_SystemManager)
+    if (auto* assetSystem = Sys<AssetSystem>())
     {
-        auto* assetSystem = m_SystemManager->GetSystem<AssetSystem>();
-        if (assetSystem)
-        {
-            m_TextureHandle = assetSystem->LoadAsset<TextureAsset>(
-                "Checker",
-                [](float p){ VX_CORE_INFO("[AssetSystem] Texture loading progress: {:.1f}%", p * 100.0f); }
-            );
-        }
+        m_TextureHandle = assetSystem->LoadAsset<TextureAsset>(
+            "Checker",
+            [](float p){ VX_CORE_INFO("[AssetSystem] Texture loading progress: {:.1f}%", p * 100.0f); }
+        );
     }
 
     // Create VAO/VBO/EBO via high-level API
@@ -252,15 +233,10 @@ void ExampleGameLayer::OnUpdate()
 
 void ExampleGameLayer::OnRender()
 {
-    // Use cached ShaderManager reference for better performance
-    if (!m_SystemsInitialized)
-    {
-        VX_WARN("Systems not initialized properly!");
-        return;
-    }
+    if (!Eng()) return;
 
     // Bind shader through ShaderManager; if not ready or invalid, skip rendering this frame
-    if (auto shaderBindResult = m_ShaderManager->BindShader(m_ShaderHandle); !shaderBindResult.IsSuccess())
+    if (auto shaderBindResult = GetShaderManager().BindShader(m_ShaderHandle); !shaderBindResult.IsSuccess())
     {
         VX_WARN("Shader not ready: {}", shaderBindResult.GetErrorMessage());
         return;
@@ -277,17 +253,17 @@ void ExampleGameLayer::OnRender()
         // Animation disabled; time not used
         
         // === Matrix uniforms (required by advanced shader) ===
-        m_ShaderManager->SetUniform("u_ViewProjection", viewProjection);
-        m_ShaderManager->SetUniform("u_View", view);
-        m_ShaderManager->SetUniform("u_Model", model);
-        m_ShaderManager->SetUniform("u_NormalMatrix", normalMatrix);
+        GetShaderManager().SetUniform("u_ViewProjection", viewProjection);
+        GetShaderManager().SetUniform("u_View", view);
+        GetShaderManager().SetUniform("u_Model", model);
+        GetShaderManager().SetUniform("u_NormalMatrix", normalMatrix);
         
         // === Animation and time ===
         // No time uniform set; shader ignores u_Time
         
         // === Camera position ===
         glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
-        m_ShaderManager->SetUniform("u_CameraPos", cameraPos);
+        GetShaderManager().SetUniform("u_CameraPos", cameraPos);
         
         // === Material properties ===
         // Use albedo texture if loaded, otherwise solid color
@@ -299,53 +275,53 @@ void ExampleGameLayer::OnRender()
             {
                 // Bind texture on render thread via command queue, then set sampler uniforms
                 tex->GetTexture()->Bind(0);
-                m_ShaderManager->SetTexture("u_AlbedoTexture", tex->GetTexture()->GetRendererID(), 0);
-                m_ShaderManager->SetUniform("u_AlbedoTexture", 0);
-                m_ShaderManager->SetUniform("u_UseAlbedoTexture", 1);
+                GetShaderManager().SetTexture("u_AlbedoTexture", tex->GetTexture()->GetRendererID(), 0);
+                GetShaderManager().SetUniform("u_AlbedoTexture", 0);
+                GetShaderManager().SetUniform("u_UseAlbedoTexture", 1);
             }
             else
             {
-                m_ShaderManager->SetUniform("u_UseAlbedoTexture", 0);
+                GetShaderManager().SetUniform("u_UseAlbedoTexture", 0);
             }
         }
         else
         {
-            m_ShaderManager->SetUniform("u_UseAlbedoTexture", 0);
+            GetShaderManager().SetUniform("u_UseAlbedoTexture", 0);
         }
 
         glm::vec3 albedo(0.9f, 0.9f, 0.9f); // base color when multiplied with texture
-        m_ShaderManager->SetUniform("u_Albedo", albedo);
-        m_ShaderManager->SetUniform("u_Metallic", 0.2f);
-        m_ShaderManager->SetUniform("u_Roughness", 0.4f);
-        m_ShaderManager->SetUniform("u_AO", 1.0f);
-        m_ShaderManager->SetUniform("u_Alpha", 1.0f);
+        GetShaderManager().SetUniform("u_Albedo", albedo);
+        GetShaderManager().SetUniform("u_Metallic", 0.2f);
+        GetShaderManager().SetUniform("u_Roughness", 0.4f);
+        GetShaderManager().SetUniform("u_AO", 1.0f);
+        GetShaderManager().SetUniform("u_Alpha", 1.0f);
         
         // Disable emission for solid color
-        m_ShaderManager->SetUniform("u_Emission", glm::vec3(0.0f));
+        GetShaderManager().SetUniform("u_Emission", glm::vec3(0.0f));
         
         // === Lighting ===
         glm::vec3 lightPos(2.0f, 2.0f, 2.0f);
         glm::vec3 lightColor(1.0f, 1.0f, 0.9f); // Warm white
-        m_ShaderManager->SetUniform("u_LightPosition", lightPos);
-        m_ShaderManager->SetUniform("u_LightColor", lightColor);
-        m_ShaderManager->SetUniform("u_LightIntensity", 10.0f);
+        GetShaderManager().SetUniform("u_LightPosition", lightPos);
+        GetShaderManager().SetUniform("u_LightColor", lightColor);
+        GetShaderManager().SetUniform("u_LightIntensity", 10.0f);
         
         // === Transform uniforms for vertex animation ===
         glm::vec3 translation(0.0f, 0.0f, 0.0f);
         glm::vec3 rotation(0.0f, 0.0f, 0.0f); // No rotation animation
         glm::vec3 scale(1.0f, 1.0f, 1.0f);
-        m_ShaderManager->SetUniform("u_Translation", translation);
-        m_ShaderManager->SetUniform("u_Rotation", rotation);
-        m_ShaderManager->SetUniform("u_Scale", scale);
+        GetShaderManager().SetUniform("u_Translation", translation);
+        GetShaderManager().SetUniform("u_Rotation", rotation);
+        GetShaderManager().SetUniform("u_Scale", scale);
         
         // === Wind animation parameters ===
         // Wind effect disabled; no wind uniforms set
 
         // === Rim lighting effect ===
-        m_ShaderManager->SetUniform("u_RimPower", 2.0f);
+        GetShaderManager().SetUniform("u_RimPower", 2.0f);
         glm::vec3 rimColor(0.2f, 0.4f, 1.0f); // Blue rim
-        m_ShaderManager->SetUniform("u_RimColor", rimColor);
-        m_ShaderManager->SetUniform("u_FresnelStrength", 0.3f);
+        GetShaderManager().SetUniform("u_RimColor", rimColor);
+        GetShaderManager().SetUniform("u_FresnelStrength", 0.3f);
         
         // Bind VAO and draw
         GetRenderCommandQueue().BindVertexArray(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(nullptr))); // no-op to ensure context
@@ -355,7 +331,7 @@ void ExampleGameLayer::OnRender()
     }
 
     // Unbind shader through ShaderManager
-    m_ShaderManager->UnbindShader();
+    GetShaderManager().UnbindShader();
 }
 
 bool ExampleGameLayer::OnEvent(Event& event)
@@ -371,13 +347,9 @@ void ExampleGameLayer::SetupShaderSystem()
 
     try
     {
-        if (!m_SystemsInitialized)
-        {
-            VX_ERROR("[ShaderSystem] Systems not initialized properly");
-            return;
-        }
+        if (!Eng()) return;
 
-        auto* assetSystem = m_SystemManager->GetSystem<AssetSystem>();
+        auto* assetSystem = Sys<AssetSystem>();
         m_ShaderLoading = true;
         m_ShaderProgress = 0.0f;
         if (!assetSystem)
@@ -400,7 +372,7 @@ void ExampleGameLayer::SetupShaderSystem()
                     VX_CORE_INFO("[AssetSystem] Shader loading completed!");
                     m_ShaderLoading = false;
                 }
-                m_Application->GetWindow()->SetTitle(title);
+                App()->GetWindow()->SetTitle(title);
             }
         );
     }
@@ -412,14 +384,9 @@ void ExampleGameLayer::SetupShaderSystem()
 
 void ExampleGameLayer::SetupInputActions()
 {
-    // Use cached system references
-    if (!m_SystemsInitialized)
-    {
-        VX_WARN("System references not cached properly for ExampleGameLayer");
-        return;
-    }
+    if (!Eng()) return;
     
-    auto* inputSystem = m_SystemManager->GetSystem<InputSystem>();
+    auto* inputSystem = Sys<InputSystem>();
     if (!inputSystem)
     {
         VX_WARN("InputSystem not available for ExampleGameLayer");
