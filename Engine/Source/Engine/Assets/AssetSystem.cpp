@@ -751,7 +751,13 @@ namespace Vortex
         // Optionally precompile shaders to Assets/Cache/Shaders
         fs::path shadersDir = assetsRoot / "Shaders";
         fs::path cacheDir   = assetsRoot / "Cache" / "Shaders";
-        if (options.PrecompileShaders && fs::exists(shadersDir, ec))
+        // In Dist builds we expect precompiled shaders in the pack; skip precompile
+        #if defined(VX_DIST)
+            bool allowPrecompile = false;
+        #else
+            bool allowPrecompile = true;
+        #endif
+        if (options.PrecompileShaders && allowPrecompile && fs::exists(shadersDir, ec))
         {
             fs::create_directories(cacheDir, ec);
             // Scan for vertex shaders and pair with fragment
@@ -817,7 +823,7 @@ namespace Vortex
             }
         }
 
-        // Pack precompiled SPIR-V cache
+        // Pack precompiled SPIR-V cache (skip in Dist if you choose to ship only the pack's Cache/)
         if (fs::exists(cacheDir, ec) && fs::is_directory(cacheDir, ec))
         {
             for (auto& p : fs::recursive_directory_iterator(cacheDir, ec))
@@ -858,12 +864,18 @@ namespace Vortex
         setProgress(0.05f);
 
         ShaderCompiler compiler;
+#if defined(VX_DIST)
+        // In distribution builds, do not create on-disk cache directories
+        compiler.SetCachingEnabled(false);
+#else
         // Keep caching enabled so reloads update on-disk cache with fresh SPIR-V
         compiler.SetCachingEnabled(true, (m_AssetsRoot / "Cache/Shaders").string());
+#endif
 
         setProgress(0.10f);
 
-        // Try using precompiled SPIR-V from asset pack: Cache/Shaders/<name>.(vert|frag).spv
+        // Try using precompiled SPIR-V from asset pack: prefer manifest mapping when available,
+        // else attempt conventional Cache/Shaders/<name>.(vert|frag).spv
         if (m_AssetPackAvailable)
         {
             std::vector<uint8_t> vsBytesRaw, fsBytesRaw;
@@ -917,6 +929,68 @@ namespace Vortex
                 }
             }
         }
+
+        // If running a Dist build and no precompiled SPIR-V was found in the asset pack,
+        // try to load via manifest from pack; if still not found, use fallback instead of compiling.
+#if defined(VX_DIST)
+        if (m_AssetPackAvailable)
+        {
+            // Attempt to load a manifest directly from the pack and enqueue again
+            try
+            {
+                using json = nlohmann::json;
+                std::vector<uint8_t> manifestBytes;
+                std::string manifestKey = std::string("Shaders/") + name + ".json";
+                if (m_AssetPack.Read(manifestKey, manifestBytes))
+                {
+                    json j = json::parse(manifestBytes.begin(), manifestBytes.end());
+                    std::string vertRel = j.value("vertex", std::string{});
+                    std::string fragRel = j.value("fragment", std::string{});
+                    if (!vertRel.empty() && !fragRel.empty())
+                    {
+                        // Try again: LoadShader will re-enter CompileShaderTask; pack path will be tried first next time
+                        auto h = LoadShader(name, vertRel, fragRel, options, {});
+                        (void)h;
+                    }
+                }
+            }
+            catch (...) {}
+
+            // Already attempted pack above; if it failed, use fallback
+            VX_CORE_WARN("AssetSystem: Dist build: missing precompiled shader '{}' in asset pack. Using fallback shader.", name);
+            EnsureFallbackShader();
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                auto it = m_Assets.find(id);
+                if (it != m_Assets.end())
+                {
+                    auto* shaderAsset = dynamic_cast<ShaderAsset*>(it->second.assetPtr.get());
+                    if (shaderAsset && m_FallbackShader && m_FallbackShader->IsValid())
+                    {
+                        shaderAsset->SetShader(m_FallbackShader);
+                        shaderAsset->SetReflection({});
+                        shaderAsset->SetIsFallback(true);
+                        shaderAsset->SetState(AssetState::Loaded);
+                        shaderAsset->SetProgress(1.0f);
+                        m_ShaderReloading.erase(id);
+                        co_return;
+                    }
+                }
+            }
+            // No fallback available; mark failed
+            {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                auto it = m_Assets.find(id);
+                if (it != m_Assets.end())
+                {
+                    it->second.assetPtr->SetState(AssetState::Failed);
+                    it->second.assetPtr->SetProgress(1.0f);
+                }
+            }
+            m_ShaderReloading.erase(id);
+            co_return;
+        }
+#endif
 
         // Resolve relative paths against AssetsRoot for robustness
         std::string resolvedVS = vertexPath;

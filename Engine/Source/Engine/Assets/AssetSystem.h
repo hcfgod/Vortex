@@ -370,6 +370,18 @@ namespace Vortex
         }
         std::error_code ec;
 
+        // 0) If asset pack contains a manifest, prefer it immediately
+        if (m_AssetPackAvailable)
+        {
+            namespace fs = std::filesystem;
+            fs::path manifestRel = fs::path("Shaders") / (name + ".json");
+            // LoadShaderFromManifest can read directly from pack when given a relative path
+            if (m_AssetPack.Exists(manifestRel.generic_string()))
+            {
+                return LoadShaderFromManifest(manifestRel.generic_string(), options, std::move(onProgress));
+            }
+        }
+
         // 1) Prefer manifest if available directly in conventional Shaders/ folder
         fs::path manifestRel = fs::path("Shaders") / (name + ".json");
         fs::path manifestAbs = m_DevAssetsAvailable ? (m_DevAssetsRoot / manifestRel) : (m_AssetsRoot / manifestRel);
@@ -379,10 +391,18 @@ namespace Vortex
         }
 
         // 2) Otherwise try conventional VS/FS filenames directly in Shaders/
+        //    If asset pack is available and we are in Dist, prefer compiled SPIR-V from pack over source
         fs::path vsRel = fs::path("Shaders") / (name + ".vert");
         fs::path fsRel = fs::path("Shaders") / (name + ".frag");
         fs::path vsAbs = m_DevAssetsAvailable ? (m_DevAssetsRoot / vsRel) : (m_AssetsRoot / vsRel);
         fs::path fsAbs = m_DevAssetsAvailable ? (m_DevAssetsRoot / fsRel) : (m_AssetsRoot / fsRel);
+#if defined(VX_DIST)
+        if (m_AssetPackAvailable)
+        {
+            // Attempt to load precompiled SPIR-V in CompileShaderTask; here, just enqueue with names for book-keeping
+            return LoadShader(name, vsRel.generic_string(), fsRel.generic_string(), options, std::move(onProgress));
+        }
+#endif
         if (fs::exists(vsAbs, ec) && fs::exists(fsAbs, ec))
         {
             return LoadShader(name, vsAbs.string(), fsAbs.string(), options, std::move(onProgress));
