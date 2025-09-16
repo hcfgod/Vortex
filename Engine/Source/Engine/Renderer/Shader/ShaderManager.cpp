@@ -155,7 +155,7 @@ namespace Vortex
         // Interpret filePath as a manifest when it ends with .json
         if (filePath.size() >= 5 && filePath.substr(filePath.size() - 5) == ".json")
         {
-            auto handle = m_Impl->m_AssetSystem->LoadShaderFromManifestAsync(filePath, options);
+            auto handle = m_Impl->m_AssetSystem->LoadAsset<ShaderAsset>(name, [](float){});
             if (!handle.IsValid())
             {
                 return Result<AssetHandle<ShaderAsset>>(ErrorCode::InvalidParameter, "Failed to request shader manifest: " + filePath);
@@ -206,7 +206,7 @@ namespace Vortex
             return Result<AssetHandle<ShaderAsset>>(ErrorCode::InvalidParameter, "Vertex and Fragment paths required");
         }
 
-        auto handle = m_Impl->m_AssetSystem->LoadShaderAsync(name, vsIt->second, fsIt->second, options);
+        auto handle = m_Impl->m_AssetSystem->LoadAsset<ShaderAsset>(name, [](float){});
         if (!handle.IsValid())
         {
             return Result<AssetHandle<ShaderAsset>>(ErrorCode::InvalidParameter, "Failed to request shader program");

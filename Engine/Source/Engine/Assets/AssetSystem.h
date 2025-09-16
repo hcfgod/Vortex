@@ -95,22 +95,6 @@ namespace Vortex
         template<typename T>
         AssetHandle<T> LoadAssetByUUID(const UUID& id) { return GetByUUID<T>(id); }
 
-        // Legacy explicit loaders (kept for now; will be phased out)
-        // Load shader via simple manifest (json or direct guess)
-        AssetHandle<ShaderAsset> LoadShaderAsync(const std::string& name,
-            const std::string& vertexPath,
-            const std::string& fragmentPath,
-            const ShaderCompileOptions& options = {},
-            ProgressCallback onProgress = {});
-        AssetHandle<ShaderAsset> LoadShaderFromManifestAsync(const std::string& manifestPath,
-            const ShaderCompileOptions& defaultOptions = {},
-            ProgressCallback onProgress = {});
-
-        // Load texture (simple async loader with procedural fallback)
-        AssetHandle<TextureAsset> LoadTextureAsync(const std::string& name,
-            const std::string& filePath,
-            const TextureLoadOptions& options = {},
-            ProgressCallback onProgress = {});
 
         // Ref management used by AssetHandle (friend)
         void Acquire(const UUID& id);
@@ -207,6 +191,11 @@ namespace Vortex
         ShaderRef m_FallbackShader;
         bool m_FallbackInitialized = false;
         bool m_Initialized = false;
+
+        // Asset loading helpers
+        AssetHandle<ShaderAsset> LoadShader(const std::string& name, const std::string& vertexPath, const std::string& fragmentPath, const ShaderCompileOptions& options, ProgressCallback onProgress);
+        AssetHandle<ShaderAsset> LoadShaderFromManifest(const std::string& manifestPath, const ShaderCompileOptions& defaultOptions, ProgressCallback onProgress);
+        AssetHandle<TextureAsset> LoadTexture(const std::string& name, const std::string& filePath, const TextureLoadOptions& options, ProgressCallback onProgress);
     };
 
     // ===== Inline/template implementations =====
@@ -215,9 +204,11 @@ namespace Vortex
     AssetHandle<T> AssetSystem::GetByName(const std::string& name)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
+
         auto it = m_NameToUUID.find(name);
         if (it == m_NameToUUID.end())
             return {};
+
         return AssetHandle<T>(this, it->second);
     }
 
@@ -225,8 +216,10 @@ namespace Vortex
     T* AssetSystem::TryGet(const UUID& id)
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
+
         auto it = m_Assets.find(id);
         if (it == m_Assets.end()) return nullptr;
+
         return dynamic_cast<T*>(it->second.assetPtr.get());
     }
 
@@ -234,8 +227,10 @@ namespace Vortex
     const T* AssetSystem::TryGet(const UUID& id) const
     {
         std::lock_guard<std::mutex> lock(m_Mutex);
+
         auto it = m_Assets.find(id);
         if (it == m_Assets.end()) return nullptr;
+
         return dynamic_cast<const T*>(it->second.assetPtr.get());
     }
 
@@ -259,7 +254,7 @@ namespace Vortex
         // 0) Absolute path provided
         if (p.is_absolute())
         {
-            return LoadTextureAsync(p.filename().string(), p.string(), {}, std::move(onProgress));
+            return LoadTexture(p.filename().string(), p.string(), {}, std::move(onProgress));
         }
 
         // 1) If name already includes subdirectories, try direct resolution first
@@ -269,48 +264,51 @@ namespace Vortex
             if (fs::exists(abs, ec))
             {
                 if (fs::is_regular_file(abs, ec))
-                    return LoadTextureAsync(p.filename().string(), abs.string(), {}, std::move(onProgress));
+                    return LoadTexture(p.filename().string(), abs.string(), {}, std::move(onProgress));
                 if (fs::is_directory(abs, ec))
                 {
                     fs::path found = FindTextureRecursive(abs, p.filename().string());
                     if (!found.empty())
-                        return LoadTextureAsync(found.filename().string(), found.string(), {}, std::move(onProgress));
+                        return LoadTexture(found.filename().string(), found.string(), {}, std::move(onProgress));
                 }
             }
+
             if (m_DevAssetsAvailable)
             {
                 fs::path absDev = m_DevAssetsRoot / p;
                 if (fs::exists(absDev, ec))
                 {
                     if (fs::is_regular_file(absDev, ec))
-                        return LoadTextureAsync(p.filename().string(), absDev.string(), {}, std::move(onProgress));
+                        return LoadTexture(p.filename().string(), absDev.string(), {}, std::move(onProgress));
                     
                     if (fs::is_directory(absDev, ec))
                     {
                         fs::path found = FindTextureRecursive(absDev, p.filename().string());
                         if (!found.empty())
-                            return LoadTextureAsync(found.filename().string(), found.string(), {}, std::move(onProgress));
+                            return LoadTexture(found.filename().string(), found.string(), {}, std::move(onProgress));
                     }
                 }
             }
         }
 
         // 2) Try common direct locations under Assets
-        fs::path candidates[] = {
+        fs::path candidates[] = 
+        {
             assetsRoot / fs::path("Textures") / p,
             assetsRoot / p
         };
+
         for (const auto& c : candidates)
         {
             if (fs::exists(c, ec))
             {
                 if (fs::is_regular_file(c, ec))
-                    return LoadTextureAsync(p.filename().string(), c.string(), {}, std::move(onProgress));
+                    return LoadTexture(p.filename().string(), c.string(), {}, std::move(onProgress));
                 if (fs::is_directory(c, ec))
                 {
                     fs::path found = FindTextureRecursive(c, p.filename().string());
                     if (!found.empty())
-                        return LoadTextureAsync(found.filename().string(), found.string(), {}, std::move(onProgress));
+                        return LoadTexture(found.filename().string(), found.string(), {}, std::move(onProgress));
                 }
             }
         }
@@ -320,18 +318,19 @@ namespace Vortex
         {
             fs::path found = FindTextureRecursive(m_DevAssetsRoot, p.has_filename() ? p.filename().string() : name);
             if (!found.empty())
-                return LoadTextureAsync(found.filename().string(), found.string(), {}, std::move(onProgress));
+                return LoadTexture(found.filename().string(), found.string(), {}, std::move(onProgress));
         }
         {
             fs::path found = FindTextureRecursive(m_AssetsRoot, p.has_filename() ? p.filename().string() : name);
             if (!found.empty())
-                return LoadTextureAsync(found.filename().string(), found.string(), {}, std::move(onProgress));
+                return LoadTexture(found.filename().string(), found.string(), {}, std::move(onProgress));
         }
 
         // 4) Fall back to Assets/Textures/<name> (may trigger procedural fallback if missing)
         fs::path rel = fs::path("Textures") / p;
         fs::path abs = assetsRoot / rel;
-        return LoadTextureAsync(p.filename().string(), abs.string(), {}, std::move(onProgress));
+
+        return LoadTexture(p.filename().string(), abs.string(), {}, std::move(onProgress));
     }
 
     // ShaderAsset specialization
@@ -348,6 +347,7 @@ namespace Vortex
             case GraphicsAPI::DirectX11:
             case GraphicsAPI::DirectX12:
             case GraphicsAPI::Metal:
+
             default:                    options.TargetProfile = "opengl";      break; // fallback for now
         }
         std::error_code ec;
@@ -357,7 +357,7 @@ namespace Vortex
         fs::path manifestAbs = m_DevAssetsAvailable ? (m_DevAssetsRoot / manifestRel) : (m_AssetsRoot / manifestRel);
         if (fs::exists(manifestAbs, ec))
         {
-            return LoadShaderFromManifestAsync(manifestAbs.string(), options, std::move(onProgress));
+            return LoadShaderFromManifest(manifestAbs.string(), options, std::move(onProgress));
         }
 
         // 2) Otherwise try conventional VS/FS filenames directly in Shaders/
@@ -367,7 +367,7 @@ namespace Vortex
         fs::path fsAbs = m_DevAssetsAvailable ? (m_DevAssetsRoot / fsRel) : (m_AssetsRoot / fsRel);
         if (fs::exists(vsAbs, ec) && fs::exists(fsAbs, ec))
         {
-            return LoadShaderAsync(name, vsAbs.string(), fsAbs.string(), options, std::move(onProgress));
+            return LoadShader(name, vsAbs.string(), fsAbs.string(), options, std::move(onProgress));
         }
 
         // 3) If not found, recursively search under DevAssets first (when available), then packaged Assets
@@ -375,25 +375,25 @@ namespace Vortex
         {
             fs::path manifestFound = FindFirstFileRecursive(m_DevAssetsRoot, name + ".json");
             if (!manifestFound.empty())
-                return LoadShaderFromManifestAsync(manifestFound.string(), options, std::move(onProgress));
+                return LoadShaderFromManifest(manifestFound.string(), options, std::move(onProgress));
 
             fs::path vsFound, fsFound;
             if (FindShaderPairRecursive(m_DevAssetsRoot, name, vsFound, fsFound))
-                return LoadShaderAsync(name, vsFound.string(), fsFound.string(), options, std::move(onProgress));
+                return LoadShader(name, vsFound.string(), fsFound.string(), options, std::move(onProgress));
         }
 
         {
             fs::path manifestFound = FindFirstFileRecursive(m_AssetsRoot, name + ".json");
             if (!manifestFound.empty())
-                return LoadShaderFromManifestAsync(manifestFound.string(), options, std::move(onProgress));
+                return LoadShaderFromManifest(manifestFound.string(), options, std::move(onProgress));
 
             fs::path vsFound, fsFound;
             if (FindShaderPairRecursive(m_AssetsRoot, name, vsFound, fsFound))
-                return LoadShaderAsync(name, vsFound.string(), fsFound.string(), options, std::move(onProgress));
+                return LoadShader(name, vsFound.string(), fsFound.string(), options, std::move(onProgress));
         }
 
         // 4) As a last resort, point to conventional Shaders/<name> files (may fail and use fallback)
-        return LoadShaderAsync(name, vsAbs.string(), fsAbs.string(), options, std::move(onProgress));
+        return LoadShader(name, vsAbs.string(), fsAbs.string(), options, std::move(onProgress));
     }
 
     // AssetHandle inline method defs

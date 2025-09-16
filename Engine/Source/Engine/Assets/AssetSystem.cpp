@@ -321,11 +321,7 @@ namespace Vortex
         }
     }
 
-    AssetHandle<ShaderAsset> AssetSystem::LoadShaderAsync(const std::string& name,
-        const std::string& vertexPath,
-        const std::string& fragmentPath,
-        const ShaderCompileOptions& options,
-        ProgressCallback onProgress)
+    AssetHandle<ShaderAsset> AssetSystem::LoadShader(const std::string& name, const std::string& vertexPath, const std::string& fragmentPath, const ShaderCompileOptions& options, ProgressCallback onProgress)
     {
         // Create placeholder asset entry
         auto shaderAsset = std::make_shared<ShaderAsset>(name);
@@ -370,9 +366,7 @@ namespace Vortex
         return AssetHandle<ShaderAsset>(this, id);
     }
 
-    AssetHandle<ShaderAsset> AssetSystem::LoadShaderFromManifestAsync(const std::string& manifestPath,
-        const ShaderCompileOptions& defaultOptions,
-        ProgressCallback onProgress)
+    AssetHandle<ShaderAsset> AssetSystem::LoadShaderFromManifest(const std::string& manifestPath, const ShaderCompileOptions& defaultOptions, ProgressCallback onProgress)
     {
         // Read JSON manifest
         using json = nlohmann::json;
@@ -405,13 +399,10 @@ namespace Vortex
         // Resolve paths
         std::string vert = (m_AssetsRoot / manifest.VertexPath).string();
         std::string frag = (m_AssetsRoot / manifest.FragmentPath).string();
-        return LoadShaderAsync(manifest.Name, vert, frag, options, std::move(onProgress));
+        return LoadShader(manifest.Name, vert, frag, options, std::move(onProgress));
     }
 
-    AssetHandle<TextureAsset> AssetSystem::LoadTextureAsync(const std::string& name,
-        const std::string& filePath,
-        const TextureLoadOptions& options,
-        ProgressCallback onProgress)
+    AssetHandle<TextureAsset> AssetSystem::LoadTexture(const std::string& name, const std::string& filePath, const TextureLoadOptions& options, ProgressCallback onProgress)
     {
         VX_CORE_INFO("AssetSystem: Loading texture '{}' from '{}'", name, filePath);
         // Create placeholder asset
@@ -569,11 +560,7 @@ namespace Vortex
         return AssetHandle<TextureAsset>(this, id);
     }
 
-
-    Result<void> AssetSystem::BuildShader(const std::string& name,
-        const std::string& vertexPath,
-        const std::string& fragmentPath,
-        const std::filesystem::path& outputDir)
+    Result<void> AssetSystem::BuildShader(const std::string& name, const std::string& vertexPath, const std::string& fragmentPath, const std::filesystem::path& outputDir)
     {
         // Basic stub: compile and write SPIR-V blobs to outputDir for packaging
         ShaderCompiler compiler;
@@ -607,24 +594,20 @@ namespace Vortex
         return Result<void>();
     }
 
-    Task<void> AssetSystem::CompileShaderTask(UUID id,
-        std::string name,
-        std::string vertexPath,
-        std::string fragmentPath,
-        ShaderCompileOptions options,
-        ProgressCallback progress,
-        bool isReload)
+    Task<void> AssetSystem::CompileShaderTask(UUID id, std::string name, std::string vertexPath, std::string fragmentPath, ShaderCompileOptions options, ProgressCallback progress, bool isReload)
     {
         // Small staged progress model: 0.0-0.1 read, 0.1-0.8 compile, 0.8-1.0 create
-        auto setProgress = [&](float p) {
+        auto setProgress = [&](float p) 
+        {
             {
                 std::lock_guard<std::mutex> lock(m_Mutex);
                 auto it = m_Assets.find(id);
                 if (it != m_Assets.end())
                     it->second.assetPtr->SetProgress(p);
             }
+
             if (progress) progress(p);
-            };
+        };
 
         setProgress(0.05f);
 

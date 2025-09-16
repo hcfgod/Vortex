@@ -28,13 +28,6 @@ void ExampleGameLayer::OnAttach()
     VX_INFO("  - Mouse/Right Stick: Look around (Polling)");
     VX_INFO("  - PS5 Controller: Full support for buttons and sticks");
     
-    // Use engine-global helpers; no client caching needed
-    if (!GetApp() || !GetEngine())
-    {
-        VX_ERROR("Application/Engine not available!");
-        return;
-    }
-
 	m_AssetSystem = SysShared<AssetSystem>();
     if(!m_AssetSystem)
     {
@@ -48,10 +41,7 @@ void ExampleGameLayer::OnAttach()
     SetupShaderSystem();
 
     // Load a texture asset using generic loader (name-based)
-    m_TextureHandle = m_AssetSystem->LoadAsset<TextureAsset>(
-        "Checker",
-        [](float p) { VX_CORE_INFO("[AssetSystem] Texture loading progress: {:.1f}%", p * 100.0f); }
-    );
+    m_TextureHandle = m_AssetSystem->LoadAsset<TextureAsset>("Checker");
 
     // Create VAO/VBO/EBO via high-level API
     m_VertexArray = VertexArray::Create();
@@ -237,110 +227,102 @@ void ExampleGameLayer::OnUpdate()
 
 void ExampleGameLayer::OnRender()
 {
-    // Bind shader through ShaderManager; if not ready or invalid, skip rendering this frame
-    if (auto shaderBindResult = GetShaderManager().BindShader(m_ShaderHandle); !shaderBindResult.IsSuccess())
+    // Bind shader through ShaderManager
+    Result<void> shaderBindResult = GetShaderManager().BindShader(m_ShaderHandle);
+	// Note: You don't have to check if it succeeds but its always good practice so the api is there if needed.
+    if (!shaderBindResult.IsSuccess())
     {
         VX_WARN("Shader not ready: {}", shaderBindResult.GetErrorMessage());
         return;
     }
 
-    if (m_VertexArray)
+    // Set matrix uniforms for advanced shader
+    glm::mat4 viewProjection = glm::mat4(1.0f);
+    glm::mat4 view = glm::mat4(1.0f);
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::mat3 normalMatrix = glm::mat3(1.0f);
+
+    // Animation disabled; time not used
+
+    // === Matrix uniforms (required by advanced shader) ===
+    GetShaderManager().SetUniform("u_ViewProjection", viewProjection);
+    GetShaderManager().SetUniform("u_View", view);
+    GetShaderManager().SetUniform("u_Model", model);
+    GetShaderManager().SetUniform("u_NormalMatrix", normalMatrix);
+
+    // === Camera position ===
+    glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
+    GetShaderManager().SetUniform("u_CameraPos", cameraPos);
+
+    // === Material properties ===
+    // Use albedo texture if loaded, otherwise solid color
+    bool useTexture = m_TextureHandle.IsValid() && m_TextureHandle.IsLoaded();
+    if (useTexture)
     {
-        // Set matrix uniforms for advanced shader
-        glm::mat4 viewProjection = glm::mat4(1.0f);
-        glm::mat4 view = glm::mat4(1.0f);
-        glm::mat4 model = glm::mat4(1.0f);
-        glm::mat3 normalMatrix = glm::mat3(1.0f);
-        
-        // Animation disabled; time not used
-        
-        // === Matrix uniforms (required by advanced shader) ===
-        GetShaderManager().SetUniform("u_ViewProjection", viewProjection);
-        GetShaderManager().SetUniform("u_View", view);
-        GetShaderManager().SetUniform("u_Model", model);
-        GetShaderManager().SetUniform("u_NormalMatrix", normalMatrix);
-        
-        // === Animation and time ===
-        // No time uniform set; shader ignores u_Time
-        
-        // === Camera position ===
-        glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
-        GetShaderManager().SetUniform("u_CameraPos", cameraPos);
-        
-        // === Material properties ===
-        // Use albedo texture if loaded, otherwise solid color
-        bool useTexture = m_TextureHandle.IsValid() && m_TextureHandle.IsLoaded();
-        if (useTexture)
+        const TextureAsset* tex = m_TextureHandle.TryGet();
+        if (tex && tex->IsReady() && tex->GetTexture())
         {
-            const TextureAsset* tex = m_TextureHandle.TryGet();
-            if (tex && tex->IsReady() && tex->GetTexture())
-            {
-                // Bind texture on render thread via command queue, then set sampler uniforms
-                tex->GetTexture()->Bind(0);
-                GetShaderManager().SetTexture("u_AlbedoTexture", tex->GetTexture()->GetRendererID(), 0);
-                GetShaderManager().SetUniform("u_AlbedoTexture", 0);
-                GetShaderManager().SetUniform("u_UseAlbedoTexture", 1);
-            }
-            else
-            {
-                GetShaderManager().SetUniform("u_UseAlbedoTexture", 0);
-            }
+            // Bind texture on render thread via command queue, then set sampler uniforms
+            tex->GetTexture()->Bind(0);
+            GetShaderManager().SetTexture("u_AlbedoTexture", tex->GetTexture()->GetRendererID(), 0);
+            GetShaderManager().SetUniform("u_AlbedoTexture", 0);
+            GetShaderManager().SetUniform("u_UseAlbedoTexture", 1);
         }
         else
         {
             GetShaderManager().SetUniform("u_UseAlbedoTexture", 0);
         }
-
-        glm::vec3 albedo(0.9f, 0.9f, 0.9f); // base color when multiplied with texture
-        GetShaderManager().SetUniform("u_Albedo", albedo);
-        GetShaderManager().SetUniform("u_Metallic", 0.2f);
-        GetShaderManager().SetUniform("u_Roughness", 0.4f);
-        GetShaderManager().SetUniform("u_AO", 1.0f);
-        GetShaderManager().SetUniform("u_Alpha", 1.0f);
-        
-        // Disable emission for solid color
-        GetShaderManager().SetUniform("u_Emission", glm::vec3(0.0f));
-        
-        // === Lighting ===
-        glm::vec3 lightPos(2.0f, 2.0f, 2.0f);
-        glm::vec3 lightColor(1.0f, 1.0f, 0.9f); // Warm white
-        GetShaderManager().SetUniform("u_LightPosition", lightPos);
-        GetShaderManager().SetUniform("u_LightColor", lightColor);
-        GetShaderManager().SetUniform("u_LightIntensity", 10.0f);
-        
-        // === Transform uniforms for vertex animation ===
-        glm::vec3 translation(0.0f, 0.0f, 0.0f);
-        glm::vec3 rotation(0.0f, 0.0f, 0.0f); // No rotation animation
-        glm::vec3 scale(1.0f, 1.0f, 1.0f);
-        GetShaderManager().SetUniform("u_Translation", translation);
-        GetShaderManager().SetUniform("u_Rotation", rotation);
-        GetShaderManager().SetUniform("u_Scale", scale);
-        
-        // === Wind animation parameters ===
-        // Wind effect disabled; no wind uniforms set
-
-        // === Rim lighting effect ===
-        GetShaderManager().SetUniform("u_RimPower", 2.0f);
-        glm::vec3 rimColor(0.2f, 0.4f, 1.0f); // Blue rim
-        GetShaderManager().SetUniform("u_RimColor", rimColor);
-        GetShaderManager().SetUniform("u_FresnelStrength", 0.3f);
-        
-        // Bind VAO and draw
-        GetRenderCommandQueue().BindVertexArray(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(nullptr))); // no-op to ensure context
-        m_VertexArray->Bind();
-        GetRenderCommandQueue().DrawIndexed(3, 1, 0, 0, 0, static_cast<uint32_t>(PrimitiveTopology::Triangles));
-        m_VertexArray->Unbind();
     }
+    else
+    {
+        GetShaderManager().SetUniform("u_UseAlbedoTexture", 0);
+    }
+
+    glm::vec3 albedo(0.1f, 0.9f, 0.4f); // base color when multiplied with texture
+    GetShaderManager().SetUniform("u_Albedo", albedo);
+    GetShaderManager().SetUniform("u_Metallic", 0.2f);
+    GetShaderManager().SetUniform("u_Roughness", 0.4f);
+    GetShaderManager().SetUniform("u_AO", 1.0f);
+    GetShaderManager().SetUniform("u_Alpha", 1.0f);
+
+    // Disable emission for solid color
+    GetShaderManager().SetUniform("u_Emission", glm::vec3(0.0f));
+
+    // === Lighting ===
+    glm::vec3 lightPos(2.0f, 2.0f, 2.0f);
+    glm::vec3 lightColor(1.0f, 1.0f, 0.9f); // Warm white
+    GetShaderManager().SetUniform("u_LightPosition", lightPos);
+    GetShaderManager().SetUniform("u_LightColor", lightColor);
+    GetShaderManager().SetUniform("u_LightIntensity", 10.0f);
+
+    // === Transform uniforms for vertex animation ===
+    glm::vec3 translation(0.0f, 0.0f, 0.0f);
+    glm::vec3 rotation(0.0f, 0.0f, 0.0f); // No rotation animation
+    glm::vec3 scale(1.0f, 1.0f, 1.0f);
+    GetShaderManager().SetUniform("u_Translation", translation);
+    GetShaderManager().SetUniform("u_Rotation", rotation);
+    GetShaderManager().SetUniform("u_Scale", scale);
+
+    // === Rim lighting effect ===
+    GetShaderManager().SetUniform("u_RimPower", 2.0f);
+    glm::vec3 rimColor(0.2f, 0.4f, 1.0f); // Blue rim
+    GetShaderManager().SetUniform("u_RimColor", rimColor);
+    GetShaderManager().SetUniform("u_FresnelStrength", 0.3f);
+
+    // Bind VAO and draw
+    GetRenderCommandQueue().BindVertexArray(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(nullptr))); // no-op to ensure context
+    m_VertexArray->Bind();
+    GetRenderCommandQueue().DrawIndexed(3, 1, 0, 0, 0, static_cast<uint32_t>(PrimitiveTopology::Triangles));
+    m_VertexArray->Unbind();
 
     // Unbind shader through ShaderManager
     GetShaderManager().UnbindShader();
 }
 
+// This is a way of handling events if needed, but there are better ways via Input Actions and the event system, so we leave it empty here.
 bool ExampleGameLayer::OnEvent(Event& event)
 {
-    // We no longer handle input events directly here.
-    // Input is now handled via the InputSystem (polling + actions)
-    return false; // Don't consume any events
+    return false;
 }
 
 void ExampleGameLayer::SetupShaderSystem()

@@ -9,8 +9,7 @@ using namespace Vortex;
 class ExampleGameLayer : public Layer
 {
 public:
-    ExampleGameLayer() 
-        : Layer("ExampleGame", LayerType::Game, LayerPriority::Normal) {}
+    ExampleGameLayer() : Layer("ExampleGame", LayerType::Game, LayerPriority::Normal) {}
 
     virtual ~ExampleGameLayer() = default;
 
@@ -41,12 +40,13 @@ private:
     // Simple animation
     float m_AnimationTime = 0.0f;
     float m_RotationAngle = 0.0f;
+
+	// Cache engine systems for optimal access
+	std::shared_ptr<AssetSystem> m_AssetSystem;
+	std::shared_ptr<InputSystem> m_InputSystem;
     
     // Input action map
     std::shared_ptr<InputActionMap> m_GameplayActions;
-
-	std::shared_ptr<AssetSystem> m_AssetSystem;
-	std::shared_ptr<InputSystem> m_InputSystem;
 
     // Asset-system managed handles
     AssetHandle<ShaderAsset> m_ShaderHandle;

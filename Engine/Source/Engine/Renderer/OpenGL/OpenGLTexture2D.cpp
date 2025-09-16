@@ -74,25 +74,25 @@ namespace Vortex
         m_Format = info.Format;
 
         // Create texture object
-        GetRenderCommandQueue().GenTextures(1, &m_RendererID, true);
-        GetRenderCommandQueue().BindTextureTarget(TextureTarget::Texture2D, m_RendererID, true); 
+        GetRenderCommandQueue().GenTextures(1, &m_RendererID, false);
+        GetRenderCommandQueue().BindTextureTarget(TextureTarget::Texture2D, m_RendererID, false);
 
         // Set parameters
-        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::MinFilter, ToGLMinFilter(info.MinFilter, info.GenerateMips), true);
-        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::MagFilter, ToGLFilter(info.MagFilter), true);
-        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::WrapS, ToGLWrap(info.WrapS), true);
-        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::WrapT, ToGLWrap(info.WrapT), true);
+        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::MinFilter, ToGLMinFilter(info.MinFilter, info.GenerateMips), false);
+        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::MagFilter, ToGLFilter(info.MagFilter), false);
+        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::WrapS, ToGLWrap(info.WrapS), false);
+        GetRenderCommandQueue().TexParameteri(TextureTarget::Texture2D, TextureParamName::WrapT, ToGLWrap(info.WrapT), false);
 
         // Allocate / upload data
         const uint32_t glInternal = ToGLInternalFormat(info.Format);
         const uint32_t glFormat = ToGLFormat(info.Format);
         const uint32_t glType = 0x1401; // GL_UNSIGNED_BYTE
         GetRenderCommandQueue().TexImage2D(TextureTarget::Texture2D, 0, glInternal, m_Width, m_Height, glFormat, glType,
-                                           info.InitialData, info.InitialDataSize, true);
+                                           info.InitialData, info.InitialDataSize, false);
 
         if (info.GenerateMips)
         {
-            GetRenderCommandQueue().GenerateMipmap(TextureTarget::Texture2D, true);
+            GetRenderCommandQueue().GenerateMipmap(TextureTarget::Texture2D, false);
         }
     }
 
@@ -100,7 +100,7 @@ namespace Vortex
     {
         if (m_RendererID)
         {
-            GetRenderCommandQueue().DeleteTextures(1, &m_RendererID, true);
+            GetRenderCommandQueue().DeleteTextures(1, &m_RendererID, false);
             m_RendererID = 0;
         }
     }

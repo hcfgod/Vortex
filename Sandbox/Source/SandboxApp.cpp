@@ -21,10 +21,10 @@ void Sandbox::Initialize()
 	m_ExampleLayer = PushLayer<ExampleGameLayer>();
 
 	// Subscribe to additional events for demonstration
-	m_CustomSubscription = VX_SUBSCRIBE_EVENT(Vortex::WindowResizeEvent,
-		[this](const Vortex::WindowResizeEvent& e) -> bool {
-			VX_INFO("[Custom Handler] Window resized to {}x{}", e.GetWidth(), e.GetHeight());
-			return false; // Don't consume the event
+	m_CustomSubscription = VX_SUBSCRIBE_EVENT(Vortex::WindowResizeEvent, [this](const Vortex::WindowResizeEvent& e) -> bool 
+	{
+		VX_INFO("[Custom Handler] Window resized to {}x{}", e.GetWidth(), e.GetHeight());
+		return false; // Don't consume the event
 	});
 }
 
