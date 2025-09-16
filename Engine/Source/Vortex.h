@@ -67,9 +67,9 @@
 // Convenience engine-wide accessors for clients
 namespace Vortex
 {
-    inline Application* App() { return Application::Get(); }
+    inline Application* GetApp() { return Application::Get(); }
 
-    inline Engine* Eng()
+    inline Engine* GetEngine()
     {
         auto* a = Application::Get();
         return a ? a->GetEngine() : nullptr;
@@ -78,8 +78,15 @@ namespace Vortex
     template<typename T>
     inline T* Sys()
     {
-        auto* e = Eng();
+        auto* e = GetEngine();
         return e ? e->GetSystem<T>() : nullptr;
+    }
+
+    template<typename T>
+    inline std::shared_ptr<T> SysShared()
+    {
+        auto* e = GetEngine();
+        return e ? e->GetSystemShared<T>() : std::shared_ptr<T>();
     }
 }
 

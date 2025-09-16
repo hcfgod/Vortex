@@ -45,7 +45,8 @@ private:
     // Input action map
     std::shared_ptr<InputActionMap> m_GameplayActions;
 
-    // No engine/system caching fields; engine provides global helpers now
+	std::shared_ptr<AssetSystem> m_AssetSystem;
+	std::shared_ptr<InputSystem> m_InputSystem;
 
     // Asset-system managed handles
     AssetHandle<ShaderAsset> m_ShaderHandle;
@@ -55,7 +56,7 @@ private:
     bool m_ShaderLoading = false;
     float m_ShaderProgress = 0.0f;
 
-    // GL resources for demo triangle (VAO/VBO still needed for vertex data)
+    // Resources for demo triangle (VAO/VBO still needed for vertex data)
     unsigned int m_VBO = 0;
     unsigned int m_VAO = 0;
     unsigned int m_EBO = 0;

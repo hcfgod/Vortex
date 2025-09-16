@@ -29,11 +29,18 @@ void ExampleGameLayer::OnAttach()
     VX_INFO("  - PS5 Controller: Full support for buttons and sticks");
     
     // Use engine-global helpers; no client caching needed
-    if (!App() || !Eng())
+    if (!GetApp() || !GetEngine())
     {
         VX_ERROR("Application/Engine not available!");
         return;
     }
+
+	m_AssetSystem = SysShared<AssetSystem>();
+    if(!m_AssetSystem)
+    {
+        VX_ERROR("AssetSystem not available!");
+        return;
+	}
     
     SetupInputActions();
     
@@ -41,13 +48,10 @@ void ExampleGameLayer::OnAttach()
     SetupShaderSystem();
 
     // Load a texture asset using generic loader (name-based)
-    if (auto* assetSystem = Sys<AssetSystem>())
-    {
-        m_TextureHandle = assetSystem->LoadAsset<TextureAsset>(
-            "Checker",
-            [](float p){ VX_CORE_INFO("[AssetSystem] Texture loading progress: {:.1f}%", p * 100.0f); }
-        );
-    }
+    m_TextureHandle = m_AssetSystem->LoadAsset<TextureAsset>(
+        "Checker",
+        [](float p) { VX_CORE_INFO("[AssetSystem] Texture loading progress: {:.1f}%", p * 100.0f); }
+    );
 
     // Create VAO/VBO/EBO via high-level API
     m_VertexArray = VertexArray::Create();
@@ -233,8 +237,6 @@ void ExampleGameLayer::OnUpdate()
 
 void ExampleGameLayer::OnRender()
 {
-    if (!Eng()) return;
-
     // Bind shader through ShaderManager; if not ready or invalid, skip rendering this frame
     if (auto shaderBindResult = GetShaderManager().BindShader(m_ShaderHandle); !shaderBindResult.IsSuccess())
     {
@@ -347,19 +349,11 @@ void ExampleGameLayer::SetupShaderSystem()
 
     try
     {
-        if (!Eng()) return;
-
-        auto* assetSystem = Sys<AssetSystem>();
         m_ShaderLoading = true;
         m_ShaderProgress = 0.0f;
-        if (!assetSystem)
-        {
-            VX_ERROR("[ShaderSystem] AssetSystem not available");
-            return;
-        }
 
-        // Request async load with progress callback for logging and window title updates
-        m_ShaderHandle = assetSystem->LoadAsset<ShaderAsset>(
+        // Request async load with progress callback for logging
+        m_ShaderHandle = m_AssetSystem->LoadAsset<ShaderAsset>(
             "AdvancedTriangle",
             [this](float progress)
             {
@@ -372,7 +366,6 @@ void ExampleGameLayer::SetupShaderSystem()
                     VX_CORE_INFO("[AssetSystem] Shader loading completed!");
                     m_ShaderLoading = false;
                 }
-                App()->GetWindow()->SetTitle(title);
             }
         );
     }
@@ -384,17 +377,15 @@ void ExampleGameLayer::SetupShaderSystem()
 
 void ExampleGameLayer::SetupInputActions()
 {
-    if (!Eng()) return;
-    
-    auto* inputSystem = Sys<InputSystem>();
-    if (!inputSystem)
+    m_InputSystem = SysShared<InputSystem>();
+    if (!m_InputSystem)
     {
         VX_WARN("InputSystem not available for ExampleGameLayer");
         return;
     }
     
     // Create a gameplay action map
-    m_GameplayActions = inputSystem->CreateActionMap("ExampleGameplay");
+    m_GameplayActions = m_InputSystem->CreateActionMap("ExampleGameplay");
 
     // === Pause Action ===
     auto* pauseAction = m_GameplayActions->CreateAction("Pause", InputActionType::Button);

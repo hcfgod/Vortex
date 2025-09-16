@@ -3,6 +3,7 @@
 #include "Core/Debug/ErrorCodes.h"
 #include "Core/Layer/LayerStack.h"
 #include "Systems/SystemManager.h"
+#include <memory>
 
 namespace Vortex 
 {
@@ -32,6 +33,14 @@ namespace Vortex
 		T* GetSystem() { return m_SystemManager.GetSystem<T>(); }
 		template<typename T>
 		const T* GetSystem() const { return m_SystemManager.GetSystem<T>(); }
+
+		// Optional non-owning shared-pointer accessor (client-friendly caching)
+		template<typename T>
+		std::shared_ptr<T> GetSystemShared()
+		{
+			T* ptr = m_SystemManager.GetSystem<T>();
+			return std::shared_ptr<T>(ptr, [](T*){}); // non-owning
+		}
 	
 		// ===== Layer API (Engine manages LayerStack) =====
 		LayerStack& GetLayerStack() { return m_LayerStack; }
