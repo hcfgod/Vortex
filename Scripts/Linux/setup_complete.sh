@@ -697,6 +697,22 @@ else
     echo "GLAD updated successfully!"
 fi
 
+# Setup stb (image load/write headers)
+echo "Setting up stb headers..."
+mkdir -p "Engine/Vendor/stb"
+if [ ! -f "Engine/Vendor/stb/stb_image.h" ]; then
+    echo "Downloading stb_image.h..."
+    curl -fsSL "https://raw.githubusercontent.com/nothings/stb/master/stb_image.h" -o "Engine/Vendor/stb/stb_image.h" || echo "Failed to download stb_image.h"
+fi
+if [ ! -f "Engine/Vendor/stb/stb_image_write.h" ]; then
+    echo "Downloading stb_image_write.h..."
+    curl -fsSL "https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h" -o "Engine/Vendor/stb/stb_image_write.h" || echo "Failed to download stb_image_write.h"
+fi
+if [ ! -f "Engine/Vendor/stb/stb_image_write.cpp" ]; then
+    echo "Creating stb_image_write.cpp TU..."
+    printf "#define STB_IMAGE_WRITE_IMPLEMENTATION\n#include \"stb_image_write.h\"\n" > "Engine/Vendor/stb/stb_image_write.cpp"
+fi
+
 # Generate GLAD files for OpenGL 4.6 Core Profile
 echo "Generating GLAD files for OpenGL 4.6 Core Profile..."
 cd "Engine/Vendor/GLAD"

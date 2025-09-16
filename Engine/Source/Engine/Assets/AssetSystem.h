@@ -5,6 +5,7 @@
 #include "Engine/Assets/AssetHandle.h"
 #include "Engine/Assets/ShaderAsset.h"
 #include "Engine/Assets/TextureAsset.h"
+#include "Engine/Assets/AssetPack.h"
 #include "Engine/Renderer/Shader/ShaderCompiler.h"
 #include "Engine/Renderer/GraphicsContext.h"
 #include "Core/Async/Task.h"
@@ -114,6 +115,19 @@ namespace Vortex
             const std::string& fragmentPath,
             const std::filesystem::path& outputDir);
 
+        struct BuildAssetsOptions
+        {
+            // Output pack file path (e.g., Assets.vxpack). If empty, defaults next to AssetsRoot
+            std::filesystem::path OutputPackPath;
+            // Whether to include raw GLSL sources (manifests always included)
+            bool IncludeShaderSources = false;
+            // Recompile shaders to cache before packing
+            bool PrecompileShaders = true;
+        };
+
+        // Programmatic API to build a packaged assets file
+        Result<std::filesystem::path> BuildAssetsPack(const BuildAssetsOptions& options = {});
+
     private:
         struct ShaderSourceInfo
         {
@@ -188,6 +202,10 @@ namespace Vortex
         std::filesystem::path m_AssetsRoot;
         std::filesystem::path m_DevAssetsRoot; // Optional: repo-level Assets for development
         bool m_DevAssetsAvailable = false;
+        // Optional packaged assets (used typically in release builds)
+        AssetPackReader m_AssetPack;
+        bool m_AssetPackAvailable = false;
+        std::filesystem::path m_AssetPackPath;
         ShaderRef m_FallbackShader;
         bool m_FallbackInitialized = false;
         bool m_Initialized = false;

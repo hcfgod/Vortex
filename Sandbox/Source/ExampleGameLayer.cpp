@@ -398,6 +398,16 @@ void ExampleGameLayer::SetupInputActions()
         [this](InputActionPhase phase) { OnFireAction(phase); }, // Performed
         nullptr  // Canceled
     );
+
+    // === Build Assets Action ===
+    auto* buildAssetsAction = m_GameplayActions->CreateAction("BuildAssets", InputActionType::Button);
+    buildAssetsAction->AddBinding(InputBinding::KeyboardKey(KeyCode::B, "Keyboard/B"));
+    buildAssetsAction->AddBinding(InputBinding::GamepadButton(-1, 6, "Gamepad/Options")); // PS5 Options
+    buildAssetsAction->SetCallbacks(
+        nullptr,
+        [this](InputActionPhase phase) { OnBuildAssetsAction(phase); },
+        nullptr
+    );
     
     VX_INFO("[Input] Input actions configured for ExampleGameLayer");
 }
@@ -429,5 +439,28 @@ void ExampleGameLayer::OnFireAction(InputActionPhase phase)
     else
     {
         VX_INFO("[Action] Can't score while paused! (via Input Action)");
+    }
+}
+
+void ExampleGameLayer::OnBuildAssetsAction(InputActionPhase phase)
+{
+    if (!m_AssetSystem)
+    {
+        VX_WARN("[Action] AssetSystem not available");
+        return;
+    }
+
+    VX_INFO("[Action] Building asset pack via AssetSystem...");
+    AssetSystem::BuildAssetsOptions opts;
+    opts.PrecompileShaders = true;
+    opts.IncludeShaderSources = false;
+    auto res = m_AssetSystem->BuildAssetsPack(opts);
+    if (res.IsError())
+    {
+        VX_ERROR("[Action] BuildAssetsPack failed: {}", res.GetErrorMessage());
+    }
+    else
+    {
+        VX_INFO("[Action] Asset pack written to {}", res.GetValue().string());
     }
 }

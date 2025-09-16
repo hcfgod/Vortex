@@ -160,6 +160,15 @@ if not exist "Engine\Vendor\stb\stb_image.h" (
     echo Downloading stb_image.h...
     powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/nothings/stb/master/stb_image.h' -OutFile 'Engine\Vendor\stb\stb_image.h' } catch { Write-Host 'Failed to download stb_image.h' }"
 )
+if not exist "Engine\Vendor\stb\stb_image_write.h" (
+    echo Downloading stb_image_write.h...
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h' -OutFile 'Engine\Vendor\stb\stb_image_write.h' } catch { Write-Host 'Failed to download stb_image_write.h' }"
+)
+if not exist "Engine\Vendor\stb\stb_image_write.cpp" (
+    echo Creating stb_image_write.cpp TU...
+    (echo #define STB_IMAGE_WRITE_IMPLEMENTATION) > "Engine\Vendor\stb\stb_image_write.cpp"
+    (echo #include "stb_image_write.h") >> "Engine\Vendor\stb\stb_image_write.cpp"
+)
 
 :: Setup nlohmann/json (JSON Library)
 echo Setting up nlohmann/json...

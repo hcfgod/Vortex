@@ -11,6 +11,7 @@
 #include <random>
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 
 namespace Vortex
 {
@@ -66,6 +67,25 @@ namespace Vortex
         catch (const std::exception& e)
         {
             VX_CORE_WARN("AssetSystem: Dev assets detection failed: {}", e.what());
+        }
+
+        // Attempt to load packaged asset pack next to executable (Assets.vxpack)
+        try
+        {
+            namespace fs = std::filesystem;
+            fs::path packPath = m_AssetsRoot.parent_path() / "Assets.vxpack";
+            if (fs::exists(packPath))
+            {
+                m_AssetPackAvailable = m_AssetPack.Load(packPath);
+                if (m_AssetPackAvailable)
+                {
+                    m_AssetPackPath = packPath;
+                    VX_CORE_INFO("AssetSystem: Asset pack detected at: {}", m_AssetPackPath.string());
+                }
+            }
+        }
+        catch (...)
+        {
         }
 
         // Defer fallback shader creation until a graphics context exists (after RenderSystem initializes)
@@ -368,22 +388,73 @@ namespace Vortex
 
     AssetHandle<ShaderAsset> AssetSystem::LoadShaderFromManifest(const std::string& manifestPath, const ShaderCompileOptions& defaultOptions, ProgressCallback onProgress)
     {
-        // Read JSON manifest
+        // Read JSON manifest (prefer from asset pack when available)
         using json = nlohmann::json;
-        std::filesystem::path path = manifestPath;
-        if (path.is_relative())
-            path = m_AssetsRoot / path;
-
-        std::ifstream f(path);
-        if (!f.is_open())
+        json j;
+        bool loaded = false;
+        if (m_AssetPackAvailable)
         {
-            VX_CORE_ERROR("AssetSystem: Shader manifest not found: {}", path.string());
-            return {};
+            std::vector<uint8_t> bytes;
+            std::string key = manifestPath;
+            // Normalize path to be relative within Assets
+            try
+            {
+                namespace fs = std::filesystem;
+                fs::path p(manifestPath);
+                if (p.is_absolute())
+                {
+                    auto s = p.string();
+                    auto pos = s.rfind("Assets/");
+                    if (pos != std::string::npos) key = s.substr(pos + 7);
+                    else key = p.filename().string();
+                }
+                else
+                {
+                    key = p.generic_string();
+                }
+            }
+            catch (...)
+            {
+            }
+            if (!m_AssetPack.Read(key, bytes))
+            {
+                // Try Shaders/<name>.json fallback
+                std::string alt = std::string("Shaders/") + std::filesystem::path(manifestPath).filename().string();
+                m_AssetPack.Read(alt, bytes);
+            }
+            if (!bytes.empty())
+            {
+                try
+                {
+                    j = json::parse(bytes.begin(), bytes.end());
+                    loaded = true;
+                }
+                catch (const std::exception& e)
+                {
+                    VX_CORE_ERROR("AssetSystem: Failed to parse manifest from pack '{}': {}", manifestPath, e.what());
+                }
+            }
         }
-        json j; f >> j;
+        if (!loaded)
+        {
+            std::filesystem::path path = manifestPath;
+            if (path.is_relative())
+                path = m_AssetsRoot / path;
+
+            std::ifstream f(path);
+            if (!f.is_open())
+            {
+                VX_CORE_ERROR("AssetSystem: Shader manifest not found: {}", path.string());
+                return {};
+            }
+            f >> j;
+        }
 
         ShaderManifest manifest;
-        manifest.Name = j.value("name", path.stem().string());
+        std::string defaultName;
+        try { defaultName = std::filesystem::path(manifestPath).stem().string(); }
+        catch (...) { defaultName = std::string(); }
+        manifest.Name = j.value("name", defaultName);
         manifest.VertexPath = j.value("vertex", std::string{});
         manifest.FragmentPath = j.value("fragment", std::string{});
 
@@ -396,9 +467,18 @@ namespace Vortex
             options.TargetProfile = jo.value("TargetProfile", options.TargetProfile);
         }
 
-        // Resolve paths
-        std::string vert = (m_AssetsRoot / manifest.VertexPath).string();
-        std::string frag = (m_AssetsRoot / manifest.FragmentPath).string();
+        // Resolve paths (prefer pack if present by letting LoadShader handle resolution)
+        std::string vert = manifest.VertexPath;
+        std::string frag = manifest.FragmentPath;
+        // If manifests contain absolute paths, fall back to m_AssetsRoot
+        try
+        {
+            namespace fs = std::filesystem;
+            fs::path vp(vert), fp(frag);
+            if (vp.is_relative()) vert = (m_AssetsRoot / vp).string();
+            if (fp.is_relative()) frag = (m_AssetsRoot / fp).string();
+        }
+        catch (...) {}
         return LoadShader(manifest.Name, vert, frag, options, std::move(onProgress));
     }
 
@@ -411,7 +491,7 @@ namespace Vortex
         texAsset->SetProgress(0.0f);
         UUID id = RegisterAsset(texAsset);
 
-        // Load from disk using stb_image if available; fallback to solid magenta error texture
+        // Load from pack (preferred when available) or from disk using stb_image; fallback to solid magenta error texture
         Task<void> task = [this, id, name, filePath, options, onProgress]() -> Task<void>
         {
             auto setProgress = [&](float p)
@@ -429,10 +509,64 @@ namespace Vortex
             uint32_t width = 0, height = 0;
             std::vector<uint8_t> pixels;
 
-            // Attempt to load using stb_image (path-based)
+            // If asset pack is available, try reading raw bytes from pack first
+            std::vector<uint8_t> packedBytes;
+            bool loadedFromPack = false;
+            if (m_AssetPackAvailable)
+            {
+                // Construct a relative key under Assets/ by stripping any absolute prefix
+                try
+                {
+                    namespace fs = std::filesystem;
+                    fs::path p(filePath);
+                    std::string key = p.string();
+                    if (p.is_absolute())
+                    {
+                        // Try to find substring after "Assets/"
+                        auto pos = key.rfind("Assets/");
+                        if (pos != std::string::npos)
+                            key = key.substr(pos + 7); // skip "Assets/"
+                        else if (m_DevAssetsAvailable)
+                        {
+                            // If dev assets root is present, make path relative to it
+                            std::error_code ec;
+                            auto rel = fs::relative(p, m_DevAssetsRoot, ec);
+                            if (!ec) key = rel.generic_string();
+                        }
+                    }
+                    if (!key.empty())
+                    {
+                        // Try typical locations if not already rooted
+                        if (!m_AssetPack.Read(key, packedBytes))
+                        {
+                            std::string alt1 = std::string("Textures/") + std::filesystem::path(key).filename().string();
+                            std::string alt2 = std::filesystem::path(key).filename().string();
+                            if (!m_AssetPack.Read(alt1, packedBytes))
+                                m_AssetPack.Read(alt2, packedBytes);
+                        }
+                        if (!packedBytes.empty())
+                        {
+                            loadedFromPack = true;
+                        }
+                    }
+                }
+                catch (...)
+                {
+                }
+            }
+
+            // Attempt to load using stb_image
             stbi_set_flip_vertically_on_load(options.FlipVertically ? 1 : 0);
             int w = 0, h = 0, comp = 0;
-            unsigned char* data = stbi_load(filePath.c_str(), &w, &h, &comp, options.DesiredChannels);
+            unsigned char* data = nullptr;
+            if (loadedFromPack)
+            {
+                data = stbi_load_from_memory(packedBytes.data(), static_cast<int>(packedBytes.size()), &w, &h, &comp, options.DesiredChannels);
+            }
+            else
+            {
+                data = stbi_load(filePath.c_str(), &w, &h, &comp, options.DesiredChannels);
+            }
             if (!data || w <= 0 || h <= 0)
             {
                 const char* reason = stbi_failure_reason();
@@ -565,6 +699,16 @@ namespace Vortex
         // Basic stub: compile and write SPIR-V blobs to outputDir for packaging
         ShaderCompiler compiler;
         ShaderCompileOptions options; // default or load from config
+        // Select target profile based on active graphics API (match runtime)
+        switch (GetGraphicsAPI())
+        {
+            case GraphicsAPI::OpenGL:   options.TargetProfile = "opengl";     break;
+            case GraphicsAPI::Vulkan:   options.TargetProfile = "vulkan1.1";  break;
+            case GraphicsAPI::DirectX11:
+            case GraphicsAPI::DirectX12:
+            case GraphicsAPI::Metal:
+            default:                    options.TargetProfile = "opengl";     break;
+        }
         if (auto* renderer = GetRenderer())
         {
             if (auto* ctx = renderer->GetContext())
@@ -594,6 +738,108 @@ namespace Vortex
         return Result<void>();
     }
 
+    Result<std::filesystem::path> AssetSystem::BuildAssetsPack(const BuildAssetsOptions& options)
+    {
+        namespace fs = std::filesystem;
+        std::error_code ec;
+
+        fs::path assetsRoot = m_DevAssetsAvailable ? m_DevAssetsRoot : m_AssetsRoot;
+        fs::path outputPack = options.OutputPackPath;
+        if (outputPack.empty())
+            outputPack = assetsRoot.parent_path() / "Assets.vxpack";
+
+        // Optionally precompile shaders to Assets/Cache/Shaders
+        fs::path shadersDir = assetsRoot / "Shaders";
+        fs::path cacheDir   = assetsRoot / "Cache" / "Shaders";
+        if (options.PrecompileShaders && fs::exists(shadersDir, ec))
+        {
+            fs::create_directories(cacheDir, ec);
+            // Scan for vertex shaders and pair with fragment
+            for (auto& p : fs::recursive_directory_iterator(shadersDir, ec))
+            {
+                if (p.is_regular_file(ec) && p.path().extension() == ".vert")
+                {
+                    fs::path vs = p.path();
+                    fs::path fp = vs;
+                    fp.replace_extension(".frag");
+                    if (fs::exists(fp, ec))
+                    {
+                        std::string shaderName = vs.stem().string();
+                        auto res = BuildShader(shaderName, vs.string(), fp.string(), cacheDir);
+                        if (res.IsError())
+                        {
+                            VX_CORE_WARN("BuildShader failed for {}: {}", shaderName, res.GetErrorMessage());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Create writer and add assets
+        AssetPackWriter writer;
+
+        // Pack textures
+        fs::path texturesDir = assetsRoot / "Textures";
+        if (fs::exists(texturesDir, ec) && fs::is_directory(texturesDir, ec))
+        {
+            for (auto& p : fs::recursive_directory_iterator(texturesDir, ec))
+            {
+                if (p.is_regular_file(ec))
+                {
+                    auto ext = p.path().extension().string();
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tga")
+                    {
+                        auto rel = fs::relative(p.path(), assetsRoot, ec).generic_string();
+                        writer.AddFile(rel, p.path());
+                    }
+                }
+            }
+        }
+
+        // Pack shader manifests and optionally sources
+        if (fs::exists(shadersDir, ec) && fs::is_directory(shadersDir, ec))
+        {
+            for (auto& p : fs::recursive_directory_iterator(shadersDir, ec))
+            {
+                if (p.is_regular_file(ec))
+                {
+                    auto ext = p.path().extension().string();
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                    bool isManifest = (ext == ".json");
+                    bool isSource = (ext == ".vert" || ext == ".frag");
+                    if (isManifest || (options.IncludeShaderSources && isSource))
+                    {
+                        auto rel = fs::relative(p.path(), assetsRoot, ec).generic_string();
+                        writer.AddFile(rel, p.path());
+                    }
+                }
+            }
+        }
+
+        // Pack precompiled SPIR-V cache
+        if (fs::exists(cacheDir, ec) && fs::is_directory(cacheDir, ec))
+        {
+            for (auto& p : fs::recursive_directory_iterator(cacheDir, ec))
+            {
+                if (p.is_regular_file(ec))
+                {
+                    auto rel = fs::relative(p.path(), assetsRoot, ec).generic_string();
+                    writer.AddFile(rel, p.path());
+                }
+            }
+        }
+
+        // Ensure output directory exists
+        fs::create_directories(outputPack.parent_path(), ec);
+        if (!writer.WriteToFile(outputPack))
+        {
+            return Result<fs::path>(ErrorCode::FileCorrupted, "Failed to write asset pack");
+        }
+
+        VX_CORE_INFO("Asset pack written: {}", outputPack.string());
+        return Result<fs::path>(outputPack);
+    }
     Task<void> AssetSystem::CompileShaderTask(UUID id, std::string name, std::string vertexPath, std::string fragmentPath, ShaderCompileOptions options, ProgressCallback progress, bool isReload)
     {
         // Small staged progress model: 0.0-0.1 read, 0.1-0.8 compile, 0.8-1.0 create
@@ -616,6 +862,61 @@ namespace Vortex
         compiler.SetCachingEnabled(true, (m_AssetsRoot / "Cache/Shaders").string());
 
         setProgress(0.10f);
+
+        // Try using precompiled SPIR-V from asset pack: Cache/Shaders/<name>.(vert|frag).spv
+        if (m_AssetPackAvailable)
+        {
+            std::vector<uint8_t> vsBytesRaw, fsBytesRaw;
+            std::string vsKey = std::string("Cache/Shaders/") + name + ".vert.spv";
+            std::string fsKey = std::string("Cache/Shaders/") + name + ".frag.spv";
+            bool haveVS = m_AssetPack.Read(vsKey, vsBytesRaw);
+            bool haveFS = m_AssetPack.Read(fsKey, fsBytesRaw);
+            if (haveVS && haveFS && (vsBytesRaw.size() % 4 == 0) && (fsBytesRaw.size() % 4 == 0))
+            {
+                std::vector<uint32_t> vsSpv(vsBytesRaw.size() / 4);
+                std::vector<uint32_t> fsSpv(fsBytesRaw.size() / 4);
+                memcpy(vsSpv.data(), vsBytesRaw.data(), vsBytesRaw.size());
+                memcpy(fsSpv.data(), fsBytesRaw.data(), fsBytesRaw.size());
+
+                // Reflect
+                ShaderReflection refl;
+                auto vsReflRes = refl.Reflect(vsSpv, ShaderStage::Vertex);
+                auto fsReflRes = refl.Reflect(fsSpv, ShaderStage::Fragment);
+                if (vsReflRes.IsSuccess() && fsReflRes.IsSuccess())
+                {
+                    ShaderReflectionData reflection = ShaderReflection::CombineReflections({ vsReflRes.GetValue(), fsReflRes.GetValue() });
+
+                    // Create GPU shader
+                    auto shader = GPUShader::Create(name);
+                    std::unordered_map<ShaderStage, std::vector<uint32_t>> stages;
+                    stages[ShaderStage::Vertex] = std::move(vsSpv);
+                    stages[ShaderStage::Fragment] = std::move(fsSpv);
+                    auto createRes = shader->Create(stages, reflection);
+                    if (createRes.IsSuccess())
+                    {
+                        setProgress(0.95f);
+                        {
+                            std::lock_guard<std::mutex> lock(m_Mutex);
+                            auto it = m_Assets.find(id);
+                            if (it != m_Assets.end())
+                            {
+                                auto* shaderAsset = dynamic_cast<ShaderAsset*>(it->second.assetPtr.get());
+                                if (shaderAsset)
+                                {
+                                    shaderAsset->SetShader(std::shared_ptr<GPUShader>(std::move(shader)));
+                                    shaderAsset->SetReflection(reflection);
+                                    shaderAsset->SetState(AssetState::Loaded);
+                                    shaderAsset->SetProgress(1.0f);
+                                    m_ShaderReloading.erase(id);
+                                }
+                            }
+                        }
+                        setProgress(1.0f);
+                        co_return; // done using precompiled
+                    }
+                }
+            }
+        }
 
         // Resolve relative paths against AssetsRoot for robustness
         std::string resolvedVS = vertexPath;
@@ -670,7 +971,7 @@ namespace Vortex
         VX_CORE_INFO("AssetSystem: %s shader '%s'\n  VS: %s\n  FS: %s",
             isReload ? "Recompiling" : "Compiling", name.c_str(), resolvedVS.c_str(), resolvedFS.c_str());
 
-        // Compile asynchronously (run concurrently)
+        // Compile asynchronously (run concurrently). If asset pack has precompiled SPIR-V in Cache/Shaders, try load-from-cache path first.
         auto vsTask = compiler.CompileFromFileAsync(resolvedVS, options, CoroutinePriority::Low);
         auto fsTask = compiler.CompileFromFileAsync(resolvedFS, options, CoroutinePriority::Low);
 
