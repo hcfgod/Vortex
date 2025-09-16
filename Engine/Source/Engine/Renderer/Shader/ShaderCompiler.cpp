@@ -111,6 +111,31 @@ namespace Vortex
 
         Impl() = default;
 
+        // Normalize a path for use as a stable cache key across reloads (absolute, generic separators, lowercased)
+        std::string NormalizePathKey(const std::string& path) const
+        {
+            try
+            {
+                if (path.empty()) return {};
+                namespace fs = std::filesystem;
+                std::error_code ec;
+                fs::path p(path);
+                if (!p.is_absolute())
+                {
+                    p = fs::absolute(p, ec);
+                }
+                fs::path canon = fs::weakly_canonical(p, ec);
+                std::string s = (ec ? p : canon).generic_string();
+                // Normalize case (Windows) so the key matches regardless of letter casing
+                for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                return s;
+            }
+            catch (...)
+            {
+                return path;
+            }
+        }
+
         shaderc::CompileOptions CreateCompileOptions(const ShaderCompileOptions& options) const
         {
             shaderc::CompileOptions shadercOptions;
@@ -308,7 +333,7 @@ namespace Vortex
                     m_ShaderCache[hash] = outShader;
                     if (!outShader.SourceFile.empty())
                     {
-                        std::string sourceKey = outShader.SourceFile + "|" + std::to_string(static_cast<int>(outShader.Stage));
+                        std::string sourceKey = NormalizePathKey(outShader.SourceFile) + "|" + std::to_string(static_cast<int>(outShader.Stage));
                         m_SourceStageToHash[sourceKey] = hash;
                     }
                 }
@@ -452,7 +477,7 @@ namespace Vortex
         auto shadercOptions = m_Impl->CreateCompileOptions(options);
         shaderc_shader_kind shadercKind = GetShadercKind(stage);
 
-        std::string actualFilename = filename.empty() ? "shader" : filename;
+        std::string actualFilename = filename.empty() ? "shader" : m_Impl->NormalizePathKey(filename);
 
         auto compilationResult = m_Impl->m_Compiler.CompileGlslToSpv(
             source, 
@@ -478,6 +503,8 @@ namespace Vortex
         compiledShader.Stage = stage;
         compiledShader.SourceHash = hash;
         compiledShader.SpirV = std::vector<uint32_t>(compilationResult.cbegin(), compilationResult.cend());
+        // Record source file (if provided) so cache mapping can prune old entries
+        compiledShader.SourceFile = actualFilename;
 
         // Perform reflection
         auto reflectionResult = m_Impl->m_Reflection.Reflect(compiledShader.SpirV, stage);
@@ -490,7 +517,7 @@ namespace Vortex
             VX_CORE_WARN("Shader reflection failed: {0}", reflectionResult.GetErrorMessage());
         }
 
-        // Cache the compiled shader
+        // Cache the compiled shader (also updates mapping and prunes previous cache for this source)
         m_Impl->SaveToCache(hash, compiledShader);
 
         // Update statistics
@@ -543,12 +570,12 @@ return Result<CompiledShader>(ErrorCode::InvalidParameter, "Could not determine 
             }
         }
 
-        auto result = CompileFromSource(source, stage, options, filePath);
+        auto result = CompileFromSource(source, stage, options, m_Impl->NormalizePathKey(filePath));
         if (result.IsSuccess())
         {
             // Store file path for hot-reload
             CompiledShader& shader = const_cast<CompiledShader&>(result.GetValue());
-            shader.SourceFile = filePath;
+            shader.SourceFile = m_Impl->NormalizePathKey(filePath);
             // Ensure cache mapping is updated as soon as we have a compiled shader
             if (m_Impl->m_CachingEnabled)
             {
