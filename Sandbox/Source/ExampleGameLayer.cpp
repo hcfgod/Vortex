@@ -55,13 +55,13 @@ void ExampleGameLayer::OnAttach()
     // Initialize the modern shader system
     SetupShaderSystem();
 
-    // Load a texture asset (procedural checkerboard for now)
+    // Load a texture asset using generic loader (name-based)
     if (m_SystemManager)
     {
         auto* assetSystem = m_SystemManager->GetSystem<AssetSystem>();
         if (assetSystem)
         {
-            m_TextureHandle = assetSystem->LoadTextureAsync("Checkerboard", (std::filesystem::path("Textures") / "Checkerboard.png").string());
+            m_TextureHandle = assetSystem->LoadAsset<TextureAsset>("Checkerboard.png");
         }
     }
 

@@ -48,6 +48,13 @@ namespace Vortex
         template<typename T>
         AssetHandle<T> GetByName(const std::string& name);
 
+        // Preferred generic asset loading API
+        template<typename T>
+        AssetHandle<T> LoadAsset(const std::string& name, ProgressCallback onProgress = {});
+        template<typename T>
+        AssetHandle<T> LoadAssetByUUID(const UUID& id) { return GetByUUID<T>(id); }
+
+        // Legacy explicit loaders (kept for now; will be phased out)
         // Load shader via simple manifest (json or direct guess)
         AssetHandle<ShaderAsset> LoadShaderAsync(const std::string& name,
             const std::string& vertexPath,
@@ -183,6 +190,47 @@ namespace Vortex
         auto it = m_Assets.find(id);
         if (it == m_Assets.end()) return nullptr;
         return dynamic_cast<const T*>(it->second.assetPtr.get());
+    }
+
+    // Generic LoadAsset default (static_assert for unsupported types)
+    template<typename T>
+    AssetHandle<T> AssetSystem::LoadAsset(const std::string& /*name*/, ProgressCallback /*onProgress*/)
+    {
+        static_assert(sizeof(T) == 0, "LoadAsset<T>: Unsupported asset type T");
+        return {};
+    }
+
+    // TextureAsset specialization
+    template<>
+    inline AssetHandle<TextureAsset> AssetSystem::LoadAsset<TextureAsset>(const std::string& name, ProgressCallback onProgress)
+    {
+        namespace fs = std::filesystem;
+        // Resolve to Assets/Textures/<name>
+        fs::path rel = fs::path("Textures") / name;
+        fs::path abs = m_DevAssetsAvailable ? (m_DevAssetsRoot / rel) : (m_AssetsRoot / rel);
+        return LoadTextureAsync(name, abs.string(), std::move(onProgress));
+    }
+
+    // ShaderAsset specialization
+    template<>
+    inline AssetHandle<ShaderAsset> AssetSystem::LoadAsset<ShaderAsset>(const std::string& name, ProgressCallback onProgress)
+    {
+        namespace fs = std::filesystem;
+        ShaderCompileOptions options{}; // default
+        // Prefer manifest if available: Assets/Shaders/<name>.json
+        fs::path manifestRel = fs::path("Shaders") / (name + ".json");
+        fs::path manifestAbs = m_DevAssetsAvailable ? (m_DevAssetsRoot / manifestRel) : (m_AssetsRoot / manifestRel);
+        std::error_code ec;
+        if (fs::exists(manifestAbs, ec))
+        {
+            return LoadShaderFromManifestAsync(manifestAbs.string(), options, std::move(onProgress));
+        }
+        // Otherwise try conventional VS/FS filenames
+        fs::path vsRel = fs::path("Shaders") / (name + ".vert");
+        fs::path fsRel = fs::path("Shaders") / (name + ".frag");
+        fs::path vsAbs = m_DevAssetsAvailable ? (m_DevAssetsRoot / vsRel) : (m_AssetsRoot / vsRel);
+        fs::path fsAbs = m_DevAssetsAvailable ? (m_DevAssetsRoot / fsRel) : (m_AssetsRoot / fsRel);
+        return LoadShaderAsync(name, vsAbs.string(), fsAbs.string(), options, std::move(onProgress));
     }
 
     // AssetHandle inline method defs

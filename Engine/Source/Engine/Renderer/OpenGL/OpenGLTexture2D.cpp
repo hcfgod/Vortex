@@ -45,6 +45,15 @@ namespace Vortex
         }
     }
 
+    static uint32_t ToGLTarget(TextureTarget target)
+    {
+        switch (target)
+        {
+            case TextureTarget::Texture2D: return 0x0DE1; // GL_TEXTURE_2D
+            default: return 0x0DE1;
+        }
+    }
+
     OpenGLTexture2D::OpenGLTexture2D(const CreateInfo& info)
     {
         m_Width = info.Width;
@@ -53,24 +62,25 @@ namespace Vortex
 
         // Create texture object
         GetRenderCommandQueue().GenTextures(1, &m_RendererID, true);
-        GetRenderCommandQueue().BindTextureTarget(0x0DE1 /*GL_TEXTURE_2D*/, m_RendererID, true); 
+        const uint32_t glTarget = static_cast<uint32_t>(TextureTarget::Texture2D);
+        GetRenderCommandQueue().BindTextureTarget(glTarget, m_RendererID, true); 
 
         // Set parameters
-        GetRenderCommandQueue().TexParameteri(0x0DE1, 0x2801 /*GL_TEXTURE_MIN_FILTER*/, ToGLFilter(info.MinFilter), true);
-        GetRenderCommandQueue().TexParameteri(0x0DE1, 0x2800 /*GL_TEXTURE_MAG_FILTER*/, ToGLFilter(info.MagFilter), true);
-        GetRenderCommandQueue().TexParameteri(0x0DE1, 0x2802 /*GL_TEXTURE_WRAP_S*/, ToGLWrap(info.WrapS), true);
-        GetRenderCommandQueue().TexParameteri(0x0DE1, 0x2803 /*GL_TEXTURE_WRAP_T*/, ToGLWrap(info.WrapT), true);
+        GetRenderCommandQueue().TexParameteri(glTarget, 0x2801 /*GL_TEXTURE_MIN_FILTER*/, ToGLFilter(info.MinFilter), true);
+        GetRenderCommandQueue().TexParameteri(glTarget, 0x2800 /*GL_TEXTURE_MAG_FILTER*/, ToGLFilter(info.MagFilter), true);
+        GetRenderCommandQueue().TexParameteri(glTarget, 0x2802 /*GL_TEXTURE_WRAP_S*/, ToGLWrap(info.WrapS), true);
+        GetRenderCommandQueue().TexParameteri(glTarget, 0x2803 /*GL_TEXTURE_WRAP_T*/, ToGLWrap(info.WrapT), true);
 
         // Allocate / upload data
         const uint32_t glInternal = ToGLInternalFormat(info.Format);
         const uint32_t glFormat = ToGLFormat(info.Format);
         const uint32_t glType = 0x1401; // GL_UNSIGNED_BYTE
-        GetRenderCommandQueue().TexImage2D(0x0DE1, 0, glInternal, m_Width, m_Height, glFormat, glType,
+        GetRenderCommandQueue().TexImage2D(glTarget, 0, glInternal, m_Width, m_Height, glFormat, glType,
                                            info.InitialData, info.InitialDataSize, true);
 
         if (info.GenerateMips)
         {
-            GetRenderCommandQueue().GenerateMipmap(0x0DE1, true);
+            GetRenderCommandQueue().GenerateMipmap(glTarget, true);
         }
     }
 

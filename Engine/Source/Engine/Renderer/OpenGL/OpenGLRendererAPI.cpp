@@ -648,7 +648,7 @@ namespace Vortex
         {
             return validateResult;
         }
-        glBindTexture(target, texture);
+        glBindTexture(ConvertTextureTarget(target), texture);
         if (!CheckGLError("BindTextureTarget"))
         {
             return Result<void>(ErrorCode::RendererInitFailed, "Failed to bind texture target");
@@ -665,7 +665,7 @@ namespace Vortex
         {
             return validateResult;
         }
-        glTexImage2D(target, level, static_cast<GLint>(internalFormat), static_cast<GLsizei>(width), static_cast<GLsizei>(height), 0,
+        glTexImage2D(ConvertTextureTarget(target), level, static_cast<GLint>(internalFormat), static_cast<GLsizei>(width), static_cast<GLsizei>(height), 0,
                      format, type, data);
         if (!CheckGLError("TexImage2D"))
         {
@@ -681,7 +681,7 @@ namespace Vortex
         {
             return validateResult;
         }
-        glTexParameteri(target, pname, param);
+        glTexParameteri(ConvertTextureTarget(target), ConvertTextureParam(pname), param);
         if (!CheckGLError("TexParameteri"))
         {
             return Result<void>(ErrorCode::RendererInitFailed, "Failed to set texture parameter");
@@ -696,7 +696,7 @@ namespace Vortex
         {
             return validateResult;
         }
-        glGenerateMipmap(target);
+        glGenerateMipmap(ConvertTextureTarget(target));
         if (!CheckGLError("GenerateMipmap"))
         {
             return Result<void>(ErrorCode::RendererInitFailed, "Failed to generate mipmaps");
@@ -1078,6 +1078,27 @@ namespace Vortex
             case PrimitiveTopology::TriangleStrip:  return GL_TRIANGLE_STRIP;
             case PrimitiveTopology::TriangleFan:    return GL_TRIANGLE_FAN;
             default:                                return GL_TRIANGLES;
+        }
+    }
+
+    uint32_t OpenGLRendererAPI::ConvertTextureTarget(uint32_t target) const
+    {
+        switch (static_cast<TextureTarget>(target))
+        {
+            case TextureTarget::Texture2D: return GL_TEXTURE_2D;
+            default: return GL_TEXTURE_2D;
+        }
+    }
+
+    uint32_t OpenGLRendererAPI::ConvertTextureParam(uint32_t pname) const
+    {
+        switch (static_cast<TextureParamName>(pname))
+        {
+            case TextureParamName::MinFilter: return GL_TEXTURE_MIN_FILTER;
+            case TextureParamName::MagFilter: return GL_TEXTURE_MAG_FILTER;
+            case TextureParamName::WrapS:     return GL_TEXTURE_WRAP_S;
+            case TextureParamName::WrapT:     return GL_TEXTURE_WRAP_T;
+            default: return GL_TEXTURE_MIN_FILTER;
         }
     }
 }

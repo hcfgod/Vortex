@@ -129,7 +129,7 @@ if not exist "Engine\Vendor\glm" (
     echo GLM updated successfully!
 )
 
-::: Setup doctest (header-only unit testing framework)
+:: Setup doctest (header-only unit testing framework)
 echo Setting up doctest...
 if not exist "Engine\Vendor\doctest" (
     echo Cloning doctest...
@@ -151,7 +151,17 @@ if not exist "Engine\Vendor\doctest" (
     echo doctest updated successfully!
 )
 
-::: Setup nlohmann/json (JSON Library)
+:: Setup stb (header-only for image loading)
+echo Setting up stb...
+if not exist "Engine\Vendor\stb" (
+    mkdir "Engine\Vendor\stb"
+)
+if not exist "Engine\Vendor\stb\stb_image.h" (
+    echo Downloading stb_image.h...
+    powershell -Command "try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/nothings/stb/master/stb_image.h' -OutFile 'Engine\Vendor\stb\stb_image.h' } catch { Write-Host 'Failed to download stb_image.h' }"
+)
+
+:: Setup nlohmann/json (JSON Library)
 echo Setting up nlohmann/json...
 if not exist "Engine\Vendor\nlohmann_json" (
     echo Cloning nlohmann/json...

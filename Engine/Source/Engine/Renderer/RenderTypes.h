@@ -42,4 +42,18 @@ namespace Vortex
         TriangleStrip = 5,
         TriangleFan = 6
     };
+
+    // Texture enums for API-agnostic calls
+    enum class TextureTarget : uint32_t
+    {
+        Texture2D = 0
+    };
+
+    enum class TextureParamName : uint32_t
+    {
+        MinFilter = 0,
+        MagFilter = 1,
+        WrapS     = 2,
+        WrapT     = 3
+    };
 }

@@ -168,5 +168,7 @@ namespace Vortex
         uint32_t ConvertBufferUsage(uint32_t usage) const;
         uint32_t ConvertDataType(uint32_t type) const;
         uint32_t ConvertPrimitiveTopology(uint32_t topology) const;
+        uint32_t ConvertTextureTarget(uint32_t target) const;
+        uint32_t ConvertTextureParam(uint32_t pname) const;
     };
 }

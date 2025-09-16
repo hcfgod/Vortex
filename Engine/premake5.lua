@@ -58,7 +58,8 @@ project "Engine"
         "Vendor/nlohmann_json/single_include",
         "Vendor/SPIRV-Headers/include",
         "Vendor/shaderc/libshaderc/include",
-        "Vendor/SPIRV-Cross"
+        "Vendor/SPIRV-Cross",
+        "Vendor/stb"
     }
 
     -- Disable warnings from external headers

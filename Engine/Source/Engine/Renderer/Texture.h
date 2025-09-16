@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include "Core/Debug/ErrorCodes.h"
+#include "Engine/Renderer/RenderTypes.h"
 
 namespace Vortex
 {
