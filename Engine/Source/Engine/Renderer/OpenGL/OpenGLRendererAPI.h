@@ -89,6 +89,7 @@ namespace Vortex
 		Result<void> BindFramebuffer(uint32_t target, uint32_t fbo) override;
 		Result<void> FramebufferTexture2D(uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) override;
 		Result<void> CheckFramebufferStatus(uint32_t target, uint32_t* outStatus) override;
+		Result<void> SetDrawBuffers(uint32_t count, const uint32_t* attachments) override;
 
 	private:
 		bool m_Initialized = false;

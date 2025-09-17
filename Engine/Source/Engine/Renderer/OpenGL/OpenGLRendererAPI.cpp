@@ -840,6 +840,28 @@ namespace Vortex
         return Result<void>();
     }
 
+    Result<void> OpenGLRendererAPI::SetDrawBuffers(uint32_t count, const uint32_t* attachments)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        // Map attachment indices (0..n) to GL_COLOR_ATTACHMENTi enums
+        std::vector<GLenum> bufs;
+        bufs.reserve(count);
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            bufs.push_back(GL_COLOR_ATTACHMENT0 + attachments[i]);
+        }
+        glDrawBuffers(static_cast<GLsizei>(bufs.size()), bufs.data());
+        if (!CheckGLError("SetDrawBuffers"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to set draw buffers");
+        }
+        return Result<void>();
+    }
+
     // ============================================================================
     // Render State
     // ============================================================================

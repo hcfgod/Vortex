@@ -1,6 +1,7 @@
 #define VX_IMPLEMENT_MAIN
 #include <Vortex.h>
 #include "ExampleGameLayer.h"
+#include "ImGuiViewportLayer.h"
 #include "SandboxApp.h"
 
 Sandbox::Sandbox()
@@ -19,6 +20,8 @@ void Sandbox::Initialize()
 
 	// Push the ExampleGameLayer to the LayerStack
 	m_ExampleLayer = PushLayer<ExampleGameLayer>();
+	// Add an ImGui viewport layer that shows scene output
+	PushLayer<ImGuiViewportLayer>();
 
 	// Subscribe to additional events for demonstration
 	m_CustomSubscription = VX_SUBSCRIBE_EVENT(Vortex::WindowResizeEvent, [this](const Vortex::WindowResizeEvent& e) -> bool 

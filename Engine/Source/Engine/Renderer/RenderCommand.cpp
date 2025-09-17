@@ -291,4 +291,11 @@ namespace Vortex
         return renderer->CheckFramebufferStatus(m_Target, m_OutStatus);
     }
 
+    Result<void> SetDrawBuffersCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->SetDrawBuffers(m_Count, m_Attachments);
+    }
+
 } // namespace Vortex

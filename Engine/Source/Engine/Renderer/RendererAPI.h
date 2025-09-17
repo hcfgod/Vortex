@@ -297,6 +297,13 @@ namespace Vortex
          */
         virtual Result<void> CheckFramebufferStatus(uint32_t target, uint32_t* outStatus) = 0;
 
+        /**
+         * @brief Set active draw buffers for the currently bound framebuffer
+         * @param count Number of color attachments
+         * @param attachments Array of attachment indices (0 -> COLOR_ATTACHMENT0)
+         */
+        virtual Result<void> SetDrawBuffers(uint32_t count, const uint32_t* attachments) = 0;
+
         // ============================================================================
         // RENDER STATE
         // ============================================================================

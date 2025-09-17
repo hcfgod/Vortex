@@ -424,6 +424,11 @@ namespace Vortex
             return Submit(std::make_unique<CheckFramebufferStatusCommand>(static_cast<uint32_t>(target), outStatus), executeImmediate);
         }
 
+        bool SetDrawBuffers(uint32_t count, const uint32_t* attachments, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<SetDrawBuffersCommand>(count, attachments), executeImmediate);
+        }
+
         // UBO/SSBO binding helper
         bool BindBufferBase(uint32_t target, uint32_t index, uint32_t buffer, bool executeImmediate = false)
         {

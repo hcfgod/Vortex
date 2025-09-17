@@ -813,4 +813,19 @@ namespace Vortex
         uint32_t m_Target;
         uint32_t* m_OutStatus;
     };
+
+    class SetDrawBuffersCommand : public RenderCommand
+    {
+    public:
+        SetDrawBuffersCommand(uint32_t count, const uint32_t* attachments)
+            : m_Count(count), m_Attachments(attachments) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "SetDrawBuffers"; }
+        float GetEstimatedCost() const override { return 0.01f * m_Count; }
+
+    private:
+        uint32_t m_Count;
+        const uint32_t* m_Attachments;
+    };
 }

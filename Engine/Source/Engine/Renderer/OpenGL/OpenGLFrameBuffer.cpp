@@ -48,6 +48,15 @@ namespace Vortex
                 TextureTarget::Texture2D, tex->GetRendererID(), 0, false);
         }
 
+        // Ensure draw buffers are set for the FBO (at least COLOR_ATTACHMENT0)
+        if (m_Spec.ColorAttachmentCount > 0)
+        {
+            std::vector<uint32_t> attachments(m_Spec.ColorAttachmentCount);
+            for (uint32_t i = 0; i < m_Spec.ColorAttachmentCount; ++i)
+                attachments[i] = i;
+            GetRenderCommandQueue().SetDrawBuffers(static_cast<uint32_t>(attachments.size()), attachments.data(), false);
+        }
+
         // Depth attachment (optional) - use texture for generality
         if (m_Spec.HasDepth)
         {
