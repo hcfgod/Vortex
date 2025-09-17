@@ -30,7 +30,8 @@ project "Sandbox"
         "%{wks.location}/Engine/Vendor/GLAD/generated/include",
         "%{wks.location}/Engine/Vendor/glm",
         "%{wks.location}/Engine/Vendor/nlohmann_json/single_include",
-        "%{wks.location}/Engine/Vendor/SPIRV-Headers/include"
+        "%{wks.location}/Engine/Vendor/SPIRV-Headers/include",
+        "%{wks.location}/Engine/Vendor/imgui"
     }
 
     -- Disable warnings from external headers

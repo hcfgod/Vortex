@@ -700,7 +700,7 @@ if %GLAD_ERROR% NEQ 0 (
     )
 )
 
-cd "..\..\."
+cd "..\..\..\."
 echo GLAD generated successfully!
 
 :: Setup ImGui with docking branch

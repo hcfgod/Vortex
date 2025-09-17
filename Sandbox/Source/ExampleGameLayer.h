@@ -18,6 +18,7 @@ public:
     virtual void OnDetach() override;
     virtual void OnUpdate() override;
     virtual void OnRender() override;
+    virtual void OnImGuiRender() override;
     virtual bool OnEvent(Event& event) override;
 
 private:

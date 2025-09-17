@@ -48,6 +48,10 @@ namespace Vortex
         // Notify the renderer of window size changes
         Result<void> OnWindowResized(uint32_t width, uint32_t height) { return HandleResize(width, height); }
 
+        // Graphics context access (non-owning)
+        GraphicsContext* GetGraphicsContext() { return m_GraphicsContext.get(); }
+        const GraphicsContext* GetGraphicsContext() const { return m_GraphicsContext.get(); }
+
     private:
         Result<void> InitializeRendering();
         Result<void> HandleResize(uint32_t width, uint32_t height);

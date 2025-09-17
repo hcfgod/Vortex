@@ -10,6 +10,8 @@
 #include "Events/ApplicationEvent.h"
 #include "Events/WindowEvent.h"
 #include "Events/InputEvent.h"
+#include <imgui.h>
+#include "Engine/Systems/ImGuiSystem.h"
 
 #ifdef VX_USE_SDL
 	#include "Platform/SDL/SDL3Manager.h"
@@ -106,6 +108,12 @@ namespace Vortex
 				// Handle SDL events
 				while (SDL_PollEvent(&event))
 				{
+				// Feed raw SDL events to ImGui backend first
+				if (auto* imgui = m_Engine->GetSystemManager().GetSystem<ImGuiSystem>())
+				{
+					imgui->ProcessSDLEvent(event);
+				}
+
 					// Convert SDL events to Vortex events and dispatch/forward to layers
 					ConvertSDLEventToVortexEvent(event);
 
@@ -184,6 +192,21 @@ namespace Vortex
 		{
 			auto rs = renderSystem->AttachWindow(m_Window.get());
 			VX_LOG_ERROR(rs);
+
+			// Attach ImGui backends now that window + graphics context are available
+			if (auto* imguiSystem = m_Engine->GetSystemManager().GetSystem<ImGuiSystem>())
+			{
+				auto* gfx = renderSystem->GetGraphicsContext();
+				if (gfx)
+				{
+					auto attachRes = imguiSystem->AttachPlatform(m_Window.get(), gfx);
+					VX_LOG_ERROR(attachRes);
+				}
+				else
+				{
+					VX_CORE_WARN("GraphicsContext not ready; ImGui backends not attached");
+				}
+			}
 		}
 		else
 		{
@@ -343,6 +366,16 @@ namespace Vortex
 
 	void Application::ConvertSDLEventToVortexEvent(const SDL_Event& sdlEvent)
 	{
+		// Query ImGui IO to optionally prevent forwarding input to the engine when UI is focused
+		bool wantsKeyboard = false;
+		bool wantsMouse = false;
+		if (ImGui::GetCurrentContext() != nullptr)
+		{
+			ImGuiIO& io = ImGui::GetIO();
+			wantsKeyboard = io.WantCaptureKeyboard;
+			wantsMouse = io.WantCaptureMouse;
+		}
+
 		// Convert SDL events to Vortex events and dispatch them
 		switch (sdlEvent.type)
 		{
@@ -399,6 +432,7 @@ namespace Vortex
 			// =============================================================================
 			case SDL_EVENT_KEY_DOWN:
 			{
+				if (wantsKeyboard) break;
 				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
 				bool isRepeat = sdlEvent.key.repeat != 0;
 				{
@@ -413,6 +447,7 @@ namespace Vortex
 			
 			case SDL_EVENT_KEY_UP:
 			{
+				if (wantsKeyboard) break;
 				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
 				{
 				KeyReleasedEvent e(keyCode);
@@ -432,6 +467,7 @@ namespace Vortex
 			
 			case SDL_EVENT_TEXT_INPUT:
 			{
+				if (wantsKeyboard) break;
 				const char* text = sdlEvent.text.text;
 				size_t idx = 0;
 				while (text[idx] != '\0')
@@ -453,6 +489,7 @@ namespace Vortex
 			// =============================================================================
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
 			{
+				if (wantsMouse) break;
 				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
 				{
 				MouseButtonPressedEvent e(button);
@@ -466,6 +503,7 @@ namespace Vortex
 			
 			case SDL_EVENT_MOUSE_BUTTON_UP:
 			{
+				if (wantsMouse) break;
 				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
 				{
 				MouseButtonReleasedEvent e(button);
@@ -479,6 +517,7 @@ namespace Vortex
 			
 			case SDL_EVENT_MOUSE_MOTION:
 			{
+				if (wantsMouse) break;
 				float x = static_cast<float>(sdlEvent.motion.x);
 				float y = static_cast<float>(sdlEvent.motion.y);
 				{
@@ -493,6 +532,7 @@ namespace Vortex
 			
 			case SDL_EVENT_MOUSE_WHEEL:
 			{
+				if (wantsMouse) break;
 				float xOffset = sdlEvent.wheel.x;
 				float yOffset = sdlEvent.wheel.y;
 				{

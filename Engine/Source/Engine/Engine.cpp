@@ -12,6 +12,7 @@
 #include "Core/Events/EngineEvent.h"
 #include "Engine/Time/Time.h"
 #include "Engine/Assets/AssetSystem.h"
+#include "Systems/ImGuiSystem.h"
 
 namespace Vortex 
 {
@@ -134,15 +135,32 @@ namespace Vortex
 		{
 			m_RenderSystem->PreRender();
 		}
+
+	// Begin ImGui frame before layer rendering
+	if (auto* imgui = m_SystemManager.GetSystem<ImGuiSystem>())
+	{
+		imgui->BeginFrame();
+	}
 		
 		// Render layers first (Game -> UI -> Debug -> Overlay) so they can queue commands
 		m_LayerStack.OnRender();
+
+
 		
 		// Render engine systems (processes queued commands)
 		auto systemsResult = m_SystemManager.RenderAllSystems();
 		if (systemsResult.IsError())
 			return systemsResult;
 		
+	// Render ImGui for layers (tools, overlays) after systems (dockspace drawn by ImGuiSystem)
+	m_LayerStack.OnImGuiRender();
+
+	// End ImGui frame and render draw data after systems + layer UI
+	if (auto* imgui = m_SystemManager.GetSystem<ImGuiSystem>())
+	{
+		imgui->EndFrameAndRender();
+	}
+
 		// Post-render cleanup (present frame)
 		if (m_RenderSystem)
 		{
@@ -201,6 +219,16 @@ namespace Vortex
 			{
 				VX_CORE_ERROR("Failed to register InputSystem");
 				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register InputSystem");
+			}
+		}
+
+		// Register ImGuiSystem (High priority) after RenderSystem so it can attach to window/context later
+		{
+			auto* imguiSystem = m_SystemManager.RegisterSystem<ImGuiSystem>();
+			if (!imguiSystem)
+			{
+				VX_CORE_ERROR("Failed to register ImGuiSystem");
+				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register ImGuiSystem");
 			}
 		}
 

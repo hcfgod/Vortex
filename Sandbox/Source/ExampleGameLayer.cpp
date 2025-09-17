@@ -1,4 +1,5 @@
 #include "ExampleGameLayer.h"
+#include <imgui.h>
 
 namespace 
 {
@@ -324,6 +325,23 @@ void ExampleGameLayer::OnRender()
 bool ExampleGameLayer::OnEvent(Event& event)
 {
     return false;
+}
+
+void ExampleGameLayer::OnImGuiRender()
+{
+    if (ImGui::Begin("Example Panel"))
+    {
+        ImGui::Text("Hello from ExampleGameLayer!");
+        ImGui::Separator();
+        ImGui::Text("Time: %.2fs", m_GameTime);
+        ImGui::Text("Score: %d", m_Score);
+        ImGui::Checkbox("Paused", &m_IsPaused);
+        if (ImGui::Button("Reset"))
+        {
+            OnResetAction(InputActionPhase::Performed);
+        }
+    }
+    ImGui::End();
 }
 
 void ExampleGameLayer::SetupShaderSystem()

@@ -41,8 +41,21 @@ project "Engine"
         "Vendor/SPIRV-Cross/spirv_parser.cpp",
         "Vendor/SPIRV-Cross/spirv_cfg.cpp",
         "Vendor/SPIRV-Cross/spirv_reflect.cpp",
-        "Vendor/SPIRV-Cross/spirv_glsl.cpp"
+        "Vendor/SPIRV-Cross/spirv_glsl.cpp",
+        -- ImGui core + backends (SDL3 + OpenGL3)
+        "Vendor/imgui/imgui.cpp",
+        "Vendor/imgui/imgui_draw.cpp",
+        "Vendor/imgui/imgui_tables.cpp",
+        "Vendor/imgui/imgui_widgets.cpp",
+        "Vendor/imgui/backends/imgui_impl_sdl3.cpp",
+        "Vendor/imgui/backends/imgui_impl_opengl3.cpp"
     }
+
+    -- Disable PCH for ImGui sources (vendor files should not include engine PCH)
+    filter "files:Vendor/imgui/**.cpp"
+        flags { "NoPCH" }
+        disablewarnings { "4005" } -- silence benign macro redefinitions inside vendor
+    filter {}
 
     defines
     {
@@ -64,7 +77,9 @@ project "Engine"
         "Vendor/SPIRV-Headers/include",
         "Vendor/shaderc/libshaderc/include",
         "Vendor/SPIRV-Cross",
-        "Vendor/stb"
+        "Vendor/stb",
+        "Vendor/imgui",
+        "Vendor/imgui/backends"
     }
 
     -- Disable warnings from external headers
@@ -79,7 +94,9 @@ project "Engine"
         {
             "VX_PLATFORM_WINDOWS",
             "VX_OPENGL_SUPPORT",
-            "VX_USE_SDL"
+            "VX_USE_SDL",
+            -- Ensure ImGui OpenGL3 backend uses GLAD2 loader headers (glad/gl.h)
+            "IMGUI_IMPL_OPENGL_LOADER_GLAD2"
         }
         
         filter { "system:windows", "configurations:*" }

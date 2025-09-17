@@ -114,6 +114,9 @@ namespace Vortex
 
         // Central dockspace and basic menu bar for tooling (no Begin/End frame here)
         ImGuiIO& io = ImGui::GetIO();
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(viewport->WorkPos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(viewport->WorkSize, ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
         ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
         ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
@@ -121,12 +124,14 @@ namespace Vortex
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
                                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
                                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                                 ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
+                                 ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar |
+                                 ImGuiWindowFlags_NoBackground;
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::Begin("###VortexDockspace", nullptr, flags);
-        ImGui::PopStyleVar(2);
+        ImGui::PopStyleVar(3);
 
         // Dockspace
         ImGuiID dockspaceID = ImGui::GetID("VortexDockspaceID");
