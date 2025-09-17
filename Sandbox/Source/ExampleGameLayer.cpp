@@ -1,5 +1,6 @@
 #include "ExampleGameLayer.h"
 #include "ImGuiViewportLayer.h"
+#include "Vortex.h"
 #include <imgui.h>
 
 // Triangle vertices with position, texture coordinates, normal, and tangent
@@ -257,7 +258,10 @@ void ExampleGameLayer::OnRender()
     {
         Vortex::GetRenderCommandQueue().BindFramebuffer(Vortex::FramebufferTarget::Framebuffer, m_ExternalFramebuffer->GetRendererID());
         Vortex::GetRenderCommandQueue().SetViewport(0, 0, w, h);
-        Vortex::GetRenderCommandQueue().Clear(Vortex::ClearCommand::Color, glm::vec4(0.05f, 0.05f, 0.08f, 1.0f));
+        glm::vec4 clearColor(0.2f, 0.2f, 0.2f, 1.0f);
+        if (auto* rs = Vortex::Sys<Vortex::RenderSystem>())
+            clearColor = rs->GetRenderSettings().ClearColor;
+        Vortex::GetRenderCommandQueue().Clear(Vortex::ClearCommand::Color, clearColor);
     }
 
     // Bind shader through ShaderManager
@@ -354,7 +358,7 @@ void ExampleGameLayer::OnRender()
     // If we rendered offscreen, unbind to default framebuffer
     if (m_ExternalFramebuffer)
     {
-        Vortex::GetRenderCommandQueue().BindFramebuffer(Vortex::FramebufferTarget::Framebuffer, 0);
+        GetRenderCommandQueue().BindFramebuffer(FramebufferTarget::Framebuffer, 0);
     }
 }
 

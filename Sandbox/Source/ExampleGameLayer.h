@@ -69,5 +69,5 @@ private:
 	std::shared_ptr<IndexBuffer> m_IndexBuffer;
 
     // Optional offscreen target provided by ImGuiViewportLayer
-    Vortex::FrameBufferRef m_ExternalFramebuffer;
+    FrameBufferRef m_ExternalFramebuffer;
 };

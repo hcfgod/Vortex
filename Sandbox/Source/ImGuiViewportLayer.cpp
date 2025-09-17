@@ -37,7 +37,14 @@ void ImGuiViewportLayer::OnRender()
 void ImGuiViewportLayer::OnImGuiRender()
 {
 	ImGui::SetNextWindowSize(ImVec2((float)m_ViewportWidth, (float)m_ViewportHeight), ImGuiCond_FirstUseEver);
-	if (ImGui::Begin("Viewport"))
+    // Match ImGui window background to engine clear color
+    if (auto* rs = Vortex::Sys<Vortex::RenderSystem>())
+    {
+        const auto& s = rs->GetRenderSettings();
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(s.ClearColor.r, s.ClearColor.g, s.ClearColor.b, s.ClearColor.a));
+    }
+
+    if (ImGui::Begin("Viewport"))
 	{
 		ImVec2 avail = ImGui::GetContentRegionAvail();
 		uint32_t newW = (uint32_t)std::max(1.0f, avail.x);
@@ -65,6 +72,12 @@ void ImGuiViewportLayer::OnImGuiRender()
 		}
 	}
 	ImGui::End();
+
+    // Pop style if we pushed it
+    if (Vortex::Sys<Vortex::RenderSystem>())
+    {
+        ImGui::PopStyleColor();
+    }
 }
 
 bool ImGuiViewportLayer::OnEvent(Event& event)
