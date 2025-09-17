@@ -265,6 +265,17 @@ namespace Vortex
             return Submit(std::make_unique<BufferDataCommand>(target, std::move(payload), usage), executeImmediate);
         }
 
+        bool BufferSubData(uint32_t target, uint64_t offset, const void* data, uint64_t size, bool executeImmediate = false)
+        {
+            auto payload = std::make_shared<BufferSubDataCommand::ByteVector>();
+            if (data && size > 0)
+            {
+                payload->resize(static_cast<size_t>(size));
+                std::memcpy(payload->data(), data, static_cast<size_t>(size));
+            }
+            return Submit(std::make_unique<BufferSubDataCommand>(target, offset, std::move(payload)), executeImmediate);
+        }
+
         bool BindTexture(uint32_t slot, uint32_t texture, uint32_t sampler = 0, bool executeImmediate = false)
         {
             return Submit(std::make_unique<BindTextureCommand>(slot, texture, sampler), executeImmediate);
@@ -370,6 +381,58 @@ namespace Vortex
         bool GenerateMipmap(TextureTarget target, bool executeImmediate = false)
         {
             return Submit(std::make_unique<GenerateMipmapCommand>(static_cast<uint32_t>(target)), executeImmediate);
+        }
+
+        // Framebuffer helpers
+        bool GenFramebuffers(uint32_t count, uint32_t* outFbos, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<GenFramebuffersCommand>(count, outFbos), executeImmediate);
+        }
+
+        bool DeleteFramebuffers(uint32_t count, const uint32_t* fbos, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<DeleteFramebuffersCommand>(count, fbos), executeImmediate);
+        }
+
+        bool BindFramebuffer(uint32_t target, uint32_t fbo, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BindFramebufferCommand>(target, fbo), executeImmediate);
+        }
+
+        bool BindFramebuffer(FramebufferTarget target, uint32_t fbo, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BindFramebufferCommand>(static_cast<uint32_t>(target), fbo), executeImmediate);
+        }
+
+        bool FramebufferTexture2D(uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<FramebufferTexture2DCommand>(target, attachment, textarget, texture, level), executeImmediate);
+        }
+
+        bool FramebufferTexture2D(FramebufferTarget target, FramebufferAttachment attachment, TextureTarget textarget, uint32_t texture, int32_t level, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<FramebufferTexture2DCommand>(static_cast<uint32_t>(target), static_cast<uint32_t>(attachment), static_cast<uint32_t>(textarget), texture, level), executeImmediate);
+        }
+
+        bool CheckFramebufferStatus(uint32_t target, uint32_t* outStatus, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<CheckFramebufferStatusCommand>(target, outStatus), executeImmediate);
+        }
+
+        bool CheckFramebufferStatus(FramebufferTarget target, uint32_t* outStatus, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<CheckFramebufferStatusCommand>(static_cast<uint32_t>(target), outStatus), executeImmediate);
+        }
+
+        // UBO/SSBO binding helper
+        bool BindBufferBase(uint32_t target, uint32_t index, uint32_t buffer, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BindBufferBaseCommand>(target, index, buffer), executeImmediate);
+        }
+
+        bool BindBufferBase(BufferTarget target, uint32_t index, uint32_t buffer, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<BindBufferBaseCommand>(static_cast<uint32_t>(target), index, buffer), executeImmediate);
         }
 
         /**
@@ -516,4 +579,17 @@ namespace Vortex
     // Convenience wrapper for binding textures to slots
 #define VX_RENDER_BIND_TEXTURE(slot, texture, sampler) \
         ::Vortex::GetRenderCommandQueue().Submit(std::make_unique<BindTextureCommand>(slot, texture, sampler))
+
+    // Convenience wrappers for framebuffer ops
+#define VX_RENDER_GEN_FBO(count, out) \
+        ::Vortex::GetRenderCommandQueue().GenFramebuffers(count, out)
+
+#define VX_RENDER_DEL_FBO(count, fbos) \
+        ::Vortex::GetRenderCommandQueue().DeleteFramebuffers(count, fbos)
+
+#define VX_RENDER_BIND_FBO(target, fbo) \
+        ::Vortex::GetRenderCommandQueue().BindFramebuffer(target, fbo)
+
+#define VX_RENDER_FBO_TEX2D(target, attachment, textarget, tex, level) \
+        ::Vortex::GetRenderCommandQueue().FramebufferTexture2D(target, attachment, textarget, tex, level)
 }

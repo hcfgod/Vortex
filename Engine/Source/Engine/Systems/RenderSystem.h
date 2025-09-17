@@ -69,8 +69,6 @@ namespace Vortex
         RenderPass m_Pass3D{ RenderPassDesc{ "3D", 0 } };
         RenderPass m_Pass2D{ RenderPassDesc{ "2D", 0 } };
         RenderPass m_PassUI{ RenderPassDesc{ "UI", 0 } };
-
-        // Optional: subscribe to window resize events later if needed
     };
 }
 

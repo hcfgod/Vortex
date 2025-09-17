@@ -47,7 +47,6 @@
 #include "Engine/Renderer/RenderCommand.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
 #include "Engine/Renderer/RenderPass.h"
-#include "Engine/Renderer/Pipeline.h"
 #include "Engine/Systems/RenderSystem.h"
 #include "Engine/Renderer/Shader/Shader.h"
 #include "Engine/Renderer/Shader/ShaderCompiler.h"
@@ -57,6 +56,8 @@
 #include "Engine/Renderer/VertexArray.h"
 #include "Engine/Renderer/Buffer.h"
 #include "Engine/Renderer/Texture.h"
+#include "Engine/Renderer/UniformBuffer.h"
+#include "Engine/Renderer/FrameBuffer.h"
 
 // Assets
 #include "Engine/Assets/Asset.h"

@@ -1,22 +1,19 @@
 #include "ExampleGameLayer.h"
 #include <imgui.h>
 
-namespace 
+// Triangle vertices with position, texture coordinates, normal, and tangent
+const float kVertices[] =
 {
-    // Triangle vertices with position, texture coordinates, normal, and tangent
-    const float kVertices[] =
-    {
-        // Position (x, y, z)    // TexCoord (u, v)  // Normal (x, y, z)     // Tangent (x, y, z)
-        -0.8f, -0.8f, 0.0f,     0.0f, 0.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, // Bottom-left
-         0.8f, -0.8f, 0.0f,     1.0f, 0.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, // Bottom-right
-         0.0f,  0.8f, 0.0f,     0.5f, 1.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f  // Top-center
-    };
+    // Position (x, y, z)    // TexCoord (u, v)  // Normal (x, y, z)     // Tangent (x, y, z)
+    -0.8f, -0.8f, 0.0f,     0.0f, 0.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, // Bottom-left
+     0.8f, -0.8f, 0.0f,     1.0f, 0.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, // Bottom-right
+     0.0f,  0.8f, 0.0f,     0.5f, 1.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f  // Top-center
+};
 
-    const unsigned int kIndices[] =
-    {
-        0, 1, 2 // Single triangle
-    };
-}
+const unsigned int kIndices[] =
+{
+    0, 1, 2 // Single triangle
+};
 
 void ExampleGameLayer::OnAttach()
 {

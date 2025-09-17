@@ -65,11 +65,12 @@ namespace Vortex
                 std::ofstream out(defaultsPath, std::ios::binary);
                 if (out.is_open())
                 {
-                    const char* kDefaults = R"({
-  "Window": {"Title": "Vortex Application", "Width": 1280, "Height": 720, "Fullscreen": false, "Resizable": true},
-  "Renderer": {"API": "OpenGL", "VSync": "Enabled", "ClearColor": {"r":0.07, "g":0.07, "b":0.08, "a":1.0}},
-  "Logging": {"EnableAsync": true, "AsyncQueueSize": 8192, "AsyncThreadCount": 1, "EnableConsole": true, "ConsoleColors": true, "EnableFileLogging": true, "LogDirectory": "logs", "EnableRotation": true, "DailyRotation": false, "MaxFiles": 5, "AutoFlush": false, "MaxFileSizeBytes": 10485760, "Level": "info", "FlushIntervalSeconds": 3}
-})";
+                    const char* kDefaults =
+                    R"({
+                        "Window": {"Title": "Vortex Application", "Width": 1280, "Height": 720, "Fullscreen": false, "Resizable": true},
+                        "Renderer": {"API": "OpenGL", "VSync": "Enabled", "ClearColor": {"r":0.07, "g":0.07, "b":0.08, "a":1.0}},
+                        "Logging": {"EnableAsync": true, "AsyncQueueSize": 8192, "AsyncThreadCount": 1, "EnableConsole": true, "ConsoleColors": true, "EnableFileLogging": true, "LogDirectory": "logs", "EnableRotation": true, "DailyRotation": false, "MaxFiles": 5, "AutoFlush": false, "MaxFileSizeBytes": 10485760, "Level": "info", "FlushIntervalSeconds": 3}
+                    })";
                     out << kDefaults;
                     out.close();
                 }

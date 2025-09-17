@@ -258,6 +258,28 @@ namespace Vortex
     };
 
     /**
+     * @brief Command to update a sub-range of a buffer
+     */
+    class BufferSubDataCommand : public RenderCommand
+    {
+    public:
+        using ByteVector = std::vector<uint8_t>;
+
+        BufferSubDataCommand(uint32_t target, uint64_t offset, std::shared_ptr<ByteVector> payload)
+            : m_Target(target), m_Offset(offset), m_Payload(std::move(payload)), m_Size(m_Payload ? static_cast<uint64_t>(m_Payload->size()) : 0ull) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "BufferSubData"; }
+        float GetEstimatedCost() const override { return static_cast<float>(m_Size) * 1e-9f; }
+
+    private:
+        uint32_t m_Target;
+        uint64_t m_Offset;
+        std::shared_ptr<ByteVector> m_Payload;
+        uint64_t m_Size;
+    };
+
+    /**
      * @brief Command to set vertex attribute pointer
      */
     class VertexAttribPointerCommand : public RenderCommand
@@ -412,6 +434,25 @@ namespace Vortex
         uint32_t m_Slot;
         uint32_t m_Texture;
         uint32_t m_Sampler;
+    };
+
+    /**
+     * @brief Bind a buffer to an indexed binding point (UBO/SSBO)
+     */
+    class BindBufferBaseCommand : public RenderCommand
+    {
+    public:
+        BindBufferBaseCommand(uint32_t target, uint32_t index, uint32_t buffer)
+            : m_Target(target), m_Index(index), m_Buffer(buffer) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "BindBufferBase"; }
+        float GetEstimatedCost() const override { return 0.01f; }
+
+    private:
+        uint32_t m_Target;
+        uint32_t m_Index;
+        uint32_t m_Buffer;
     };
 
     // ============================================================================
@@ -689,5 +730,87 @@ namespace Vortex
 
     private:
         uint32_t m_Target;
+    };
+
+    // ============================================================================
+    // FRAMEBUFFER COMMANDS
+    // ============================================================================
+
+    class GenFramebuffersCommand : public RenderCommand
+    {
+    public:
+        GenFramebuffersCommand(uint32_t count, uint32_t* outFbos)
+            : m_Count(count), m_OutFbos(outFbos) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "GenFramebuffers"; }
+        float GetEstimatedCost() const override { return 0.01f * m_Count; }
+
+    private:
+        uint32_t m_Count;
+        uint32_t* m_OutFbos;
+    };
+
+    class DeleteFramebuffersCommand : public RenderCommand
+    {
+    public:
+        DeleteFramebuffersCommand(uint32_t count, const uint32_t* fbos)
+            : m_Count(count), m_Fbos(fbos) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "DeleteFramebuffers"; }
+        float GetEstimatedCost() const override { return 0.01f * m_Count; }
+
+    private:
+        uint32_t m_Count;
+        const uint32_t* m_Fbos;
+    };
+
+    class BindFramebufferCommand : public RenderCommand
+    {
+    public:
+        BindFramebufferCommand(uint32_t target, uint32_t fbo)
+            : m_Target(target), m_FBO(fbo) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "BindFramebuffer"; }
+        float GetEstimatedCost() const override { return 0.01f; }
+
+    private:
+        uint32_t m_Target;
+        uint32_t m_FBO;
+    };
+
+    class FramebufferTexture2DCommand : public RenderCommand
+    {
+    public:
+        FramebufferTexture2DCommand(uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level)
+            : m_Target(target), m_Attachment(attachment), m_TexTarget(textarget), m_Texture(texture), m_Level(level) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "FramebufferTexture2D"; }
+        float GetEstimatedCost() const override { return 0.02f; }
+
+    private:
+        uint32_t m_Target;
+        uint32_t m_Attachment;
+        uint32_t m_TexTarget;
+        uint32_t m_Texture;
+        int32_t m_Level;
+    };
+
+    class CheckFramebufferStatusCommand : public RenderCommand
+    {
+    public:
+        CheckFramebufferStatusCommand(uint32_t target, uint32_t* outStatus)
+            : m_Target(target), m_OutStatus(outStatus) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "CheckFramebufferStatus"; }
+        float GetEstimatedCost() const override { return 0.005f; }
+
+    private:
+        uint32_t m_Target;
+        uint32_t* m_OutStatus;
     };
 }

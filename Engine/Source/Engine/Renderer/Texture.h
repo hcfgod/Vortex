@@ -60,5 +60,3 @@ namespace Vortex
 
     using Texture2DRef = std::shared_ptr<Texture2D>;
 }
-
-

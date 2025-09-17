@@ -447,6 +447,42 @@ namespace Vortex
         return Result<void>();
     }
 
+    Result<void> OpenGLRendererAPI::BufferSubData(uint32_t target, uint64_t offset, uint64_t size, const void* data)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        glBufferSubData(ConvertBufferTarget(target), static_cast<GLintptr>(offset), static_cast<GLsizeiptr>(size), data);
+
+        if (!CheckGLError("BufferSubData"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to update buffer sub data");
+        }
+
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::BindBufferBase(uint32_t target, uint32_t index, uint32_t buffer)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+        glBindBufferBase(ConvertBufferTarget(target), index, buffer);
+
+        if (!CheckGLError("BindBufferBase"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to bind buffer base");
+        }
+
+        return Result<void>();
+    }
+
     Result<void> OpenGLRendererAPI::GenBuffers(uint32_t count, uint32_t* outBuffers)
     {
         auto validateResult = ValidateContext();
@@ -719,6 +755,87 @@ namespace Vortex
         if (!CheckGLError("GenerateMipmap"))
         {
             return Result<void>(ErrorCode::RendererInitFailed, "Failed to generate mipmaps");
+        }
+        return Result<void>();
+    }
+
+    // ============================================================================
+    // Framebuffers
+    // ============================================================================
+
+    Result<void> OpenGLRendererAPI::GenFramebuffers(uint32_t count, uint32_t* outFbos)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glGenFramebuffers(static_cast<GLsizei>(count), reinterpret_cast<GLuint*>(outFbos));
+        if (!CheckGLError("GenFramebuffers"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to generate framebuffers");
+        }
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::DeleteFramebuffers(uint32_t count, const uint32_t* fbos)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glDeleteFramebuffers(static_cast<GLsizei>(count), reinterpret_cast<const GLuint*>(fbos));
+        if (!CheckGLError("DeleteFramebuffers"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to delete framebuffers");
+        }
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::BindFramebuffer(uint32_t target, uint32_t fbo)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glBindFramebuffer(ConvertFramebufferTarget(target), fbo);
+        if (!CheckGLError("BindFramebuffer"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to bind framebuffer");
+        }
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::FramebufferTexture2D(uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glFramebufferTexture2D(ConvertFramebufferTarget(target), ConvertFramebufferAttachment(attachment), ConvertTextureTarget(textarget), texture, level);
+        if (!CheckGLError("FramebufferTexture2D"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to attach texture to framebuffer");
+        }
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::CheckFramebufferStatus(uint32_t target, uint32_t* outStatus)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        GLenum status = glCheckFramebufferStatus(ConvertFramebufferTarget(target));
+        if (outStatus) *outStatus = status;
+        if (status != GL_FRAMEBUFFER_COMPLETE)
+        {
+            VX_CORE_ERROR("Framebuffer not complete: {}", static_cast<uint32_t>(status));
+            return Result<void>(ErrorCode::RendererInitFailed, "Framebuffer incomplete");
         }
         return Result<void>();
     }
@@ -1118,6 +1235,32 @@ namespace Vortex
             case TextureParamName::WrapS:     return GL_TEXTURE_WRAP_S;
             case TextureParamName::WrapT:     return GL_TEXTURE_WRAP_T;
             default: return GL_TEXTURE_MIN_FILTER;
+        }
+    }
+
+    uint32_t OpenGLRendererAPI::ConvertFramebufferTarget(uint32_t target) const
+    {
+        switch (static_cast<FramebufferTarget>(target))
+        {
+            case FramebufferTarget::Framebuffer:      return GL_FRAMEBUFFER;
+            case FramebufferTarget::ReadFramebuffer:  return GL_READ_FRAMEBUFFER;
+            case FramebufferTarget::DrawFramebuffer:  return GL_DRAW_FRAMEBUFFER;
+            default:                                  return GL_FRAMEBUFFER;
+        }
+    }
+
+    uint32_t OpenGLRendererAPI::ConvertFramebufferAttachment(uint32_t attachment) const
+    {
+        switch (static_cast<FramebufferAttachment>(attachment))
+        {
+            case FramebufferAttachment::Color0:       return GL_COLOR_ATTACHMENT0;
+            case FramebufferAttachment::Color1:       return GL_COLOR_ATTACHMENT1;
+            case FramebufferAttachment::Color2:       return GL_COLOR_ATTACHMENT2;
+            case FramebufferAttachment::Color3:       return GL_COLOR_ATTACHMENT3;
+            case FramebufferAttachment::Depth:        return GL_DEPTH_ATTACHMENT;
+            case FramebufferAttachment::Stencil:      return GL_STENCIL_ATTACHMENT;
+            case FramebufferAttachment::DepthStencil: return GL_DEPTH_STENCIL_ATTACHMENT;
+            default:                                  return GL_COLOR_ATTACHMENT0;
         }
     }
 }

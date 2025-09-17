@@ -74,6 +74,14 @@ namespace Vortex
         return renderer->BufferData(m_Target, dataPtr, m_Size, m_Usage);
     }
 
+    Result<void> BufferSubDataCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        const void* dataPtr = (m_Payload && !m_Payload->empty()) ? static_cast<const void*>(m_Payload->data()) : nullptr;
+        return renderer->BufferSubData(m_Target, m_Offset, m_Size, dataPtr);
+    }
+
     // --------------------- VertexAttribPointerCommand --------------------
     Result<void> VertexAttribPointerCommand::Execute(GraphicsContext* /*context*/)
     {
@@ -109,6 +117,13 @@ namespace Vortex
         auto* renderer = GetRenderer();
         if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
         return renderer->BindTexture(m_Slot, m_Texture, m_Sampler);
+    }
+
+    Result<void> BindBufferBaseCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->BindBufferBase(m_Target, m_Index, m_Buffer);
     }
 
     // ------------------------ SetDepthStateCommand -----------------------
@@ -238,6 +253,42 @@ namespace Vortex
         auto* renderer = GetRenderer();
         if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
         return renderer->GenerateMipmap(m_Target);
+    }
+
+    // ----------------------------- Framebuffer commands -----------------------------
+    Result<void> GenFramebuffersCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->GenFramebuffers(m_Count, m_OutFbos);
+    }
+
+    Result<void> DeleteFramebuffersCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->DeleteFramebuffers(m_Count, m_Fbos);
+    }
+
+    Result<void> BindFramebufferCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->BindFramebuffer(m_Target, m_FBO);
+    }
+
+    Result<void> FramebufferTexture2DCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->FramebufferTexture2D(m_Target, m_Attachment, m_TexTarget, m_Texture, m_Level);
+    }
+
+    Result<void> CheckFramebufferStatusCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->CheckFramebufferStatus(m_Target, m_OutStatus);
     }
 
 } // namespace Vortex

@@ -56,4 +56,23 @@ namespace Vortex
         WrapS     = 2,
         WrapT     = 3
     };
+
+    // Framebuffer enums for API-agnostic calls
+    enum class FramebufferTarget : uint32_t
+    {
+        Framebuffer = 0,      // both read+draw
+        ReadFramebuffer = 1,
+        DrawFramebuffer = 2
+    };
+
+    enum class FramebufferAttachment : uint32_t
+    {
+        Color0 = 0,
+        Color1 = 1,
+        Color2 = 2,
+        Color3 = 3,
+        Depth = 100,
+        Stencil = 101,
+        DepthStencil = 102
+    };
 }

@@ -154,6 +154,16 @@ namespace Vortex
          */
         virtual Result<void> BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage) = 0;
 
+        /**
+         * @brief Update a sub-range of the currently bound buffer
+         */
+        virtual Result<void> BufferSubData(uint32_t target, uint64_t offset, uint64_t size, const void* data) = 0;
+
+        /**
+         * @brief Bind a buffer object to an indexed binding point (e.g., UBO)
+         */
+        virtual Result<void> BindBufferBase(uint32_t target, uint32_t index, uint32_t buffer) = 0;
+
         // ============================================================================
         // OBJECT LIFETIME (GEN/DELETE)
         // ============================================================================
@@ -255,6 +265,37 @@ namespace Vortex
          * @brief Generate mipmaps for the texture bound to target
          */
         virtual Result<void> GenerateMipmap(uint32_t target) = 0;
+
+        // ============================================================================
+        // FRAMEBUFFER OPERATIONS
+        // ============================================================================
+
+        /**
+         * @brief Generate one or more framebuffer objects
+         */
+        virtual Result<void> GenFramebuffers(uint32_t count, uint32_t* outFbos) = 0;
+
+        /**
+         * @brief Delete one or more framebuffer objects
+         */
+        virtual Result<void> DeleteFramebuffers(uint32_t count, const uint32_t* fbos) = 0;
+
+        /**
+         * @brief Bind a framebuffer target
+         */
+        virtual Result<void> BindFramebuffer(uint32_t target, uint32_t fbo) = 0;
+
+        /**
+         * @brief Attach a 2D texture to a framebuffer attachment point
+         */
+        virtual Result<void> FramebufferTexture2D(uint32_t target, uint32_t attachment, uint32_t textarget, uint32_t texture, int32_t level) = 0;
+
+        /**
+         * @brief Check framebuffer completeness status
+         * @param target Framebuffer target
+         * @param outStatus Receives API-specific status enum
+         */
+        virtual Result<void> CheckFramebufferStatus(uint32_t target, uint32_t* outStatus) = 0;
 
         // ============================================================================
         // RENDER STATE
