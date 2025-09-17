@@ -133,11 +133,10 @@ namespace Vortex
         // Central dockspace and basic menu bar for tooling (no Begin/End frame here)
         ImGuiIO& io = ImGui::GetIO();
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->WorkPos, ImGuiCond_Always);
-        ImGui::SetNextWindowSize(viewport->WorkSize, ImGuiCond_Always);
-        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
-        ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+        // Use main viewport position/size so docking guides align correctly in windowed mode
+        ImGui::SetNextWindowPos(viewport->Pos);
+        ImGui::SetNextWindowSize(viewport->Size);
+        ImGui::SetNextWindowViewport(viewport->ID);
 
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
                                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
