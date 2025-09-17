@@ -103,8 +103,26 @@ namespace Vortex
 #endif
         if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
         {
+            // Backup current GL context and window before ImGui renders additional platform windows
+#ifdef VX_USE_SDL
+#ifdef VX_OPENGL_SUPPORT
+            SDL_Window* backupWindow = SDL_GL_GetCurrentWindow();
+            SDL_GLContext backupContext = SDL_GL_GetCurrentContext();
+#endif
+#endif
+
             ImGui::UpdatePlatformWindows();
             ImGui::RenderPlatformWindowsDefault();
+
+            // Restore previous GL context to keep engine render state consistent
+#ifdef VX_USE_SDL
+#ifdef VX_OPENGL_SUPPORT
+            if (backupWindow && backupContext)
+            {
+                SDL_GL_MakeCurrent(backupWindow, backupContext);
+            }
+#endif
+#endif
         }
     }
 
