@@ -8,6 +8,7 @@
 #include <string>
 #include <shared_mutex>
 #include <algorithm>
+#include <spdlog/spdlog.h>
 
 namespace Vortex
 {
@@ -110,4 +111,3 @@ namespace Vortex
 // Template specialization for spdlog::level::level_enum (implemented in .cpp)
 template<>
 spdlog::level::level_enum Vortex::Configuration::GetAs<spdlog::level::level_enum>(const std::string& dottedPath, const spdlog::level::level_enum& defaultValue) const;
-

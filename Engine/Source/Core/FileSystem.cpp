@@ -133,6 +133,8 @@ namespace Vortex
     bool FileSystem::CreateDirectories(const std::filesystem::path& path)
     {
         std::error_code ec;
-        return std::filesystem::create_directories(path, ec);
+        bool created = std::filesystem::create_directories(path, ec);
+        // Return true if directories were created OR if they already exist
+        return created || (!ec && std::filesystem::exists(path, ec) && std::filesystem::is_directory(path, ec));
     }
 }

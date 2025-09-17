@@ -430,6 +430,12 @@ namespace Vortex
         }
     }
 
+    bool AssetSystem::Exists(const UUID& id) const
+    {
+        std::lock_guard<std::mutex> lock(m_Mutex);
+        return m_Assets.find(id) != m_Assets.end();
+    }
+
     bool AssetSystem::IsLoaded(const UUID& id) const
     {
         std::lock_guard<std::mutex> lock(m_Mutex);

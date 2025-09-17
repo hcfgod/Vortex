@@ -1,0 +1,6 @@
+{
+                "name": "Default",
+                "vertex": "Shaders/Default.vert",
+                "fragment": "Shaders/Default.frag",
+                "options": { "TargetProfile": "opengl" }
+            }

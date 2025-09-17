@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 union SDL_Event;
 

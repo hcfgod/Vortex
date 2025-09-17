@@ -103,6 +103,7 @@ namespace Vortex
         void Release(const UUID& id);
 
         // Internal accessors for AssetHandle
+        bool Exists(const UUID& id) const;
         bool IsLoaded(const UUID& id) const;
         float GetProgress(const UUID& id) const;
         template<typename T>

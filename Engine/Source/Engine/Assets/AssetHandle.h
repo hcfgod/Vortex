@@ -64,7 +64,7 @@ namespace Vortex
             if (IsValid()) m_System->Release(m_Id);
         }
 
-        bool IsValid() const { return m_System != nullptr && m_Id != UUID::Invalid; }
+        bool IsValid() const { return m_System != nullptr && m_Id != UUID::Invalid && m_System->Exists(m_Id); }
         const UUID& GetId() const { return m_Id; }
 
         // Query state/progress via system

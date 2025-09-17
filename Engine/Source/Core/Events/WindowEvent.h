@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Event.h"
+#include <spdlog/fmt/ostr.h>
 
 namespace Vortex
 {
