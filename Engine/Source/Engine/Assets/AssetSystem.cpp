@@ -32,7 +32,11 @@ namespace Vortex
         if (m_Initialized)
             return Result<void>();
 
-        // Default assets root: prefer working directory (VS debugdir) if it has Assets/, else next to executable, else relative Assets/
+        // Default assets root resolution (priority):
+        // 1) VS debugdir (current working directory) if it has Assets/
+        // 2) Explicit working directory set via SetWorkingDirectory
+        // 3) Next to executable
+        // 4) Relative ./Assets
         namespace fs = std::filesystem;
         auto exeDir = FileSystem::GetExecutableDirectory();
         fs::path wd = fs::current_path();
@@ -40,7 +44,12 @@ namespace Vortex
         if (fs::exists(wd / "Assets", initEc) && fs::is_directory(wd / "Assets", initEc))
         {
             m_AssetsRoot = wd / "Assets";
-            VX_CORE_INFO("AssetSystem: Using AssetsRoot from working directory: {}", m_AssetsRoot.string());
+            VX_CORE_INFO("AssetSystem: Using AssetsRoot from VS debugdir/current working directory: {}", m_AssetsRoot.string());
+        }
+        else if (m_HasExplicitWorkingDirectory && fs::exists(m_ExplicitWorkingDirectory / "Assets", initEc))
+        {
+            m_AssetsRoot = m_ExplicitWorkingDirectory / "Assets";
+            VX_CORE_INFO("AssetSystem: Using AssetsRoot from explicit working directory: {}", m_AssetsRoot.string());
         }
         else if (exeDir.has_value())
         {
@@ -133,6 +142,8 @@ namespace Vortex
     void AssetSystem::SetWorkingDirectory(const std::filesystem::path& dir)
     {
         namespace fs = std::filesystem;
+        m_ExplicitWorkingDirectory = dir;
+        m_HasExplicitWorkingDirectory = true;
         m_AssetsRoot = dir / "Assets";
         m_AssetPackPath = dir / "Assets.vxpack";
         std::error_code ec;

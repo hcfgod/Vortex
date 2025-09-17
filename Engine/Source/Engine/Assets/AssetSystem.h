@@ -203,6 +203,9 @@ namespace Vortex
         double m_UnloadGracePeriodSeconds = 5.0; // default grace window
 
         std::filesystem::path m_AssetsRoot;
+        // Explicit working directory set via SetWorkingDirectory (preferred when not running under VS debugger)
+        std::filesystem::path m_ExplicitWorkingDirectory;
+        bool m_HasExplicitWorkingDirectory = false;
         std::filesystem::path m_DevAssetsRoot; // Optional: repo-level Assets for development
         bool m_DevAssetsAvailable = false;
         // Optional packaged assets (used typically in release builds)
