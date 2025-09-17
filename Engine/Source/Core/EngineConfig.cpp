@@ -54,8 +54,33 @@ namespace Vortex
         auto defaultsPath = std::filesystem::path(configDirectory) / "EngineDefaults.json";
         if (!config.LoadLayerFromFile(defaultsPath, "EngineDefaults", 100, &error, true))
         {
-            VX_CORE_ERROR("Failed to load engine defaults: {0}", error);
-            return Result<void>(ErrorCode::ConfigurationError, "Failed to load EngineDefaults.json: " + error);
+            VX_CORE_WARN("EngineDefaults.json missing or invalid: {0}. Generating minimal defaults...", error);
+            // Generate minimal defaults via Bootstrap helper (duplicated minimal content to avoid dependency loop)
+            try
+            {
+                std::error_code ec;
+                std::filesystem::create_directories(defaultsPath.parent_path(), ec);
+                std::ofstream out(defaultsPath, std::ios::binary);
+                if (out.is_open())
+                {
+                    const char* kDefaults = R"({
+  "Window": {"Title": "Vortex Application", "Width": 1280, "Height": 720, "Fullscreen": false, "Resizable": true},
+  "Renderer": {"API": "OpenGL", "VSync": "Enabled", "ClearColor": {"r":0.07, "g":0.07, "b":0.08, "a":1.0}},
+  "Logging": {"EnableAsync": true, "AsyncQueueSize": 8192, "AsyncThreadCount": 1, "EnableConsole": true, "ConsoleColors": true, "EnableFileLogging": true, "LogDirectory": "logs", "EnableRotation": true, "DailyRotation": false, "MaxFiles": 5, "AutoFlush": false, "MaxFileSizeBytes": 10485760, "Level": "info", "FlushIntervalSeconds": 3}
+})";
+                    out << kDefaults;
+                    out.close();
+                }
+            }
+            catch (...)
+            {
+            }
+            error.clear();
+            if (!config.LoadLayerFromFile(defaultsPath, "EngineDefaults", 100, &error, true))
+            {
+                VX_CORE_ERROR("Failed to load engine defaults after generation: {0}", error);
+                return Result<void>(ErrorCode::ConfigurationError, "Failed to load EngineDefaults.json: " + error);
+            }
         }
 
         // 2. Engine overrides (priority 200) - optional

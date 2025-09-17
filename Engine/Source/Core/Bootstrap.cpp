@@ -4,9 +4,60 @@
 #include "Debug/Log.h"
 #include "FileSystem.h"
 #include <filesystem>
+#include <fstream>
 
 namespace Vortex
 {
+    // Internal helper to generate a minimal EngineDefaults.json if missing
+    static bool WriteDefaultEngineDefaults(const std::filesystem::path& defaultsPath)
+    {
+        try
+        {
+            std::error_code ec;
+            std::filesystem::create_directories(defaultsPath.parent_path(), ec);
+            std::ofstream out(defaultsPath, std::ios::binary);
+            if (!out.is_open())
+                return false;
+            const char* kDefaults = R"({
+  "Window": {
+    "Title": "Vortex Sandbox",
+    "Width": 1280,
+    "Height": 720,
+    "Fullscreen": false,
+    "Resizable": true
+  },
+  "Renderer": {
+    "API": "OpenGL",
+    "VSync": "Enabled",
+    "ClearColor": { "r": 0.07, "g": 0.07, "b": 0.08, "a": 1.0 },
+    "MSAASamples": 4,
+    "AnisotropicFiltering": 16
+  },
+  "Logging": {
+    "EnableAsync": true,
+    "AsyncQueueSize": 8192,
+    "AsyncThreadCount": 1,
+    "EnableConsole": true,
+    "ConsoleColors": true,
+    "EnableFileLogging": true,
+    "LogDirectory": "logs",
+    "EnableRotation": true,
+    "DailyRotation": false,
+    "MaxFiles": 5,
+    "AutoFlush": false,
+    "MaxFileSizeBytes": 10485760,
+    "Level": "trace",
+    "FlushIntervalSeconds": 3
+  }
+})";
+            out << kDefaults;
+            return true;
+        }
+        catch (...)
+        {
+            return false;
+        }
+    }
     bool Bootstrap::s_Initialized = false;
     std::string Bootstrap::s_ConfigDirectory;
 
@@ -44,12 +95,25 @@ namespace Vortex
         std::string err;
         bool success = true;
 
-        // Load engine defaults (critical)
+        // Load engine defaults (critical). If missing, generate minimal defaults and try again.
         auto defaultsPath = std::filesystem::path(configDir) / "EngineDefaults.json";
         if (!cfg.LoadLayerFromFile(defaultsPath, "EngineDefaults", 100, &err, true))
         {
             std::cerr << "[CONFIG ERROR] Failed to load EngineDefaults.json: " << err << std::endl;
-            success = false;
+            // Attempt to generate minimal defaults on disk
+            if (WriteDefaultEngineDefaults(defaultsPath))
+            {
+                err.clear();
+                if (!cfg.LoadLayerFromFile(defaultsPath, "EngineDefaults", 100, &err, true))
+                {
+                    std::cerr << "[CONFIG ERROR] Retry load EngineDefaults.json failed: " << err << std::endl;
+                    success = false;
+                }
+            }
+            else
+            {
+                success = false;
+            }
         }
 
         // Load engine overrides (optional)
