@@ -700,8 +700,31 @@ if %GLAD_ERROR% NEQ 0 (
     )
 )
 
-cd "..\..\.."
+cd "..\..\."
 echo GLAD generated successfully!
+
+:: Setup ImGui with docking branch
+echo Setting up ImGui with docking support...
+if not exist "Engine\Vendor\imgui" (
+    echo Cloning ImGui docking branch...
+    git clone --depth 1 --branch docking https://github.com/ocornut/imgui.git "Engine\Vendor\imgui"
+    
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to clone ImGui! Make sure git is installed.
+        popd
+        pause
+        exit /b 1
+    )
+    
+    echo ImGui docking branch cloned successfully!
+) else (
+    echo Updating ImGui docking branch...
+    cd "Engine\Vendor\imgui"
+    git checkout docking
+    git pull origin docking
+    cd "..\..\."
+    echo ImGui docking branch updated successfully!
+)
 
 echo Generating Visual Studio project files...
 call "Vendor\Premake\premake5.exe" vs2022
