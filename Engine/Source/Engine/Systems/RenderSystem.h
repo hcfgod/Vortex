@@ -6,6 +6,7 @@
 #include "Engine/Renderer/RenderCommandQueue.h"
 #include "Engine/Renderer/Shader/ShaderManager.h"
 #include "Engine/Renderer/RenderPass.h"
+#include "Engine/Renderer/FrameBuffer.h"
 #include "Core/Window.h"
 #include "Core/Debug/ErrorCodes.h"
 
@@ -45,6 +46,9 @@ namespace Vortex
         void SetRenderSettings(const RenderSettings& settings) { m_Settings = settings; ApplySettings(); }
         const RenderSettings& GetRenderSettings() const { return m_Settings; }
 
+        // Editor/viewport integration: set external scene render target
+        void SetSceneRenderTarget(const FrameBufferRef& fb) { m_SceneTarget = fb; }
+
         // Notify the renderer of window size changes
         Result<void> OnWindowResized(uint32_t width, uint32_t height) { return HandleResize(width, height); }
 
@@ -69,6 +73,9 @@ namespace Vortex
         RenderPass m_Pass3D{ RenderPassDesc{ "3D", 0 } };
         RenderPass m_Pass2D{ RenderPassDesc{ "2D", 0 } };
         RenderPass m_PassUI{ RenderPassDesc{ "UI", 0 } };
+
+        // Optional external framebuffer for scene rendering (editor viewport)
+        FrameBufferRef m_SceneTarget;
     };
 }
 

@@ -242,6 +242,25 @@ namespace Vortex
             flags &= ~Vortex::ClearCommand::Stencil;
         }
 
+        // If an external scene target is set (editor viewport), bind it and set viewport/clear
+        if (m_SceneTarget)
+        {
+            GetRenderCommandQueue().BindFramebuffer(FramebufferTarget::Framebuffer, m_SceneTarget->GetRendererID());
+            const auto& spec = m_SceneTarget->GetSpec();
+            uint32_t w = spec.Width;
+            uint32_t h = spec.Height;
+            if (w == 0 || h == 0)
+            {
+                if (m_Window)
+                {
+                    const auto& props = m_Window->GetProperties();
+                    w = (uint32_t)props.Width;
+                    h = (uint32_t)props.Height;
+                }
+            }
+            GetRenderCommandQueue().SetViewport(0, 0, w, h);
+        }
+
         // Configure built-in passes
         m_Pass3D.SetDesc(RenderPassDesc{ "3D", flags, m_Settings.ClearColor, m_Settings.ClearDepth, m_Settings.ClearStencil, false });
         m_Pass2D.SetDesc(RenderPassDesc{ "2D", 0, {}, 1.0f, 0, false });
@@ -292,6 +311,12 @@ namespace Vortex
         if (m_Pass2D.IsActive()) m_Pass2D.End();
         if (m_Pass3D.IsActive()) m_Pass3D.End();
 
+        // If we redirected to an external scene target this frame, unbind back to default before ImGui render
+        if (m_SceneTarget)
+        {
+            GetRenderCommandQueue().BindFramebuffer(FramebufferTarget::Framebuffer, 0);
+        }
+
         // End ImGui frame and render draw data after all rendering is complete
         if (auto* imgui = Vortex::Sys<ImGuiSystem>())
         {
@@ -316,6 +341,10 @@ namespace Vortex
             VX_CORE_TRACE("RenderSystem already shutdown");
             return Result<void>();
         }
+
+        // Release any external scene render targets BEFORE flushing/shutting down the queue
+        // so their GPU deletes can be executed safely while the queue is still alive.
+        m_SceneTarget.reset();
 
         // Shutdown ShaderManager first to free GPU resources
         GetShaderManager().Shutdown();

@@ -59,15 +59,6 @@ void ExampleGameLayer::OnAttach()
     m_VertexArray->AddVertexBuffer(m_VertexBuffer);
     m_VertexArray->SetIndexBuffer(m_IndexBuffer);
     m_VertexArray->Unbind();
-
-    // Try to locate the ImGuiViewportLayer to acquire its framebuffer
-    if (auto* app = Vortex::Application::Get())
-    {
-        if (auto* viewport = app->GetLayerStack().FindLayer<ImGuiViewportLayer>())
-        {
-            m_ExternalFramebuffer = viewport->GetFramebuffer();
-        }
-    }
 }
 
 void ExampleGameLayer::OnDetach()
@@ -237,33 +228,6 @@ void ExampleGameLayer::OnUpdate()
 
 void ExampleGameLayer::OnRender()
 {
-    // Refresh viewport layer + framebuffer every frame (order and resizes can change it)
-    uint32_t w = 1280, h = 720;
-    if (auto* app = Vortex::Application::Get())
-    {
-        if (auto* viewport = app->GetLayerStack().FindLayer<ImGuiViewportLayer>())
-        {
-            m_ExternalFramebuffer = viewport->GetFramebuffer();
-            w = viewport->GetViewportWidth();
-            h = viewport->GetViewportHeight();
-        }
-        else
-        {
-            m_ExternalFramebuffer.reset();
-        }
-    }
-
-    // If an external framebuffer is available, bind it for offscreen rendering
-    if (m_ExternalFramebuffer)
-    {
-        Vortex::GetRenderCommandQueue().BindFramebuffer(Vortex::FramebufferTarget::Framebuffer, m_ExternalFramebuffer->GetRendererID());
-        Vortex::GetRenderCommandQueue().SetViewport(0, 0, w, h);
-        glm::vec4 clearColor(0.2f, 0.2f, 0.2f, 1.0f);
-        if (auto* rs = Vortex::Sys<Vortex::RenderSystem>())
-            clearColor = rs->GetRenderSettings().ClearColor;
-        Vortex::GetRenderCommandQueue().Clear(Vortex::ClearCommand::Color, clearColor);
-    }
-
     // Bind shader through ShaderManager
     Result<void> shaderBindResult = GetShaderManager().BindShader(m_ShaderHandle);
 	// Note: You don't have to check if it succeeds but its always good practice so the api is there if needed.
@@ -354,12 +318,6 @@ void ExampleGameLayer::OnRender()
 
     // Unbind shader through ShaderManager
     GetShaderManager().UnbindShader();
-
-    // If we rendered offscreen, unbind to default framebuffer
-    if (m_ExternalFramebuffer)
-    {
-        GetRenderCommandQueue().BindFramebuffer(FramebufferTarget::Framebuffer, 0);
-    }
 }
 
 // This is a way of handling events if needed, but there are better ways via Input Actions and the event system, so we leave it empty here.

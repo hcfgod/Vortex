@@ -31,7 +31,14 @@ void ImGuiViewportLayer::OnUpdate()
 
 void ImGuiViewportLayer::OnRender()
 {
-	// Optional: render additional offscreen content here prior to ImGui display
+	// Redirect scene rendering into our framebuffer so other layers don't know about it
+	if (m_Framebuffer)
+	{
+		if (auto* rs = Vortex::Sys<Vortex::RenderSystem>())
+		{
+			rs->SetSceneRenderTarget(m_Framebuffer);
+		}
+	}
 }
 
 void ImGuiViewportLayer::OnImGuiRender()
@@ -52,6 +59,11 @@ void ImGuiViewportLayer::OnImGuiRender()
 		if (newW != m_ViewportWidth || newH != m_ViewportHeight)
 		{
 			EnsureFramebuffer(newW, newH);
+			// Inform RenderSystem immediately so next PreRender uses the correct viewport size
+			if (auto* rs = Vortex::Sys<Vortex::RenderSystem>())
+			{
+				rs->SetSceneRenderTarget(m_Framebuffer);
+			}
 		}
 
 		m_ViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
