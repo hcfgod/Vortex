@@ -135,36 +135,24 @@ namespace Vortex
 		{
 			m_RenderSystem->PreRender();
 		}
-
-	// Begin ImGui frame before layer rendering
-	if (auto* imgui = m_SystemManager.GetSystem<ImGuiSystem>())
-	{
-		imgui->BeginFrame();
-	}
 		
 		// Render layers first (Game -> UI -> Debug -> Overlay) so they can queue commands
 		m_LayerStack.OnRender();
 
-
-		
 		// Render engine systems (processes queued commands)
 		auto systemsResult = m_SystemManager.RenderAllSystems();
 		if (systemsResult.IsError())
 			return systemsResult;
 		
-	// Render ImGui for layers (tools, overlays) after systems (dockspace drawn by ImGuiSystem)
-	m_LayerStack.OnImGuiRender();
-
-	// End ImGui frame and render draw data after systems + layer UI
-	if (auto* imgui = m_SystemManager.GetSystem<ImGuiSystem>())
-	{
-		imgui->EndFrameAndRender();
-	}
+		// Render ImGui for layers (tools, overlays) after systems
+		m_LayerStack.OnImGuiRender();
 
 		// Post-render cleanup (present frame)
 		if (m_RenderSystem)
 		{
-			m_RenderSystem->PostRender();
+			auto postRenderResult = m_RenderSystem->PostRender();
+			if (postRenderResult.IsError())
+				return postRenderResult;
 		}
 		
 		// Dispatch engine render event

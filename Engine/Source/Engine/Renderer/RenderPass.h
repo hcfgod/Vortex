@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Debug/ErrorCodes.h"
+#include "Core/Debug/Log.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
 
 namespace Vortex
@@ -32,6 +33,7 @@ namespace Vortex
 			{
 				GetRenderCommandQueue().PushDebugGroup(m_Desc.Name, executeImmediate);
 			}
+			
 			if (m_Desc.ClearFlags != 0)
 			{
 				GetRenderCommandQueue().Clear(m_Desc.ClearFlags, m_Desc.ClearColor, m_Desc.ClearDepth, m_Desc.ClearStencil, executeImmediate);

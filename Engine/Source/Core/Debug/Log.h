@@ -89,9 +89,9 @@ namespace Vortex
 		 */
 		static bool IsInitialized() { return s_Initialized; }
 
-		// Logger accessors
-		static std::shared_ptr<spdlog::logger>& GetCoreLogger() { return s_CoreLogger; }
-		static std::shared_ptr<spdlog::logger>& GetClientLogger() { return s_ClientLogger; }
+		// Logger accessors - safe versions that check initialization
+		static std::shared_ptr<spdlog::logger> GetCoreLogger() { return s_Initialized ? s_CoreLogger : nullptr; }
+		static std::shared_ptr<spdlog::logger> GetClientLogger() { return s_Initialized ? s_ClientLogger : nullptr; }
 
 	private:
 		static void CreateLogDirectory();
@@ -106,20 +106,20 @@ namespace Vortex
 	};
 }
 
-// Core log macros
-#define VX_CORE_TRACE(...)    ::Vortex::Log::GetCoreLogger()->trace(__VA_ARGS__)
-#define VX_CORE_DEBUG(...)    ::Vortex::Log::GetCoreLogger()->debug(__VA_ARGS__)
-#define VX_CORE_INFO(...)     ::Vortex::Log::GetCoreLogger()->info(__VA_ARGS__)
-#define VX_CORE_WARN(...)     ::Vortex::Log::GetCoreLogger()->warn(__VA_ARGS__)
-#define VX_CORE_ERROR(...)    ::Vortex::Log::GetCoreLogger()->error(__VA_ARGS__)
-#define VX_CORE_CRITICAL(...) ::Vortex::Log::GetCoreLogger()->critical(__VA_ARGS__)
+// Core log macros with safe initialization check
+#define VX_CORE_TRACE(...)    do { auto logger = ::Vortex::Log::GetCoreLogger(); if (logger) logger->trace(__VA_ARGS__); } while(0)
+#define VX_CORE_DEBUG(...)    do { auto logger = ::Vortex::Log::GetCoreLogger(); if (logger) logger->debug(__VA_ARGS__); } while(0)
+#define VX_CORE_INFO(...)     do { auto logger = ::Vortex::Log::GetCoreLogger(); if (logger) logger->info(__VA_ARGS__); } while(0)
+#define VX_CORE_WARN(...)     do { auto logger = ::Vortex::Log::GetCoreLogger(); if (logger) logger->warn(__VA_ARGS__); } while(0)
+#define VX_CORE_ERROR(...)    do { auto logger = ::Vortex::Log::GetCoreLogger(); if (logger) logger->error(__VA_ARGS__); } while(0)
+#define VX_CORE_CRITICAL(...) do { auto logger = ::Vortex::Log::GetCoreLogger(); if (logger) logger->critical(__VA_ARGS__); } while(0)
 
-// Client log macros
-#define VX_TRACE(...)         ::Vortex::Log::GetClientLogger()->trace(__VA_ARGS__)
+// Client log macros with safe initialization check
+#define VX_TRACE(...)         do { auto logger = ::Vortex::Log::GetClientLogger(); if (logger) logger->trace(__VA_ARGS__); } while(0)
 #ifndef VX_DEBUG
-#define VX_DEBUG(...)         ::Vortex::Log::GetClientLogger()->debug(__VA_ARGS__)
+#define VX_DEBUG(...)         do { auto logger = ::Vortex::Log::GetClientLogger(); if (logger) logger->debug(__VA_ARGS__); } while(0)
 #endif
-#define VX_INFO(...)          ::Vortex::Log::GetClientLogger()->info(__VA_ARGS__)
-#define VX_WARN(...)          ::Vortex::Log::GetClientLogger()->warn(__VA_ARGS__)
-#define VX_ERROR(...)         ::Vortex::Log::GetClientLogger()->error(__VA_ARGS__)
-#define VX_CRITICAL(...)      ::Vortex::Log::GetClientLogger()->critical(__VA_ARGS__)
+#define VX_INFO(...)          do { auto logger = ::Vortex::Log::GetClientLogger(); if (logger) logger->info(__VA_ARGS__); } while(0)
+#define VX_WARN(...)          do { auto logger = ::Vortex::Log::GetClientLogger(); if (logger) logger->warn(__VA_ARGS__); } while(0)
+#define VX_ERROR(...)         do { auto logger = ::Vortex::Log::GetClientLogger(); if (logger) logger->error(__VA_ARGS__); } while(0)
+#define VX_CRITICAL(...)      do { auto logger = ::Vortex::Log::GetClientLogger(); if (logger) logger->critical(__VA_ARGS__); } while(0)

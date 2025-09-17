@@ -11,6 +11,7 @@
 #include "Core/Async/CoroutineScheduler.h"
 #include "Engine/Engine.h"
 #include "Core/Common/SmartRef.h"
+#include "Engine/Systems/SystemAccessors.h"
 
 // Event System
 #include "Core/Events/EventSystem.h"
@@ -64,33 +65,7 @@
 #include "Engine/Assets/TextureAsset.h"
 #include "Engine/Assets/AssetSystem.h"
 
-// Convenience engine-wide accessors for clients
-namespace Vortex
-{
-    inline Application* GetApp() { return Application::Get(); }
-
-    inline Engine* GetEngine()
-    {
-        auto* a = Application::Get();
-        return a ? a->GetEngine() : nullptr;
-    }
-
-    template<typename T>
-    inline T* Sys()
-    {
-        auto* e = GetEngine();
-        return e ? e->GetSystem<T>() : nullptr;
-    }
-
-    template<typename T>
-    inline std::shared_ptr<T> SysShared()
-    {
-        auto* e = GetEngine();
-        return e ? e->GetSystemShared<T>() : std::shared_ptr<T>();
-    }
-}
-
-// ---Entry Point---------------------
+// ---Entry Point--------------------- 
 // Only include EntryPoint when VX_IMPLEMENT_MAIN is defined
 // This prevents multiple main() function definitions
 #ifdef VX_IMPLEMENT_MAIN

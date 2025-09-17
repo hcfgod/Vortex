@@ -6,6 +6,8 @@
 #include "Engine/Renderer/RendererAPI.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
 #include "Core/Window.h"
+#include "ImGuiSystem.h"
+#include "SystemAccessors.h"
 
 #ifdef VX_OPENGL_SUPPORT
     #ifdef VX_USE_SDL
@@ -250,6 +252,12 @@ namespace Vortex
         m_Pass2D.Begin();
 		m_PassUI.Begin();
 
+        // Begin ImGui frame before any rendering
+        if (auto* imgui = Vortex::Sys<ImGuiSystem>())
+        {
+            imgui->BeginFrame();
+        }
+
         return Result<void>();
     }
 
@@ -261,6 +269,12 @@ namespace Vortex
         // Process queued commands on the render thread
         auto proc = GetRenderCommandQueue().ProcessCommands();
         VX_LOG_ERROR(proc);
+
+        // Render ImGui dockspace after main rendering
+        if (auto* imgui = Vortex::Sys<ImGuiSystem>())
+        {
+            imgui->RenderDockspace();
+        }
 
         // Present the frame
         if (!m_GraphicsContext)
@@ -277,6 +291,12 @@ namespace Vortex
         if (m_PassUI.IsActive()) m_PassUI.End();
         if (m_Pass2D.IsActive()) m_Pass2D.End();
         if (m_Pass3D.IsActive()) m_Pass3D.End();
+
+        // End ImGui frame and render draw data after all rendering is complete
+        if (auto* imgui = Vortex::Sys<ImGuiSystem>())
+        {
+            imgui->EndFrameAndRender();
+        }
 
         auto presentResult = m_GraphicsContext->Present();
         if (presentResult.IsError())

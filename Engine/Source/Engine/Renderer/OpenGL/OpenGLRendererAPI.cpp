@@ -184,6 +184,18 @@ namespace Vortex
 
         GLbitfield glFlags = 0;
 
+        // glClear is affected by the scissor test. ImGui (and potentially other systems)
+        // enable scissor for clipping and may leave it enabled across frames/windows.
+        // To guarantee a full-frame clear of the default framebuffer, temporarily
+        // disable the scissor test and restore it afterwards.
+        GLboolean scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
+        GLint prevScissorBox[4] = { 0, 0, 0, 0 };
+        if (scissorEnabled)
+        {
+            glGetIntegerv(GL_SCISSOR_BOX, prevScissorBox);
+            glDisable(GL_SCISSOR_TEST);
+        }
+
         if (flags & CLEAR_COLOR_BIT)
         {
             glClearColor(color.r, color.g, color.b, color.a);
@@ -205,6 +217,13 @@ namespace Vortex
         if (glFlags != 0)
         {
             glClear(glFlags);
+        }
+
+        // Restore scissor state after clearing
+        if (scissorEnabled)
+        {
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(prevScissorBox[0], prevScissorBox[1], prevScissorBox[2], prevScissorBox[3]);
         }
 
         if (!CheckGLError("Clear"))

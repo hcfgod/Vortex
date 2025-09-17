@@ -38,7 +38,8 @@ namespace Vortex
         {
             ImGuiStyle& style = ImGui::GetStyle();
             style.WindowRounding = 6.0f;
-            style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+            style.Colors[ImGuiCol_WindowBg].w = 1.0f; // keep platform windows opaque
+            style.Colors[ImGuiCol_DockingEmptyBg].w = 0.0f; // make dockspace central background transparent to show rendered content
         }
 
         m_ImGuiInitialized = true;
@@ -128,7 +129,14 @@ namespace Vortex
 
     Result<void> ImGuiSystem::Render()
     {
-        if (!m_BackendsInitialized) return Result<void>();
+        // Skip rendering here - we handle ImGui rendering manually in Engine::Render()
+        // to ensure proper order: RenderSystem processes commands BEFORE ImGui renders
+        return Result<void>();
+    }
+
+    void ImGuiSystem::RenderDockspace()
+    {
+        if (!m_BackendsInitialized) return;
 
         // Central dockspace and basic menu bar for tooling (no Begin/End frame here)
         ImGuiIO& io = ImGui::GetIO();
@@ -173,8 +181,6 @@ namespace Vortex
         }
 
         ImGui::End();
-
-        return Result<void>();
     }
 
     Result<void> ImGuiSystem::Shutdown()

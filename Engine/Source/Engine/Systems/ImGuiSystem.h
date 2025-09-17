@@ -33,6 +33,9 @@ namespace Vortex
         // Frame control (Engine orchestrates ImGui layering)
         void BeginFrame();
         void EndFrameAndRender();
+        
+        // Render the dockspace (called manually by Engine for proper ordering)
+        void RenderDockspace();
 
     private:
     private:

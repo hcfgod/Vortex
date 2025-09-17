@@ -1,0 +1,44 @@
+{
+  "Engine": {
+    "Version": "1.0.0",
+    "EnableAsserts": true
+  },
+  "Window": {
+    "Title": "Vortex Sandbox",
+    "Width": 1280,
+    "Height": 720,
+    "Fullscreen": false,
+    "Resizable": true,
+    "Maximized": false,
+    "Centered": true,
+    "MinWidth": 640,
+    "MinHeight": 480,
+    "MaxWidth": 0,
+    "MaxHeight": 0,
+    "AlwaysOnTop": false,
+    "Decorated": true,
+    "StartHidden": false
+  },
+  "Renderer": {
+    "API": "OpenGL",
+    "VSync": "Enabled",
+    "MSAASamples": 4,
+    "ClearColor": { "r": 0.07, "g": 0.07, "b": 0.08, "a": 1.0 }
+  },
+  "Logging": {
+    "Level": "Trace",
+    "EnableAsync": true,
+    "AsyncQueueSize": 8192,
+    "AsyncThreadCount": 1,
+    "EnableConsole": true,
+    "ConsoleColors": true,
+    "EnableFileLogging": true,
+    "LogDirectory": "logs",
+    "EnableRotation": true,
+    "DailyRotation": false,
+    "MaxFileSizeMB": 10,
+    "MaxFiles": 5,
+    "AutoFlush": false,
+    "FlushIntervalSeconds": 3
+  }
+}
