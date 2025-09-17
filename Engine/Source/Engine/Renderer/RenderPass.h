@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/Debug/ErrorCodes.h"
-#include "Core/Debug/Log.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
 
 namespace Vortex

@@ -54,7 +54,6 @@ namespace Vortex
         auto defaultsPath = std::filesystem::path(configDirectory) / "EngineDefaults.json";
         VX_CORE_INFO("Loading EngineDefaults from: {}", defaultsPath.string());
         bool loadResult = config.LoadLayerFromFile(defaultsPath, "EngineDefaults", 100, &error, true);
-        VX_CORE_INFO("LoadLayerFromFile result: {}, error: {}", loadResult, error);
         if (!loadResult)
         {
             VX_CORE_WARN("EngineDefaults.json missing or invalid: {0}. Generating minimal defaults...", error);
@@ -130,13 +129,6 @@ namespace Vortex
         VX_CORE_INFO("  - Window: {0} ({1}x{2})", GetWindowTitle(), GetWindowWidth(), GetWindowHeight());
         VX_CORE_INFO("  - Renderer: {0}, VSync: {1}", GetRendererAPI(), GetVSyncMode());
 
-        // Debug: Check what's actually in the configuration
-        auto mergedConfig = Configuration::Get().GetMerged();
-        VX_CORE_INFO("Debug - Merged config size: {}", mergedConfig.size());
-        auto debugJson = Configuration::Get().Get("Renderer");
-        VX_CORE_INFO("Debug - Renderer config: {}", debugJson.is_null() ? "null" : "not null");
-        auto clearColorJson = Configuration::Get().Get("Renderer.ClearColor");
-        VX_CORE_INFO("Debug - ClearColor config: {}", clearColorJson.is_null() ? "null" : "not null");
 
         return Result<void>();
     }

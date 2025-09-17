@@ -114,7 +114,6 @@ namespace Vortex
                 layer.Data = std::move(data);
                 m_Layers.emplace(layerName, std::move(layer));
                 m_PriorityToLayerNames[priority].push_back(layerName);
-                VX_CORE_INFO("Configuration::LoadLayerFromFile - Stored layer '{}' with priority {}", layerName, priority);
             }
             else
             {
@@ -224,23 +223,17 @@ namespace Vortex
     {
         std::shared_lock lock(m_Mutex);
         Json merged = Json::object();
-        VX_CORE_INFO("Configuration::GetMerged - Starting merge with {} layers", m_Layers.size());
         for (const auto& [priority, names] : m_PriorityToLayerNames)
         {
-            VX_CORE_INFO("Configuration::GetMerged - Processing priority {} with {} layers", priority, names.size());
             for (const auto& name : names)
             {
                 auto it = m_Layers.find(name);
                 if (it != m_Layers.end())
                 {
-                    VX_CORE_INFO("Configuration::GetMerged - Merging layer '{}' with data size {}", name, it->second.Data.size());
-                    VX_CORE_INFO("Configuration::GetMerged - Layer '{}' data type: {}, is_object: {}", name, static_cast<int>(it->second.Data.type()), it->second.Data.is_object());
                     MergeInto(merged, it->second.Data);
-                    VX_CORE_INFO("Configuration::GetMerged - After merging '{}', merged size: {}", name, merged.size());
                 }
             }
         }
-        VX_CORE_INFO("Configuration::GetMerged - Final merged size: {}", merged.size());
         return merged;
     }
 
