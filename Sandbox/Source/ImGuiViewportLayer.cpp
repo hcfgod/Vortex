@@ -1,5 +1,6 @@
 #include "ImGuiViewportLayer.h"
 #include <imgui.h>
+#include "Engine/Systems/ImGuiInterop.h"
 
 using namespace Vortex;
 
@@ -53,6 +54,13 @@ void ImGuiViewportLayer::OnImGuiRender()
 		if (m_Framebuffer && m_Framebuffer->GetColorAttachment())
 		{
 			ImTextureID texId = (ImTextureID)(uintptr_t)m_Framebuffer->GetColorAttachment()->GetRendererID();
+			// Remember the top-left of the image region in main viewport space
+			ImVec2 windowPos = ImGui::GetWindowPos();
+			ImVec2 cursorPos = ImGui::GetCursorScreenPos(); // position where image will be drawn
+			ImVec2 topLeft = cursorPos;
+			ImVec2 bottomRight = ImVec2(cursorPos.x + avail.x, cursorPos.y + avail.y);
+			Vortex::ImGuiViewportInput::SetViewportRect(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y);
+			Vortex::ImGuiViewportInput::SetHoverFocus(m_ViewportHovered, m_ViewportFocused);
 			ImGui::Image(texId, avail, ImVec2(0,1), ImVec2(1,0));
 		}
 	}

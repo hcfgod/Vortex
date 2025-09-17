@@ -12,6 +12,7 @@
 #include "Events/InputEvent.h"
 #include <imgui.h>
 #include "Engine/Systems/ImGuiSystem.h"
+#include "Engine/Systems/ImGuiInterop.h"
 
 #ifdef VX_USE_SDL
 	#include "Platform/SDL/SDL3Manager.h"
@@ -376,7 +377,7 @@ namespace Vortex
 			wantsMouse = io.WantCaptureMouse;
 		}
 
-		// Convert SDL events to Vortex events and dispatch them
+        // Convert SDL events to Vortex events and dispatch them
 		switch (sdlEvent.type)
 		{
 			// =============================================================================
@@ -487,9 +488,13 @@ namespace Vortex
 			// =============================================================================
 			// MOUSE EVENTS
 			// =============================================================================
-			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
 			{
-				if (wantsMouse) break;
+                if (wantsMouse)
+                {
+                    // If ImGui wants mouse but our viewport is focused, still forward to engine
+                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                }
 				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
 				{
 				MouseButtonPressedEvent e(button);
@@ -501,9 +506,12 @@ namespace Vortex
 				break;
 			}
 			
-			case SDL_EVENT_MOUSE_BUTTON_UP:
+            case SDL_EVENT_MOUSE_BUTTON_UP:
 			{
-				if (wantsMouse) break;
+                if (wantsMouse)
+                {
+                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                }
 				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
 				{
 				MouseButtonReleasedEvent e(button);
@@ -515,9 +523,12 @@ namespace Vortex
 				break;
 			}
 			
-			case SDL_EVENT_MOUSE_MOTION:
+            case SDL_EVENT_MOUSE_MOTION:
 			{
-				if (wantsMouse) break;
+                if (wantsMouse)
+                {
+                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                }
 				float x = static_cast<float>(sdlEvent.motion.x);
 				float y = static_cast<float>(sdlEvent.motion.y);
 				{
@@ -530,9 +541,12 @@ namespace Vortex
 				break;
 			}
 			
-			case SDL_EVENT_MOUSE_WHEEL:
+            case SDL_EVENT_MOUSE_WHEEL:
 			{
-				if (wantsMouse) break;
+                if (wantsMouse)
+                {
+                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                }
 				float xOffset = sdlEvent.wheel.x;
 				float yOffset = sdlEvent.wheel.y;
 				{
