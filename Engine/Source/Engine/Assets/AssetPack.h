@@ -29,6 +29,9 @@ namespace Vortex
         bool Exists(const std::string& relativePath) const;
         bool Read(const std::string& relativePath, std::vector<uint8_t>& outBytes) const;
 
+        // Find the first entry whose filename (basename) matches filename (case-insensitive). Returns the pack key or empty string.
+        std::string FindFirstByFilename(const std::string& filename) const;
+
         const std::filesystem::path& GetPath() const { return m_FilePath; }
 
     private:

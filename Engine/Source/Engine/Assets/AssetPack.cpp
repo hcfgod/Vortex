@@ -111,6 +111,33 @@ namespace Vortex
         return true;
     }
 
+    std::string AssetPackReader::FindFirstByFilename(const std::string& filename) const
+    {
+        if (!m_IsLoaded) return {};
+        auto toLower = [](std::string s)
+        {
+            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return static_cast<char>(::tolower(c)); });
+            return s;
+        };
+        std::string target = toLower(NormalizePathKey(filename));
+        std::string targetFile = target;
+        // strip directories if passed a path
+        {
+            auto pos = target.find_last_of('/');
+            if (pos != std::string::npos)
+                targetFile = target.substr(pos + 1);
+        }
+        for (const auto& kv : m_Entries)
+        {
+            const std::string& key = kv.first;
+            auto pos = key.find_last_of('/');
+            std::string base = (pos == std::string::npos) ? key : key.substr(pos + 1);
+            if (toLower(base) == targetFile)
+                return key;
+        }
+        return {};
+    }
+
     // ----------------- Writer -----------------
 
     std::string AssetPackWriter::NormalizePathKey(const std::string& path)

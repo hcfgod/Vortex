@@ -279,7 +279,7 @@ void ExampleGameLayer::OnRender()
         GetShaderManager().SetUniform("u_UseAlbedoTexture", 0);
     }
 
-    glm::vec3 albedo(0.1f, 0.9f, 0.4f); // base color when multiplied with texture
+    glm::vec3 albedo(1.0f, 1.0f, 1.0f); // base color when multiplied with texture
     GetShaderManager().SetUniform("u_Albedo", albedo);
     GetShaderManager().SetUniform("u_Metallic", 0.2f);
     GetShaderManager().SetUniform("u_Roughness", 0.4f);

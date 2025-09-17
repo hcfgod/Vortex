@@ -662,11 +662,11 @@ namespace Vortex
                                 break;
                         }
 
-                        // If not found and the key has no extension, try common image extensions
+                        // If not found, try common image extensions when original key has no extension
+                        fs::path keyPath(key);
                         if (packedBytes.empty())
                         {
                             static const char* kExts[] = { "png", "jpg", "jpeg", "bmp", "tga", "ktx", "dds" };
-                            fs::path keyPath(key);
                             const bool hasExt = keyPath.has_extension();
                             if (!hasExt)
                             {
@@ -689,6 +689,24 @@ namespace Vortex
                                         break;
                                 }
                             }
+                        }
+                        // As a last attempt, search by filename anywhere in the pack (with or without extension)
+                        if (packedBytes.empty())
+                        {
+                            std::string baseName = keyPath.filename().generic_string();
+                            std::string keyFound = m_AssetPack.FindFirstByFilename(baseName);
+                            if (keyFound.empty())
+                            {
+                                static const char* kExts[] = { "png", "jpg", "jpeg", "bmp", "tga", "ktx", "dds" };
+                                std::string stem = keyPath.filename().stem().generic_string();
+                                for (const char* ext : kExts)
+                                {
+                                    keyFound = m_AssetPack.FindFirstByFilename(stem + "." + ext);
+                                    if (!keyFound.empty()) break;
+                                }
+                            }
+                            if (!keyFound.empty())
+                                m_AssetPack.Read(keyFound, packedBytes);
                         }
                         if (!packedBytes.empty())
                         {
@@ -895,13 +913,12 @@ namespace Vortex
             outputPack = assetsRoot.parent_path() / "Assets.vxpack";
 
         // Optionally precompile shaders to Assets/Cache/Shaders
-        fs::path shadersDir = assetsRoot / "Shaders";
         fs::path cacheDir   = assetsRoot / "Cache" / "Shaders";
-        if (options.PrecompileShaders && fs::exists(shadersDir, ec))
+        if (options.PrecompileShaders && fs::exists(assetsRoot, ec))
         {
             fs::create_directories(cacheDir, ec);
-            // Scan for vertex shaders and pair with fragment
-            for (auto& p : fs::recursive_directory_iterator(shadersDir, ec))
+            // Scan entire assets tree for vertex shaders and pair with fragment in same directory
+            for (auto& p : fs::recursive_directory_iterator(assetsRoot, ec))
             {
                 if (p.is_regular_file(ec) && p.path().extension() == ".vert")
                 {
@@ -921,58 +938,21 @@ namespace Vortex
             }
         }
 
-        // Create writer and add assets
+        // Create writer and add assets (recursively include files under Assets root)
         AssetPackWriter writer;
-
-        // Pack textures
-        fs::path texturesDir = assetsRoot / "Textures";
-        if (fs::exists(texturesDir, ec) && fs::is_directory(texturesDir, ec))
+        if (fs::exists(assetsRoot, ec) && fs::is_directory(assetsRoot, ec))
         {
-            for (auto& p : fs::recursive_directory_iterator(texturesDir, ec))
+            for (auto& p : fs::recursive_directory_iterator(assetsRoot, ec))
             {
-                if (p.is_regular_file(ec))
-                {
-                    auto ext = p.path().extension().string();
-                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                    if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tga" || ext == ".ktx" || ext == ".dds" || ext == ".rgba")
-                    {
-                        auto rel = fs::relative(p.path(), assetsRoot, ec).generic_string();
-                        writer.AddFile(rel, p.path());
-                    }
-                }
-            }
-        }
-
-        // Pack shader manifests and optionally sources
-        if (fs::exists(shadersDir, ec) && fs::is_directory(shadersDir, ec))
-        {
-            for (auto& p : fs::recursive_directory_iterator(shadersDir, ec))
-            {
-                if (p.is_regular_file(ec))
-                {
-                    auto ext = p.path().extension().string();
-                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-                    bool isManifest = (ext == ".json");
-                    bool isSource = (ext == ".vert" || ext == ".frag");
-                    if (isManifest || (options.IncludeShaderSources && isSource))
-                    {
-                        auto rel = fs::relative(p.path(), assetsRoot, ec).generic_string();
-                        writer.AddFile(rel, p.path());
-                    }
-                }
-            }
-        }
-
-        // Pack precompiled SPIR-V cache (skip in Dist if you choose to ship only the pack's Cache/)
-        if (fs::exists(cacheDir, ec) && fs::is_directory(cacheDir, ec))
-        {
-            for (auto& p : fs::recursive_directory_iterator(cacheDir, ec))
-            {
-                if (p.is_regular_file(ec))
-                {
-                    auto rel = fs::relative(p.path(), assetsRoot, ec).generic_string();
-                    writer.AddFile(rel, p.path());
-                }
+                if (!p.is_regular_file(ec))
+                    continue;
+                auto ext = p.path().extension().string();
+                std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                // Optionally skip raw shader sources unless requested
+                if (!options.IncludeShaderSources && (ext == ".vert" || ext == ".frag"))
+                    continue;
+                auto rel = fs::relative(p.path(), assetsRoot, ec).generic_string();
+                writer.AddFile(rel, p.path());
             }
         }
 
