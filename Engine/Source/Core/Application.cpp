@@ -431,9 +431,12 @@ namespace Vortex
 			// =============================================================================
 			// KEYBOARD EVENTS
 			// =============================================================================
-			case SDL_EVENT_KEY_DOWN:
+            case SDL_EVENT_KEY_DOWN:
 			{
-				if (wantsKeyboard) break;
+                if (wantsKeyboard)
+                {
+                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                }
 				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
 				bool isRepeat = sdlEvent.key.repeat != 0;
 				{
@@ -446,9 +449,12 @@ namespace Vortex
 				break;
 			}
 			
-			case SDL_EVENT_KEY_UP:
+            case SDL_EVENT_KEY_UP:
 			{
-				if (wantsKeyboard) break;
+                if (wantsKeyboard)
+                {
+                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                }
 				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
 				{
 				KeyReleasedEvent e(keyCode);
@@ -466,9 +472,12 @@ namespace Vortex
 				break;
 			}
 			
-			case SDL_EVENT_TEXT_INPUT:
+            case SDL_EVENT_TEXT_INPUT:
 			{
-				if (wantsKeyboard) break;
+                if (wantsKeyboard)
+                {
+                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                }
 				const char* text = sdlEvent.text.text;
 				size_t idx = 0;
 				while (text[idx] != '\0')
