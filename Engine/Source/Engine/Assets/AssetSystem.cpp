@@ -32,12 +32,26 @@ namespace Vortex
         if (m_Initialized)
             return Result<void>();
 
-        // Default assets root: try next to executable, fallback to relative Assets/
+        // Default assets root: prefer working directory (VS debugdir) if it has Assets/, else next to executable, else relative Assets/
+        namespace fs = std::filesystem;
         auto exeDir = FileSystem::GetExecutableDirectory();
-        if (exeDir.has_value())
+        fs::path wd = fs::current_path();
+        std::error_code initEc;
+        if (fs::exists(wd / "Assets", initEc) && fs::is_directory(wd / "Assets", initEc))
+        {
+            m_AssetsRoot = wd / "Assets";
+            VX_CORE_INFO("AssetSystem: Using AssetsRoot from working directory: {}", m_AssetsRoot.string());
+        }
+        else if (exeDir.has_value())
+        {
             m_AssetsRoot = exeDir.value() / "Assets";
+            VX_CORE_INFO("AssetSystem: Using AssetsRoot next to executable: {}", m_AssetsRoot.string());
+        }
         else
-            m_AssetsRoot = std::filesystem::path("Assets");
+        {
+            m_AssetsRoot = fs::path("Assets");
+            VX_CORE_INFO("AssetSystem: Using relative AssetsRoot: {}", m_AssetsRoot.string());
+        }
 
         // If no Assets directory exists and no pack is present, generate minimal defaults
         try
@@ -293,13 +307,6 @@ namespace Vortex
         MarkShutdown();
         VX_CORE_INFO("AssetSystem shut down");
         return Result<void>();
-    }
-
-    void AssetSystem::SetAssetsRoot(const std::filesystem::path& root)
-    {
-        std::lock_guard<std::mutex> lock(m_Mutex);
-        m_AssetsRoot = root;
-        VX_CORE_INFO("AssetSystem assets root set to: {}", m_AssetsRoot.string());
     }
 
     // ===== Recursive helpers =====

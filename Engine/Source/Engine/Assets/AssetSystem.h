@@ -80,10 +80,9 @@ namespace Vortex
         Result<void> Update() override;
         Result<void> Shutdown() override;
 
-        // Assets root directory (default resolves to Assets next to exe)
-        void SetAssetsRoot(const std::filesystem::path& root);
+        // Assets root directory (resolved from SetWorkingDirectory or next to exe)
         std::filesystem::path GetAssetsRoot() const { return m_AssetsRoot; }
-        // Optionally set working directory: adjusts Assets root and pack path to be under dir
+        // Preferred: set working directory (VS debug dir) to drive asset root and pack path
         void SetWorkingDirectory(const std::filesystem::path& dir);
 
         // Name and UUID lookup
