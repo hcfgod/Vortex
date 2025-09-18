@@ -112,5 +112,3 @@ void ImGuiViewportLayer::EnsureFramebuffer(uint32_t width, uint32_t height)
 	spec.HasDepth = false;
 	m_Framebuffer = FrameBuffer::Create(spec);
 }
-
-

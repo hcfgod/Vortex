@@ -242,7 +242,11 @@ namespace Vortex
             flags &= ~Vortex::ClearCommand::Stencil;
         }
 
-        // If an external scene target is set (editor viewport), bind it and set viewport/clear
+        // 1) Always clear the default framebuffer first so Dockspace (PassthruCentralNode) has a clean background
+        //    This prevents old ImGui pixels from lingering when windows move/drag.
+        GetRenderCommandQueue().Clear(flags, m_Settings.ClearColor, m_Settings.ClearDepth, m_Settings.ClearStencil);
+
+        // 2) If an external scene target is set (editor viewport), bind it, set viewport, and clear it as well
         if (m_SceneTarget)
         {
             GetRenderCommandQueue().BindFramebuffer(FramebufferTarget::Framebuffer, m_SceneTarget->GetRendererID());
@@ -259,17 +263,14 @@ namespace Vortex
                 }
             }
             GetRenderCommandQueue().SetViewport(0, 0, w, h);
+            GetRenderCommandQueue().Clear(flags, m_Settings.ClearColor, m_Settings.ClearDepth, m_Settings.ClearStencil);
         }
-
-        // Configure built-in passes
-        m_Pass3D.SetDesc(RenderPassDesc{ "3D", flags, m_Settings.ClearColor, m_Settings.ClearDepth, m_Settings.ClearStencil, false });
-        m_Pass2D.SetDesc(RenderPassDesc{ "2D", 0, {}, 1.0f, 0, false });
-        m_PassUI.SetDesc(RenderPassDesc{ "UI", 0, {}, 1.0f, 0, false });
-
-        // Begin passes in order: 3D (clear) -> 2D -> UI
-        m_Pass3D.Begin();
-        m_Pass2D.Begin();
-		m_PassUI.Begin();
+        else if (m_Window)
+        {
+            // Ensure viewport matches window size if we're rendering directly to the backbuffer
+            const auto& props = m_Window->GetProperties();
+            GetRenderCommandQueue().SetViewport(0, 0, static_cast<uint32_t>(props.Width), static_cast<uint32_t>(props.Height));
+        }
 
         // Begin ImGui frame before any rendering
         if (auto* imgui = Vortex::Sys<ImGuiSystem>())
@@ -306,11 +307,6 @@ namespace Vortex
 
     Result<void> RenderSystem::PostRender()
     {
-        // End passes in reverse order of Begin: UI -> 2D -> 3D
-        if (m_PassUI.IsActive()) m_PassUI.End();
-        if (m_Pass2D.IsActive()) m_Pass2D.End();
-        if (m_Pass3D.IsActive()) m_Pass3D.End();
-
         // If we redirected to an external scene target this frame, unbind back to default before ImGui render
         if (m_SceneTarget)
         {

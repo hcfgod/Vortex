@@ -46,7 +46,6 @@
 #include "Engine/Renderer/RendererAPI.h"
 #include "Engine/Renderer/RenderCommand.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
-#include "Engine/Renderer/RenderPass.h"
 #include "Engine/Systems/RenderSystem.h"
 #include "Engine/Renderer/Shader/Shader.h"
 #include "Engine/Renderer/Shader/ShaderCompiler.h"
