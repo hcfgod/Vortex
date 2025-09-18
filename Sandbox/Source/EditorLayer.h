@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Vortex.h>
-#include "Engine/Camera/Camera.h"
 
 using namespace Vortex;
 

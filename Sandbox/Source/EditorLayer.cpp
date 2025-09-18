@@ -1,7 +1,5 @@
 #include "EditorLayer.h"
 #include <imgui.h>
-#include "Engine/Systems/ImGuiInterop.h"
-#include "Engine/Systems/SystemAccessors.h"
 
 using namespace Vortex;
 

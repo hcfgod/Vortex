@@ -1,6 +1,5 @@
 #include "ExampleGameLayer.h"
 #include "EditorLayer.h"
-#include "Vortex.h"
 #include <imgui.h>
 
 // Triangle vertices with position, texture coordinates, normal, and tangent

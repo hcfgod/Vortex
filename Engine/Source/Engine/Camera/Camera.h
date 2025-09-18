@@ -2,12 +2,6 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <vector>
-#include <memory>
-#include <algorithm>
-#include <glm/gtx/euler_angles.hpp>
 #include "Engine/Systems/EngineSystem.h"
 #include "Core/Debug/ErrorCodes.h"
 #include "Engine/Input/Input.h"
@@ -17,6 +11,12 @@
 #include "Engine/Systems/ImGuiInterop.h"
 #include "Engine/Input/CursorControl.h"
 #include "Core/Events/EventSystem.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <vector>
+#include <memory>
+#include <algorithm>
+#include <glm/gtx/euler_angles.hpp>
 #include <cmath>
 
 namespace Vortex 
