@@ -537,10 +537,11 @@ void Application::SetRelativeMouseMode(bool enable)
                 }
                 break;
             }
-			
+            
             case SDL_EVENT_MOUSE_BUTTON_UP:
             {
-                if (wantsMouse)
+                // While in relative mouse mode (camera captured), always forward release to avoid stuck buttons
+                if (wantsMouse && !m_RelativeMouseMode)
                 {
                     if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
@@ -554,10 +555,11 @@ void Application::SetRelativeMouseMode(bool enable)
                 }
                 break;
             }
-			
+            
             case SDL_EVENT_MOUSE_MOTION:
             {
-                if (wantsMouse)
+                // While in relative mouse mode (camera captured), bypass hover gating so rotation doesn't stop
+                if (wantsMouse && !m_RelativeMouseMode)
                 {
                     if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
@@ -586,10 +588,10 @@ void Application::SetRelativeMouseMode(bool enable)
                 }
                 break;
             }
-			
+            
             case SDL_EVENT_MOUSE_WHEEL:
             {
-                if (wantsMouse)
+                if (wantsMouse && !m_RelativeMouseMode)
                 {
                     if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
