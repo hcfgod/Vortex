@@ -59,6 +59,9 @@ void ExampleGameLayer::OnAttach()
     m_VertexArray->AddVertexBuffer(m_VertexBuffer);
     m_VertexArray->SetIndexBuffer(m_IndexBuffer);
     m_VertexArray->Unbind();
+
+    // === Camera System Demo ===
+    SetupCameraSystem();
 }
 
 void ExampleGameLayer::OnDetach()
@@ -201,6 +204,30 @@ void ExampleGameLayer::OnUpdate()
         lastMoveLogTime = Time::GetTime();
     }
     
+    // === Camera Controls Demo ===
+    if (m_MainCamera && !m_IsPaused)
+    {
+        // Simple camera orbit around the origin
+        static float orbitAngle = 0.0f;
+        orbitAngle += 30.0f * deltaTime; // 30 degrees per second
+        
+        if (orbitAngle > 360.0f)
+            orbitAngle -= 360.0f;
+            
+        // Orbit camera around the triangle
+        float radius = 5.0f;
+        glm::vec3 orbitPos(
+            std::cos(glm::radians(orbitAngle)) * radius,
+            0.0f,
+            std::sin(glm::radians(orbitAngle)) * radius
+        );
+        
+        m_MainCamera->SetPosition(orbitPos);
+        
+        // Look at the center
+        m_MainCamera->LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+    }
+
     // === Game Logic ===
     
     if (!m_IsPaused)
@@ -237,22 +264,38 @@ void ExampleGameLayer::OnRender()
         return;
     }
 
-    // Set matrix uniforms for advanced shader
+    // === Camera System Integration ===
+    auto* cameraSystem = Sys<CameraSystem>();
+    std::shared_ptr<Camera> activeCamera = cameraSystem ? cameraSystem->GetActiveCamera() : nullptr;
+    
     glm::mat4 viewProjection = glm::mat4(1.0f);
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 model = glm::mat4(1.0f);
     glm::mat3 normalMatrix = glm::mat3(1.0f);
+    glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
 
-    // Animation disabled; time not used
+    if (activeCamera)
+    {
+        // Use camera matrices from the camera system
+        viewProjection = activeCamera->GetViewProjectionMatrix();
+        view = activeCamera->GetViewMatrix();
+        
+        // Get camera position from perspective camera
+        if (auto* perspCam = dynamic_cast<PerspectiveCamera*>(activeCamera.get()))
+        {
+            cameraPos = perspCam->GetPosition();
+        }
+    }
+    else
+    {
+        VX_CORE_WARN("[CameraSystem] No active camera found, using identity matrices");
+    }
 
     // === Matrix uniforms (required by advanced shader) ===
     GetShaderManager().SetUniform("u_ViewProjection", viewProjection);
     GetShaderManager().SetUniform("u_View", view);
     GetShaderManager().SetUniform("u_Model", model);
     GetShaderManager().SetUniform("u_NormalMatrix", normalMatrix);
-
-    // === Camera position ===
-    glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
     GetShaderManager().SetUniform("u_CameraPos", cameraPos);
 
     // === Material properties ===
@@ -338,6 +381,38 @@ void ExampleGameLayer::OnImGuiRender()
         if (ImGui::Button("Reset"))
         {
             OnResetAction(InputActionPhase::Performed);
+        }
+        
+        ImGui::Separator();
+        ImGui::Text("=== Camera System Demo ===");
+        
+        auto* cameraSystem = Sys<CameraSystem>();
+        if (cameraSystem)
+        {
+            ImGui::Text("CameraSystem: Available");
+            ImGui::Text("Registered Cameras: %zu", cameraSystem->GetCameras().size());
+            
+            auto activeCamera = cameraSystem->GetActiveCamera();
+            if (activeCamera)
+            {
+                ImGui::Text("Active Camera: Available");
+                if (auto* perspCam = dynamic_cast<PerspectiveCamera*>(activeCamera.get()))
+                {
+                    glm::vec3 pos = perspCam->GetPosition();
+                    ImGui::Text("Position: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
+                    
+                    glm::vec3 rot = perspCam->GetRotation();
+                    ImGui::Text("Rotation: (%.1f, %.1f, %.1f)", rot.x, rot.y, rot.z);
+                }
+            }
+            else
+            {
+                ImGui::Text("Active Camera: None");
+            }
+        }
+        else
+        {
+            ImGui::Text("CameraSystem: Not Available");
         }
     }
     ImGui::End();
@@ -481,4 +556,39 @@ void ExampleGameLayer::OnBuildAssetsAction(InputActionPhase phase)
     {
         VX_INFO("[Action] Asset pack written to {}", res.GetValue().string());
     }
+}
+
+void ExampleGameLayer::SetupCameraSystem()
+{
+    VX_INFO("[CameraSystem] Setting up camera system demo...");
+
+    // Get the CameraSystem through the system manager
+    auto* cameraSystem = Sys<CameraSystem>();
+    if (!cameraSystem)
+    {
+        VX_ERROR("[CameraSystem] CameraSystem not available!");
+        return;
+    }
+
+    // Create a perspective camera for 3D rendering
+    m_MainCamera = std::make_shared<PerspectiveCamera>(
+        45.0f,    // FOV
+        16.0f/9.0f, // Aspect ratio
+        0.1f,     // Near clip
+        1000.0f   // Far clip
+    );
+    
+    // Set initial camera position
+    m_MainCamera->SetPosition(glm::vec3(0.0f, 0.0f, 5.0f));
+    m_MainCamera->SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
+
+    // Register the camera with the system
+    cameraSystem->Register(m_MainCamera);
+    
+    // Set it as the active camera
+    cameraSystem->SetActiveCamera(m_MainCamera);
+
+    VX_INFO("[CameraSystem] Main camera created and registered successfully");
+    VX_INFO("[CameraSystem] Camera position: ({:.1f}, {:.1f}, {:.1f})", 
+           m_MainCamera->GetPosition().x, m_MainCamera->GetPosition().y, m_MainCamera->GetPosition().z);
 }

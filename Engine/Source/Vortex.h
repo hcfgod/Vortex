@@ -58,6 +58,9 @@
 #include "Engine/Renderer/UniformBuffer.h"
 #include "Engine/Renderer/FrameBuffer.h"
 
+// Camera
+#include "Engine/Camera/Camera.h"
+
 // Assets
 #include "Engine/Assets/Asset.h"
 #include "Engine/Assets/AssetHandle.h"

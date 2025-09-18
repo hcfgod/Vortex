@@ -13,6 +13,7 @@
 #include "Engine/Time/Time.h"
 #include "Engine/Assets/AssetSystem.h"
 #include "Systems/ImGuiSystem.h"
+#include "Engine/Camera/Camera.h"
 
 namespace Vortex 
 {
@@ -217,6 +218,16 @@ namespace Vortex
 			{
 				VX_CORE_ERROR("Failed to register ImGuiSystem");
 				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register ImGuiSystem");
+			}
+		}
+
+		// Register CameraSystem (High priority) - manages all camera instances
+		{
+			auto* cameraSystem = m_SystemManager.RegisterSystem<CameraSystem>();
+			if (!cameraSystem)
+			{
+				VX_CORE_ERROR("Failed to register CameraSystem");
+				return Result<void>(ErrorCode::SystemInitializationFailed, "Failed to register CameraSystem");
 			}
 		}
 

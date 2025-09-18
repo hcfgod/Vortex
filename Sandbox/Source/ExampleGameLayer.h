@@ -3,6 +3,7 @@
 #include <Vortex.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include "Engine/Camera/Camera.h"
 
 using namespace Vortex;
 
@@ -24,6 +25,7 @@ public:
 private:
     void SetupShaderSystem();
     void SetupInputActions();
+    void SetupCameraSystem();
     
     // Action callbacks
     void OnPauseAction(InputActionPhase phase);
@@ -67,4 +69,7 @@ private:
     std::shared_ptr<VertexArray> m_VertexArray;
 	std::shared_ptr<VertexBuffer> m_VertexBuffer;
 	std::shared_ptr<IndexBuffer> m_IndexBuffer;
+
+    // Camera system demo
+    std::shared_ptr<PerspectiveCamera> m_MainCamera;
 };
