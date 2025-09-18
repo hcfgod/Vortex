@@ -14,6 +14,9 @@
 #include "Engine/Input/KeyCodes.h"
 #include "Core/Application.h"
 #include "Engine/Engine.h"
+#include "Engine/Systems/ImGuiInterop.h"
+#include "Engine/Input/CursorControl.h"
+#include "Core/Events/EventSystem.h"
 #include <cmath>
 
 namespace Vortex 
@@ -202,6 +205,11 @@ namespace Vortex
         ~EditorCamera()
         {
             UnsubscribeFromInputEvents();
+            if (m_CursorCaptured)
+            {
+                if (auto* appPtr = Application::Get()) appPtr->SetRelativeMouseMode(false);
+                m_CursorCaptured = false;
+            }
         }
 
         // -----------------------------------------------------------------
@@ -239,6 +247,28 @@ namespace Vortex
 
                 // Rotation still available via Right mouse drag
                 HandleMouseLook(deltaTime);
+            }
+
+            // Enable SDL relative mouse mode while manipulating camera to allow unbounded deltas
+            {
+                bool shift = m_KeysDown[static_cast<size_t>(KeyCode::LeftShift)] || m_KeysDown[static_cast<size_t>(KeyCode::RightShift)];
+
+                auto manipulating = [&](bool sh){
+                    return m_MouseButtonsDown[static_cast<size_t>(MouseCode::ButtonRight)] ||
+                           (sh && m_MouseButtonsDown[static_cast<size_t>(MouseCode::ButtonLeft)]) ||
+                           (sh && m_MouseButtonsDown[static_cast<size_t>(MouseCode::ButtonMiddle)]);
+                };
+
+                bool canStart = ImGuiViewportInput::IsHovered() && manipulating(shift);
+                bool shouldContinue = manipulating(shift);
+                bool targetCapture = m_CursorCaptured ? shouldContinue : canStart;
+
+                if (targetCapture != m_CursorCaptured)
+                {
+                    m_CursorCaptured = targetCapture;
+                    if (auto* appPtr = Application::Get())
+                        appPtr->SetRelativeMouseMode(m_CursorCaptured);
+                }
             }
             
             // Reset mouse deltas and scroll values after processing input
@@ -425,6 +455,7 @@ namespace Vortex
             if(m_FirstMousePan)
             {
                 m_FirstMousePan = false;
+                return; // skip first frame to avoid jump when switching modes
             }
 
             float dx = m_MouseDX;
@@ -481,6 +512,7 @@ namespace Vortex
             if(m_FirstMouseZoom)
             {
                 m_FirstMouseZoom = false;
+                return; // skip first frame to avoid jump when switching modes
             }
 
             float dy = m_MouseDY;
@@ -556,7 +588,10 @@ namespace Vortex
         float m_MouseScrollY = 0.0f;
         
         // Event subscription IDs
-        std::vector<uint32_t> m_EventSubscriptions;
+        std::vector<SubscriptionID> m_EventSubscriptions;
+
+        // Cursor capture state while manipulating camera in viewport
+        bool m_CursorCaptured { false };
     };
 
     // ============================================================

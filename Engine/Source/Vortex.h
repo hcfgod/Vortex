@@ -36,6 +36,7 @@
 #include "Engine/Input/Input.h"
 #include "Engine/Input/InputActions.h"
 #include "Engine/Input/InputSystem.h"
+#include "Engine/Input/CursorControl.h"
 
 // Layer System
 #include "Core/Layer/Layer.h"
@@ -57,6 +58,7 @@
 #include "Engine/Renderer/Texture.h"
 #include "Engine/Renderer/UniformBuffer.h"
 #include "Engine/Renderer/FrameBuffer.h"
+#include "Engine/Systems/ImGuiInterop.h"
 
 // Camera
 #include "Engine/Camera/Camera.h"

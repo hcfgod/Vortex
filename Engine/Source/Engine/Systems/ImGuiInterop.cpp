@@ -39,6 +39,10 @@ namespace Vortex
     {
         return s_Focused;
     }
-}
 
+    void ImGuiViewportInput::GetViewportRect(float& x0, float& y0, float& x1, float& y1)
+    {
+        x0 = s_X0; y0 = s_Y0; x1 = s_X1; y1 = s_Y1;
+    }
+}
 

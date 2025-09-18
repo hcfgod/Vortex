@@ -19,11 +19,13 @@ namespace Vortex
         static bool IsHovered();            // true only when mouse is over the viewport window
         static bool HasKeyboardFocus();     // true only when viewport window has keyboard focus
 
+        // Access the current viewport rectangle (screen-space coordinates)
+        static void GetViewportRect(float& x0, float& y0, float& x1, float& y1);
+
     private:
         static float s_X0, s_Y0, s_X1, s_Y1;
         static bool s_Hovered;
         static bool s_Focused;
     };
 }
-
 
