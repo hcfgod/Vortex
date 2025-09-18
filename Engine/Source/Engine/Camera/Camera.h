@@ -10,6 +10,11 @@
 #include <glm/gtx/euler_angles.hpp>
 #include "Engine/Systems/EngineSystem.h"
 #include "Core/Debug/ErrorCodes.h"
+#include "Engine/Input/Input.h"
+#include "Engine/Input/KeyCodes.h"
+#include "Core/Application.h"
+#include "Engine/Engine.h"
+#include <cmath>
 
 namespace Vortex 
 {
@@ -165,6 +170,393 @@ namespace Vortex
 
         glm::mat4 m_View{ 1.0f };
         glm::mat4 m_Projection{ 1.0f };
+    };
+
+    // ------------------------------------------------------------
+    // EditorCamera - Interactive camera for editor mode
+    // ------------------------------------------------------------
+    class EditorCamera : public Camera 
+    {
+    public:
+        enum class ProjectionType { Perspective = 0, Orthographic = 1 };
+
+        EditorCamera(float verticalFOV = 45.0f, float aspectRatio = 16.0f/9.0f,
+                     float nearClip = 0.1f, float farClip = 1000.0f)
+            : m_VerticalFOV(verticalFOV), m_AspectRatio(aspectRatio),
+              m_NearClip(nearClip), m_FarClip(farClip)
+        {
+            // Default orientation: looking down -Z
+            m_Yaw        = 0.0f;
+            m_TargetYaw  = m_Yaw;
+
+            // Start slightly back so that origin is visible
+            m_Position = {0.0f, 0.0f, 5.0f};
+
+            RecalculateView();
+            RecalculateProjection();
+            
+            // Subscribe to input events directly
+            SubscribeToInputEvents();
+        }
+        
+        ~EditorCamera()
+        {
+            UnsubscribeFromInputEvents();
+        }
+
+        // -----------------------------------------------------------------
+        // Per-frame update (input driven)
+        // -----------------------------------------------------------------
+        void OnUpdate(float deltaTime) override
+        {
+            // Disable interactive editor camera behaviour when the engine is
+            // running in Play or Pause states. It should only respond to input
+            // while in Edit mode.
+            auto* app = Application::Get();
+            if (app && app->GetEngine() && app->GetEngine()->GetRunMode() != Engine::RunMode::Edit)
+                return;
+
+            // Common drag-zoom (Shift + Left Mouse) --------------------------------
+            HandleDragZoom();
+
+            if(m_ProjectionType == ProjectionType::Perspective)
+            {
+                HandleMouseLook(deltaTime);
+                HandleMovement(deltaTime);
+                HandlePerspectiveZoom(); // Add mouse wheel zoom for perspective
+            }
+            else // Orthographic controls (Blender-style)
+            {
+                HandleOrthoPan(deltaTime);
+                HandleOrthoZoom();
+
+                // WASD movement similar to perspective but scaled by zoom level so
+                // speed feels consistent regardless of ortho size.
+                float originalSpeed = m_MoveSpeed;
+                m_MoveSpeed = originalSpeed * (m_OrthoSize / 10.0f); // heuristic scale
+                HandleMovement(deltaTime);
+                m_MoveSpeed = originalSpeed; // restore
+
+                // Rotation still available via Right mouse drag
+                HandleMouseLook(deltaTime);
+            }
+            
+            // Reset mouse deltas and scroll values after processing input
+            m_MouseDX = 0.0f;
+            m_MouseDY = 0.0f;
+            m_MouseScrollX = 0.0f;
+            m_MouseScrollY = 0.0f;
+        }
+
+        // -----------------------------------------------------------------
+        // View / Projection access
+        // -----------------------------------------------------------------
+        const glm::mat4& GetViewMatrix() const override       { return m_View; }
+        const glm::mat4& GetProjectionMatrix() const override { return m_Projection; }
+
+        // -----------------------------------------------------------------
+        // Viewport resize – keep aspect ratio current
+        // -----------------------------------------------------------------
+        void SetViewportSize(uint32_t width, uint32_t height) override
+        {
+            if(height == 0) height = 1;
+            m_AspectRatio = static_cast<float>(width) / static_cast<float>(height);
+            RecalculateProjection();
+        }
+
+        // -----------------------------------------------------------------
+        // Projection switching / zoom
+        // -----------------------------------------------------------------
+        void SetProjectionType(ProjectionType type)
+        {
+            if (m_ProjectionType == type)
+                return; // no-op
+
+            ProjectionType prev = m_ProjectionType;
+            m_ProjectionType = type;
+            RecalculateProjection();
+
+            // When switching from 2D (orthographic) to 3D (perspective) make sure
+            // the camera is far enough from the origin so that the scene is not
+            // clipped by the near plane. Mimic Unity's default view distance.
+            if (prev == ProjectionType::Orthographic && type == ProjectionType::Perspective)
+            {
+                // Use ortho size as heuristic distance; clamp to minimum 10 units.
+                float targetDist = std::max(m_OrthoSize, 10.0f);
+                m_Position = { 0.0f, 0.0f, targetDist };
+                m_Pitch = m_TargetPitch = 0.0f;
+                m_Yaw   = m_TargetYaw   = 0.0f;
+                RecalculateView();
+            }
+        }
+        void ToggleProjection() { m_ProjectionType = m_ProjectionType == ProjectionType::Perspective ? ProjectionType::Orthographic : ProjectionType::Perspective; RecalculateProjection(); }
+
+        ProjectionType GetProjectionType() const { return m_ProjectionType; }
+
+        // Orthographic size control
+        float GetOrthoSize() const { return m_OrthoSize; }
+        void SetOrthoSize(float size) { m_OrthoSize = size; if (m_OrthoSize < 0.01f) m_OrthoSize = 0.01f; RecalculateProjection(); }
+
+        // Camera transforms --------------------------------------------------
+        const glm::vec3& GetPosition() const { return m_Position; }
+        void SetPosition(const glm::vec3& pos) { m_Position = pos; RecalculateView(); }
+
+        // Lightweight accessors for frustum parameters – needed for proper culling
+        float GetVerticalFOV() const { return m_VerticalFOV; }
+        float GetAspectRatio() const { return m_AspectRatio; }
+
+    private:
+        // Input event handling
+        void SubscribeToInputEvents();
+        void UnsubscribeFromInputEvents();
+        bool OnKeyPressed(const KeyPressedEvent& event);
+        bool OnKeyReleased(const KeyReleasedEvent& event);
+        bool OnMouseMoved(const MouseMovedEvent& event);
+        bool OnMouseButtonPressed(const MouseButtonPressedEvent& event);
+        bool OnMouseButtonReleased(const MouseButtonReleasedEvent& event);
+        bool OnMouseScrolled(const MouseScrolledEvent& event);
+
+        // --------------------------------------------------------------------
+        void HandleMouseLook(float dt)
+        {
+            // Check if right mouse button is held down
+            if (!m_MouseButtonsDown[static_cast<size_t>(MouseCode::ButtonRight)])
+            {
+                m_FirstMouse = true;
+                return;
+            }
+
+            if (m_FirstMouse)
+            {
+                m_FirstMouse = false;
+                return; // Skip first frame to avoid jump
+            }
+
+            float offsetX = m_MouseDX;
+            float offsetY = m_MouseDY;
+
+            offsetX *= m_MouseSensitivity;
+            offsetY *= m_MouseSensitivity;
+
+            // Invert horizontal mouse to match typical Unity behaviour (drag right -> look right)
+            m_TargetYaw   -= offsetX;
+            m_TargetPitch += -offsetY; // invert so that moving mouse up looks up
+
+            // Clamp target pitch
+            const float pitchLimit = 89.0f;
+            if (m_TargetPitch > pitchLimit)   m_TargetPitch = pitchLimit;
+            if (m_TargetPitch < -pitchLimit)  m_TargetPitch = -pitchLimit;
+
+            // Smoothly move current yaw/pitch towards target using exponential damping
+            float lerpFactor = 1.0f - std::exp(-m_MouseSmoothSpeed * dt);
+            m_Yaw   = glm::mix(m_Yaw,   m_TargetYaw,   lerpFactor);
+            m_Pitch = glm::mix(m_Pitch, m_TargetPitch, lerpFactor);
+
+            // Apply rotation (pitch, yaw, roll=0)
+            RecalculateView();
+        }
+
+        void HandleMovement(float dt)
+        {
+            float speed = m_MoveSpeed * (m_KeysDown[static_cast<size_t>(KeyCode::LeftShift)] ? 4.0f : 1.0f);
+
+            // Build orientation matrix matching the one used in the view calculation
+            glm::mat4 orient = glm::yawPitchRoll(glm::radians(m_Yaw), glm::radians(m_Pitch), 0.0f);
+
+            // Derive basis vectors from orientation (OpenGL convention: -Z forward)
+            glm::vec3 forward = glm::normalize(glm::vec3(orient * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f)));
+            glm::vec3 right   = glm::normalize(glm::vec3(orient * glm::vec4(1.0f, 0.0f,  0.0f, 0.0f)));
+            glm::vec3 up      = glm::normalize(glm::cross(right, forward));
+
+            glm::vec3 position = m_Position;
+
+            if (m_KeysDown[static_cast<size_t>(KeyCode::W)]) position += forward * speed * dt;
+            if (m_KeysDown[static_cast<size_t>(KeyCode::S)]) position -= forward * speed * dt;
+            if (m_KeysDown[static_cast<size_t>(KeyCode::A)]) position -= right   * speed * dt;
+            if (m_KeysDown[static_cast<size_t>(KeyCode::D)]) position += right   * speed * dt;
+            if (m_KeysDown[static_cast<size_t>(KeyCode::Q)]) position -= up      * speed * dt;
+            if (m_KeysDown[static_cast<size_t>(KeyCode::E)]) position += up      * speed * dt;
+
+            m_Position = position;
+            RecalculateView();
+        }
+
+        // ------------------------------------------------------------------
+        // Helpers
+        // ------------------------------------------------------------------
+        void RecalculateProjection()
+        {
+            if(m_ProjectionType == ProjectionType::Perspective)
+            {
+                m_Projection = glm::perspective(glm::radians(m_VerticalFOV), m_AspectRatio, m_NearClip, m_FarClip);
+            }
+            else // Orthographic
+            {
+                float orthoHalfHeight = m_OrthoSize * 0.5f;
+                float orthoHalfWidth  = orthoHalfHeight * m_AspectRatio;
+
+                m_Projection = glm::ortho(-orthoHalfWidth, orthoHalfWidth,
+                                          -orthoHalfHeight, orthoHalfHeight,
+                                          -m_FarClip, m_FarClip);
+            }
+        }
+
+        void RecalculateView()
+        {
+            glm::mat4 transform = glm::translate(glm::mat4(1.0f), m_Position) *
+                                   glm::yawPitchRoll(glm::radians(m_Yaw), glm::radians(m_Pitch), 0.0f);
+            m_View = glm::inverse(transform);
+        }
+
+        // ------------------------------------------------------------
+        // Orthographic-specific helpers
+        // ------------------------------------------------------------
+        void HandleOrthoPan(float dt)
+        {
+            (void)dt; // currently unused – future smoothing
+            if(!m_MouseButtonsDown[static_cast<size_t>(MouseCode::ButtonMiddle)]) { m_FirstMousePan = true; return; }
+
+            bool shift = m_KeysDown[static_cast<size_t>(KeyCode::LeftShift)] || m_KeysDown[static_cast<size_t>(KeyCode::RightShift)];
+
+            // Allow panning with middle mouse even without shift key
+            // but for now, keep the original behavior requiring shift
+            if(!shift) { m_FirstMousePan = true; return; }
+
+            if(m_FirstMousePan)
+            {
+                m_FirstMousePan = false;
+            }
+
+            float dx = m_MouseDX;
+            float dy = m_MouseDY;
+
+            // Convert pixel delta to world units based on ortho size & viewport
+            float panSpeed = m_OrthoSize / 600.0f; // 600: arbitrary scale factor gives nice feel
+
+            glm::mat4 orient = glm::yawPitchRoll(glm::radians(m_Yaw), glm::radians(m_Pitch), 0.0f);
+            glm::vec3 right = glm::normalize(glm::vec3(orient * glm::vec4(1,0,0,0)));
+            glm::vec3 up    = glm::normalize(glm::vec3(orient * glm::vec4(0,1,0,0)));
+
+            m_Position -= right * dx * panSpeed;
+            m_Position += up    * dy * panSpeed;
+            RecalculateView();
+        }
+
+        void HandleOrthoZoom()
+        {
+            if(m_MouseScrollY != 0.0f)
+            {
+                float zoomFactor = 1.0f - m_MouseScrollY * 0.1f; // 10% per notch
+                if(zoomFactor < 0.1f) zoomFactor = 0.1f;
+                m_OrthoSize *= zoomFactor;
+                if(m_OrthoSize < 0.01f) m_OrthoSize = 0.01f;
+                RecalculateProjection();
+            }
+        }
+        
+        void HandlePerspectiveZoom()
+        {
+            if(m_MouseScrollY != 0.0f)
+            {
+                glm::mat4 orient = glm::yawPitchRoll(glm::radians(m_Yaw), glm::radians(m_Pitch), 0.0f);
+                glm::vec3 forward = glm::normalize(glm::vec3(orient * glm::vec4(0,0,-1,0)));
+                
+                // Move forward/backward based on scroll direction
+                float zoomSpeed = 2.0f;
+                m_Position += forward * m_MouseScrollY * zoomSpeed;
+                RecalculateView();
+            }
+        }
+
+        // Zoom via Shift + Left-mouse drag (Blender dolly)
+        void HandleDragZoom()
+        {
+            bool shift = m_KeysDown[static_cast<size_t>(KeyCode::LeftShift)] || m_KeysDown[static_cast<size_t>(KeyCode::RightShift)];
+            if(!shift || !m_MouseButtonsDown[static_cast<size_t>(MouseCode::ButtonLeft)])
+            {
+                m_FirstMouseZoom = true;
+                return;
+            }
+
+            if(m_FirstMouseZoom)
+            {
+                m_FirstMouseZoom = false;
+            }
+
+            float dy = m_MouseDY;
+
+            if(std::abs(dy) < 0.0001f) return;
+
+            const float kZoomSpeed = 0.1f;
+
+            if(m_ProjectionType == ProjectionType::Orthographic)
+            {
+                // Modify ortho size directly (dolly effect)
+                float factor = 1.0f + dy * kZoomSpeed * 0.01f; // scale by small amount per pixel
+                if(factor < 0.1f) factor = 0.1f;
+                m_OrthoSize *= factor;
+                if(m_OrthoSize < 0.01f) m_OrthoSize = 0.01f;
+                RecalculateProjection();
+            }
+            else // perspective – move along forward vector
+            {
+                glm::mat4 orient = glm::yawPitchRoll(glm::radians(m_Yaw), glm::radians(m_Pitch), 0.0f);
+                glm::vec3 forward = glm::normalize(glm::vec3(orient * glm::vec4(0,0,-1,0)));
+                m_Position += forward * dy * kZoomSpeed;
+                RecalculateView();
+            }
+        }
+
+    private:
+        // Projection
+        ProjectionType m_ProjectionType { ProjectionType::Perspective };
+        float m_VerticalFOV;
+        float m_AspectRatio;
+        float m_NearClip;
+        float m_FarClip;
+
+        float m_OrthoSize { 20.0f }; // world units visible vertically in ortho
+
+        // Transform state
+        glm::vec3 m_Position {0.0f, 0.0f, 0.0f};
+
+        // Euler angles
+        float m_Yaw   = 0.0f;
+        float m_Pitch = 0.0f;
+
+        float m_TargetYaw   = 0.0f;
+        float m_TargetPitch = 0.0f;
+
+        // Matrices
+        glm::mat4 m_View {1.0f};
+        glm::mat4 m_Projection {1.0f};
+
+        // Settings
+        float m_MoveSpeed        = 2.0f;
+        float m_MouseSensitivity = 0.1f;
+        float m_MouseSmoothSpeed = 25.0f;
+
+        // Cached for mouse delta
+        bool  m_FirstMouse = true;
+
+        // Pan state
+        bool  m_FirstMousePan = true;
+
+        // Drag zoom state
+        bool  m_FirstMouseZoom = true;
+
+        // Direct input state tracking (bypasses InputSystem)
+        std::array<bool, 512> m_KeysDown{};
+        std::array<bool, 8> m_MouseButtonsDown{};
+        float m_MouseX = 0.0f;
+        float m_MouseY = 0.0f;
+        float m_MouseDX = 0.0f;
+        float m_MouseDY = 0.0f;
+        float m_MouseScrollX = 0.0f;
+        float m_MouseScrollY = 0.0f;
+        
+        // Event subscription IDs
+        std::vector<uint32_t> m_EventSubscriptions;
     };
 
     // ============================================================

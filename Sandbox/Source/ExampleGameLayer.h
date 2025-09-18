@@ -25,7 +25,7 @@ public:
 private:
     void SetupShaderSystem();
     void SetupInputActions();
-    void SetupCameraSystem();
+    void SetupGameplayCamera();
     
     // Action callbacks
     void OnPauseAction(InputActionPhase phase);

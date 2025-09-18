@@ -1,5 +1,5 @@
 #include "ExampleGameLayer.h"
-#include "ImGuiViewportLayer.h"
+#include "EditorLayer.h"
 #include "Vortex.h"
 #include <imgui.h>
 
@@ -60,8 +60,8 @@ void ExampleGameLayer::OnAttach()
     m_VertexArray->SetIndexBuffer(m_IndexBuffer);
     m_VertexArray->Unbind();
 
-    // === Camera System Demo ===
-    SetupCameraSystem();
+    // === Gameplay Camera Setup ===
+    SetupGameplayCamera();
 }
 
 void ExampleGameLayer::OnDetach()
@@ -204,8 +204,13 @@ void ExampleGameLayer::OnUpdate()
         lastMoveLogTime = Time::GetTime();
     }
     
-    // === Camera Controls Demo ===
-    if (m_MainCamera && !m_IsPaused)
+    // === Camera Controls Demo (Only in Play Mode) ===
+    auto* app = Application::Get();
+    bool isInPlayMode = app && app->GetEngine() && 
+                       (app->GetEngine()->GetRunMode() == Engine::RunMode::PlayInEditor || 
+                        app->GetEngine()->GetRunMode() == Engine::RunMode::Production);
+    
+    if (m_MainCamera && !m_IsPaused && isInPlayMode)
     {
         // Simple camera orbit around the origin
         static float orbitAngle = 0.0f;
@@ -396,18 +401,46 @@ void ExampleGameLayer::OnImGuiRender()
             if (activeCamera)
             {
                 ImGui::Text("Active Camera: Available");
+                
+                // Check camera type and display appropriate info
                 if (auto* perspCam = dynamic_cast<PerspectiveCamera*>(activeCamera.get()))
                 {
+                    ImGui::Text("Type: Perspective Camera (Gameplay)");
                     glm::vec3 pos = perspCam->GetPosition();
                     ImGui::Text("Position: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
                     
                     glm::vec3 rot = perspCam->GetRotation();
                     ImGui::Text("Rotation: (%.1f, %.1f, %.1f)", rot.x, rot.y, rot.z);
                 }
+                else if (auto* editorCam = dynamic_cast<EditorCamera*>(activeCamera.get()))
+                {
+                    ImGui::Text("Type: Editor Camera (Editor Mode)");
+                    glm::vec3 pos = editorCam->GetPosition();
+                    ImGui::Text("Position: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
+                    
+                    ImGui::Text("Projection: %s", 
+                               editorCam->GetProjectionType() == EditorCamera::ProjectionType::Perspective ? 
+                               "Perspective" : "Orthographic");
+                    
+                    if (editorCam->GetProjectionType() == EditorCamera::ProjectionType::Orthographic)
+                    {
+                        ImGui::Text("Ortho Size: %.1f", editorCam->GetOrthoSize());
+                    }
+                }
             }
             else
             {
                 ImGui::Text("Active Camera: None");
+            }
+            
+            // Show engine mode
+            auto* app = Application::Get();
+            if (app && app->GetEngine())
+            {
+                auto mode = app->GetEngine()->GetRunMode();
+                const char* modeStr = (mode == Engine::RunMode::Edit) ? "Edit" : 
+                                     (mode == Engine::RunMode::PlayInEditor) ? "Play In Editor" : "Production";
+                ImGui::Text("Engine Mode: %s", modeStr);
             }
         }
         else
@@ -558,9 +591,9 @@ void ExampleGameLayer::OnBuildAssetsAction(InputActionPhase phase)
     }
 }
 
-void ExampleGameLayer::SetupCameraSystem()
+void ExampleGameLayer::SetupGameplayCamera()
 {
-    VX_INFO("[CameraSystem] Setting up camera system demo...");
+    VX_INFO("[CameraSystem] Setting up gameplay camera...");
 
     // Get the CameraSystem through the system manager
     auto* cameraSystem = Sys<CameraSystem>();
@@ -585,10 +618,10 @@ void ExampleGameLayer::SetupCameraSystem()
     // Register the camera with the system
     cameraSystem->Register(m_MainCamera);
     
-    // Set it as the active camera
+    // Set it as the active camera for gameplay
     cameraSystem->SetActiveCamera(m_MainCamera);
 
-    VX_INFO("[CameraSystem] Main camera created and registered successfully");
+    VX_INFO("[CameraSystem] Gameplay camera created and registered successfully");
     VX_INFO("[CameraSystem] Camera position: ({:.1f}, {:.1f}, {:.1f})", 
            m_MainCamera->GetPosition().x, m_MainCamera->GetPosition().y, m_MainCamera->GetPosition().z);
 }

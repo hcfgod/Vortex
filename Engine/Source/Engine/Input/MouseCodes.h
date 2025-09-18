@@ -20,8 +20,8 @@ namespace Vortex
 
         // Common aliases
         ButtonLeft   = Button0,
-        ButtonRight  = Button1,
-        ButtonMiddle = Button2,
+        ButtonRight  = Button2,
+        ButtonMiddle = Button1,
 
         // Additional buttons (typically side buttons)
         ButtonX1 = Button3,
