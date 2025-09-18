@@ -129,6 +129,7 @@ namespace Vortex
 
         // Per-frame maintenance
         void ClearPerFrameFlags();
+        void ClearAllStates();
         void EvaluateActions();
 
     private:

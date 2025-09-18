@@ -11,7 +11,13 @@ namespace Vortex
 
         // Focus/hover state for keyboard capture decisions
         static void SetHoverFocus(bool hovered, bool focused);
+
+        // Legacy: historical behavior (focused OR hovered). Avoid for mouse gating.
         static bool IsFocused();
+
+        // New helpers for precise gating
+        static bool IsHovered();            // true only when mouse is over the viewport window
+        static bool HasKeyboardFocus();     // true only when viewport window has keyboard focus
 
     private:
         static float s_X0, s_Y0, s_X1, s_Y1;

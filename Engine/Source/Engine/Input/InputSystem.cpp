@@ -3,6 +3,7 @@
 #include "Core/Debug/Log.h"
 #include "Core/Events/EventSystem.h"
 #include "InputActions.h"
+#include "Engine/Systems/SystemAccessors.h"
 
 namespace Vortex
 {
@@ -30,6 +31,16 @@ namespace Vortex
 
     Result<void> InputSystem::Update()
     {
+        // Respect engine run mode: when in Edit mode, neutralize gameplay input state
+        if (auto* eng = GetEngine())
+        {
+            if (!eng->IsGameplayInputEnabled())
+            {
+                ClearAllStates();
+                return Result<void>();
+            }
+        }
+
         // Evaluate actions based on current device state (after events have been processed this frame)
         // Do NOT clear per-frame flags here; layers still need access to edge states during OnUpdate.
         EvaluateActions();
@@ -374,6 +385,36 @@ namespace Vortex
         {
             if (!g.connected) continue;
             for (auto& bs : g.buttons) { bs.pressed = false; bs.released = false; }
+        }
+    }
+
+    void InputSystem::ClearAllStates()
+    {
+        // Reset keyboard
+        for (size_t i = 0; i < KeyboardState::MaxKeys; ++i)
+        {
+            m_Keyboard.down[i] = false;
+            m_Keyboard.pressed[i] = false;
+            m_Keyboard.released[i] = false;
+        }
+        // Reset mouse
+        for (size_t i = 0; i < MouseState::MaxButtons; ++i)
+        {
+            m_Mouse.down[i] = false;
+            m_Mouse.pressed[i] = false;
+            m_Mouse.released[i] = false;
+        }
+        m_Mouse.dx = 0.0f; m_Mouse.dy = 0.0f;
+        m_Mouse.scrollX = 0.0f; m_Mouse.scrollY = 0.0f;
+
+        // Reset gamepads
+        for (auto& g : m_Gamepads)
+        {
+            for (auto& bs : g.buttons)
+            {
+                bs.down = bs.pressed = bs.released = false;
+            }
+            for (auto& ax : g.axes) ax = 0.0f;
         }
     }
 

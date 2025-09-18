@@ -4,6 +4,8 @@
 #include "Core/Window.h"
 #include "Engine/Renderer/GraphicsContext.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
+#include "Engine/Engine.h"
+#include "Engine/Systems/SystemAccessors.h"
 
 #include <imgui.h>
 
@@ -177,6 +179,48 @@ namespace Vortex
                 ImGui::MenuItem("Docking Enabled", nullptr, (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) != 0);
                 ImGui::EndMenu();
             }
+
+            // Lightweight editor toolbar embedded in the dockspace menu bar
+            if (auto* eng = Vortex::GetEngine())
+            {
+                ImGui::Separator();
+                auto mode = eng->GetRunMode();
+                bool isPIE = (mode == Vortex::Engine::RunMode::PlayInEditor);
+                bool isEdit = (mode == Vortex::Engine::RunMode::Edit);
+
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6, 2));
+
+                // Play button (highlighted when active)
+                if (isPIE)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.70f, 0.20f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.80f, 0.20f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.15f, 0.60f, 0.15f, 1.0f));
+                }
+                if (ImGui::Button("Play"))
+                {
+                    eng->SetRunMode(Vortex::Engine::RunMode::PlayInEditor);
+                }
+                if (isPIE) ImGui::PopStyleColor(3);
+
+                ImGui::SameLine();
+
+                // Stop button (highlighted when in Edit)
+                if (isEdit)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.70f, 0.20f, 0.20f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.80f, 0.20f, 0.20f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.60f, 0.15f, 0.15f, 1.0f));
+                }
+                if (ImGui::Button("Stop"))
+                {
+                    eng->SetRunMode(Vortex::Engine::RunMode::Edit);
+                }
+                if (isEdit) ImGui::PopStyleColor(3);
+
+                ImGui::PopStyleVar();
+            }
+
             ImGui::EndMenuBar();
         }
 

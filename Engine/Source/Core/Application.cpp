@@ -432,39 +432,40 @@ namespace Vortex
 			// KEYBOARD EVENTS
 			// =============================================================================
             case SDL_EVENT_KEY_DOWN:
-			{
+            {
                 if (wantsKeyboard)
                 {
-                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                    // Only forward keyboard to engine when the viewport window owns keyboard focus
+                    if (!Vortex::ImGuiViewportInput::HasKeyboardFocus()) break;
                 }
-				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
-				bool isRepeat = sdlEvent.key.repeat != 0;
-				{
-				KeyPressedEvent e(keyCode, isRepeat);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
-					{
-						VX_DISPATCH_EVENT(e);
-					}
-				}
-				break;
-			}
+                KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
+                bool isRepeat = sdlEvent.key.repeat != 0;
+                {
+                KeyPressedEvent e(keyCode, isRepeat);
+                if (!m_Engine->GetLayerStack().OnEvent(e))
+                    {
+                        VX_DISPATCH_EVENT(e);
+                    }
+                }
+                break;
+            }
 			
             case SDL_EVENT_KEY_UP:
-			{
+            {
                 if (wantsKeyboard)
                 {
-                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                    if (!Vortex::ImGuiViewportInput::HasKeyboardFocus()) break;
                 }
-				KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
-				{
-				KeyReleasedEvent e(keyCode);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
-					{
-						VX_DISPATCH_EVENT(e);
-					}
-				}
-				break;
-			}
+                KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
+                {
+                KeyReleasedEvent e(keyCode);
+                if (!m_Engine->GetLayerStack().OnEvent(e))
+                    {
+                        VX_DISPATCH_EVENT(e);
+                    }
+                }
+                break;
+            }
 			
 			case SDL_EVENT_TEXT_EDITING:
 			{
@@ -473,100 +474,100 @@ namespace Vortex
 			}
 			
             case SDL_EVENT_TEXT_INPUT:
-			{
+            {
                 if (wantsKeyboard)
                 {
-                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                    if (!Vortex::ImGuiViewportInput::HasKeyboardFocus()) break;
                 }
-				const char* text = sdlEvent.text.text;
-				size_t idx = 0;
-				while (text[idx] != '\0')
-				{
-					uint32_t codepoint = 0;
-					if (!DecodeNextUTF8Codepoint(text, idx, codepoint))
-						break;
-					KeyTypedEvent e(codepoint);
-					if (!m_Engine->GetLayerStack().OnEvent(e))
-					{
-						VX_DISPATCH_EVENT(e);
-					}
-				}
-				break;
-			}
+                const char* text = sdlEvent.text.text;
+                size_t idx = 0;
+                while (text[idx] != '\0')
+                {
+                    uint32_t codepoint = 0;
+                    if (!DecodeNextUTF8Codepoint(text, idx, codepoint))
+                        break;
+                    KeyTypedEvent e(codepoint);
+                    if (!m_Engine->GetLayerStack().OnEvent(e))
+                    {
+                        VX_DISPATCH_EVENT(e);
+                    }
+                }
+                break;
+            }
 			
 			// =============================================================================
 			// MOUSE EVENTS
 			// =============================================================================
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
-			{
+            {
                 if (wantsMouse)
                 {
-                    // If ImGui wants mouse but our viewport is focused, still forward to engine
-                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                    // Only forward the mouse button to engine if the viewport window is actually hovered
+                    if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
-				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
-				{
-				MouseButtonPressedEvent e(button);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
-					{
-						VX_DISPATCH_EVENT(e);
-					}
-				}
-				break;
-			}
+                MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
+                {
+                MouseButtonPressedEvent e(button);
+                if (!m_Engine->GetLayerStack().OnEvent(e))
+                    {
+                        VX_DISPATCH_EVENT(e);
+                    }
+                }
+                break;
+            }
 			
             case SDL_EVENT_MOUSE_BUTTON_UP:
-			{
+            {
                 if (wantsMouse)
                 {
-                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                    if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
-				MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
-				{
-				MouseButtonReleasedEvent e(button);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
-					{
-						VX_DISPATCH_EVENT(e);
-					}
-				}
-				break;
-			}
+                MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
+                {
+                MouseButtonReleasedEvent e(button);
+                if (!m_Engine->GetLayerStack().OnEvent(e))
+                    {
+                        VX_DISPATCH_EVENT(e);
+                    }
+                }
+                break;
+            }
 			
             case SDL_EVENT_MOUSE_MOTION:
-			{
+            {
                 if (wantsMouse)
                 {
-                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                    if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
-				float x = static_cast<float>(sdlEvent.motion.x);
-				float y = static_cast<float>(sdlEvent.motion.y);
-				{
-				MouseMovedEvent e(x, y);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
-					{
-						VX_DISPATCH_EVENT(e);
-					}
-				}
-				break;
-			}
+                float x = static_cast<float>(sdlEvent.motion.x);
+                float y = static_cast<float>(sdlEvent.motion.y);
+                {
+                MouseMovedEvent e(x, y);
+                if (!m_Engine->GetLayerStack().OnEvent(e))
+                    {
+                        VX_DISPATCH_EVENT(e);
+                    }
+                }
+                break;
+            }
 			
             case SDL_EVENT_MOUSE_WHEEL:
-			{
+            {
                 if (wantsMouse)
                 {
-                    if (!Vortex::ImGuiViewportInput::IsFocused()) break;
+                    if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
-				float xOffset = sdlEvent.wheel.x;
-				float yOffset = sdlEvent.wheel.y;
-				{
-				MouseScrolledEvent e(xOffset, yOffset);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
-					{
-						VX_DISPATCH_EVENT(e);
-					}
-				}
-				break;
-			}
+                float xOffset = sdlEvent.wheel.x;
+                float yOffset = sdlEvent.wheel.y;
+                {
+                MouseScrolledEvent e(xOffset, yOffset);
+                if (!m_Engine->GetLayerStack().OnEvent(e))
+                    {
+                        VX_DISPATCH_EVENT(e);
+                    }
+                }
+                break;
+            }
 			
 			// =============================================================================
 			// GAMEPAD EVENTS

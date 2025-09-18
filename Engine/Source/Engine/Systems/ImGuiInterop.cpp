@@ -29,6 +29,16 @@ namespace Vortex
     {
         return s_Focused || s_Hovered;
     }
+
+    bool ImGuiViewportInput::IsHovered()
+    {
+        return s_Hovered;
+    }
+
+    bool ImGuiViewportInput::HasKeyboardFocus()
+    {
+        return s_Focused;
+    }
 }
 
 
