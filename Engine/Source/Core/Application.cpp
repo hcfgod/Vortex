@@ -16,6 +16,7 @@
 
 #ifdef VX_USE_SDL
 	#include "Platform/SDL/SDL3Manager.h"
+	#include "SDL3/SDL.h"
 #endif
 
 namespace Vortex
@@ -49,7 +50,7 @@ namespace Vortex
 		}
 	}
 
-	Application::~Application()
+Application::~Application()
 {
 	// Clear static instance
 	if (s_Instance == this)
@@ -321,7 +322,26 @@ namespace Vortex
 		VX_CORE_INFO("Application event subscriptions cleanup complete");
 	}
 	
-	#ifdef VX_USE_SDL
+void Application::SetRelativeMouseMode(bool enable)
+{
+#ifdef VX_USE_SDL
+	if (enable == m_RelativeMouseMode)
+		return;
+	m_RelativeMouseMode = enable;
+	m_RelCursorX = 0.0f;
+	m_RelCursorY = 0.0f;
+	if (m_Window && m_Window->IsValid())
+	{
+		SDL_Window* sdlWin = static_cast<SDL_Window*>(m_Window->GetNativeHandle());
+		SDL_SetWindowRelativeMouseMode(sdlWin, enable);
+	}
+	// If no window, ignore request
+#else
+	(void)enable;
+#endif
+}
+
+#ifdef VX_USE_SDL
 	// Minimal UTF-8 decoder to extract Unicode codepoints from SDL text input
 	static bool DecodeNextUTF8Codepoint(const char* text, size_t& index, uint32_t& outCodepoint)
 	{
@@ -412,15 +432,17 @@ namespace Vortex
 				break;
 			}
 			
-			case SDL_EVENT_WINDOW_FOCUS_LOST:
-			{
-			WindowLostFocusEvent e;
-			if (!m_Engine->GetLayerStack().OnEvent(e))
-				{
-					VX_DISPATCH_EVENT(e);
-				}
-				break;
-			}
+            case SDL_EVENT_WINDOW_FOCUS_LOST:
+            {
+            WindowLostFocusEvent e;
+            if (!m_Engine->GetLayerStack().OnEvent(e))
+                {
+                    VX_DISPATCH_EVENT(e);
+                }
+                // Ensure we release relative mouse mode when the window loses focus
+                SetRelativeMouseMode(false);
+                break;
+            }
 			
 			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
 			{
@@ -539,8 +561,22 @@ namespace Vortex
                 {
                     if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
-                float x = static_cast<float>(sdlEvent.motion.x);
-                float y = static_cast<float>(sdlEvent.motion.y);
+                float x, y;
+                if (m_RelativeMouseMode)
+                {
+                    // Accumulate virtual cursor from relative motion, enabling unbounded deltas
+                    float dx = static_cast<float>(sdlEvent.motion.xrel);
+                    float dy = static_cast<float>(sdlEvent.motion.yrel);
+                    m_RelCursorX += dx;
+                    m_RelCursorY += dy;
+                    x = m_RelCursorX;
+                    y = m_RelCursorY;
+                }
+                else
+                {
+                    x = static_cast<float>(sdlEvent.motion.x);
+                    y = static_cast<float>(sdlEvent.motion.y);
+                }
                 {
                 MouseMovedEvent e(x, y);
                 if (!m_Engine->GetLayerStack().OnEvent(e))

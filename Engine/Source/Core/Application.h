@@ -31,6 +31,10 @@ class Application
 		Engine* GetEngine() const { return m_Engine; }
 		Window* GetWindow() const { return m_Window.get(); }
 
+		// Toggle SDL relative mouse mode while interacting in the viewport
+		void SetRelativeMouseMode(bool enable);
+		bool IsRelativeMouseModeActive() const { return m_RelativeMouseMode; }
+
 		// ===== Layer API (delegates to Engine) =====
 		class LayerStack& GetLayerStack();
 		const class LayerStack& GetLayerStack() const;
@@ -110,6 +114,11 @@ private:
 		void SetupEventSubscriptions();
 		void CleanupEventSubscriptions();
 		
+		// Relative mouse mode state for unbounded camera drag
+		bool  m_RelativeMouseMode = false;
+		float m_RelCursorX = 0.0f;
+		float m_RelCursorY = 0.0f;
+
 #ifdef VX_USE_SDL
 			void ConvertSDLEventToVortexEvent(const SDL_Event& sdlEvent);
 #endif
