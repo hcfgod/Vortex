@@ -592,6 +592,9 @@ namespace Vortex
 
         // Cursor capture state while manipulating camera in viewport
         bool m_CursorCaptured { false };
+
+        // Track last relative mode state to suppress first-delta jumps
+        bool m_RelativeActiveLast { false };
     };
 
     // ============================================================

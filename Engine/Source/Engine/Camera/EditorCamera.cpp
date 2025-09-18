@@ -57,17 +57,29 @@ namespace Vortex
 
     bool EditorCamera::OnMouseMoved(const MouseMovedEvent& event)
     {
-        // Only handle input in Edit mode and when viewport is hovered
+        // Only handle input in Edit mode
         auto* app = Application::Get();
         if (app && app->GetEngine() && app->GetEngine()->GetRunMode() != Engine::RunMode::Edit)
             return false;
-            
-        // Only process if mouse is inside the viewport
-        if (!ImGuiViewportInput::IsHovered())
+
+        // If not over viewport and not in relative mode, ignore move
+        bool rel = app && app->IsRelativeMouseModeActive();
+        if (!rel && !ImGuiViewportInput::IsHovered())
             return false;
 
         float newX = event.GetX();
         float newY = event.GetY();
+
+        // When relative mode toggles on/off, suppress the first delta to avoid jump
+        if (rel != m_RelativeActiveLast)
+        {
+            m_RelativeActiveLast = rel;
+            m_MouseDX = 0.0f;
+            m_MouseDY = 0.0f;
+            m_MouseX = newX;
+            m_MouseY = newY;
+            return false;
+        }
         
         // Only calculate delta if we have a previous position
         if (m_MouseX != 0.0f || m_MouseY != 0.0f)
@@ -90,12 +102,12 @@ namespace Vortex
 
     bool EditorCamera::OnMouseButtonPressed(const MouseButtonPressedEvent& event)
     {
-        // Only handle input in Edit mode and when viewport is hovered
+        // Only handle input in Edit mode
         auto* app = Application::Get();
         if (app && app->GetEngine() && app->GetEngine()->GetRunMode() != Engine::RunMode::Edit)
             return false;
-            
-        // Only process if mouse is inside the viewport
+
+        // Only allow starting interactions when the viewport is hovered
         if (!ImGuiViewportInput::IsHovered())
             return false;
 
@@ -127,14 +139,17 @@ namespace Vortex
 
     bool EditorCamera::OnMouseScrolled(const MouseScrolledEvent& event)
     {
-        // Only handle input in Edit mode and when viewport is hovered
+        // Only handle input in Edit mode
         auto* app = Application::Get();
         if (app && app->GetEngine() && app->GetEngine()->GetRunMode() != Engine::RunMode::Edit)
             return false;
-            
-        // Only process if mouse is inside the viewport
+
+        // Accept scroll if hovered or currently in relative mode (captured)
         if (!ImGuiViewportInput::IsHovered())
-            return false;
+        {
+            if (!(app && app->IsRelativeMouseModeActive()))
+                return false;
+        }
 
         m_MouseScrollX += event.GetXOffset();
         m_MouseScrollY += event.GetYOffset();
