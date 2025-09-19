@@ -137,6 +137,68 @@ namespace Vortex
 		Flush();
 	}
 
+	// Batching utilities
+	void Renderer2D::Flush()
+	{
+		if (!s_Data) return;
+		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data->QuadBufferPtr - (uint8_t*)s_Data->QuadBuffer);
+		if (dataSize == 0 || s_Data->QuadIndexCount == 0)
+			return;
+
+		// Upload data
+		s_Data->QuadVB->SetData(s_Data->QuadBuffer, dataSize);
+
+		// Bind shader and set uniforms (only if shader asset is loaded)
+		auto& sm = GetShaderManager();
+		if (!s_Data->QuadShaderHandle.IsValid() || !s_Data->QuadShaderHandle.IsLoaded())
+			return;
+		sm.BindShader(s_Data->QuadShaderHandle);
+		sm.SetUniform("u_ViewProjection", s_Data->CurrentViewProj);
+
+		// Bind all textures used in this batch to their slots
+		for (uint32_t i = 0; i < s_Data->TextureSlotIndex; ++i)
+		{
+			const auto& tex = s_Data->TextureSlots[i];
+			if (tex)
+			{
+				std::string uniformName = "u_Textures[" + std::to_string(i) + "]";
+				sm.SetTexture(uniformName, tex->GetRendererID(), i);
+			}
+		}
+
+		// 2D overlay: disable depth test for draw, then restore default
+		GetRenderCommandQueue().SetDepthState(false, false);
+		GetRenderCommandQueue().SetBlendState(true);
+
+		// Bind VAO and draw
+		s_Data->QuadVA->Bind();
+		GetRenderCommandQueue().DrawIndexed(s_Data->QuadIndexCount);
+
+		// Restore depth defaults (test/write enabled, Less) and disable blending
+		GetRenderCommandQueue().SetDepthState(true, true, SetDepthStateCommand::Less);
+		GetRenderCommandQueue().SetBlendState(false);
+
+		// Stats
+		s_Data->Stats.DrawCalls += 1;
+		s_Data->Stats.QuadCount += s_Data->QuadIndexCount / 6;
+
+		// Reset geometry for next batch, but keep texture slots unless StartNewBatch is called
+		s_Data->QuadIndexCount = 0;
+		s_Data->QuadBufferPtr = s_Data->QuadBuffer;
+	}
+
+	void Renderer2D::StartNewBatch()
+	{
+		if (!s_Data) return;
+		// Reset geometry pointers
+		s_Data->QuadIndexCount = 0;
+		s_Data->QuadBufferPtr = s_Data->QuadBuffer;
+		// Reset texture slots for a fresh batch
+		s_Data->TextureSlotIndex = 1;
+		s_Data->TextureSlots[0] = s_Data->WhiteTexture;
+	}
+
+	// DrawQuad implementations
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec4& color)
 	{
 		if (!s_Data) return;
@@ -231,67 +293,6 @@ namespace Vortex
 		DrawQuad(position, size, texAsset->GetTexture(), tintColor);
 	}
 
-	// Batching utilities
-	void Renderer2D::Flush()
-	{
-		if (!s_Data) return;
-		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data->QuadBufferPtr - (uint8_t*)s_Data->QuadBuffer);
-		if (dataSize == 0 || s_Data->QuadIndexCount == 0)
-			return;
-
-		// Upload data
-		s_Data->QuadVB->SetData(s_Data->QuadBuffer, dataSize);
-
-		// Bind shader and set uniforms (only if shader asset is loaded)
-		auto& sm = GetShaderManager();
-		if (!s_Data->QuadShaderHandle.IsValid() || !s_Data->QuadShaderHandle.IsLoaded())
-			return;
-		sm.BindShader(s_Data->QuadShaderHandle);
-		sm.SetUniform("u_ViewProjection", s_Data->CurrentViewProj);
-
-		// Bind all textures used in this batch to their slots
-		for (uint32_t i = 0; i < s_Data->TextureSlotIndex; ++i)
-		{
-			const auto& tex = s_Data->TextureSlots[i];
-			if (tex)
-			{
-				std::string uniformName = "u_Textures[" + std::to_string(i) + "]";
-				sm.SetTexture(uniformName, tex->GetRendererID(), i);
-			}
-		}
-
-		// 2D overlay: disable depth test for draw, then restore default
-		GetRenderCommandQueue().SetDepthState(false, false);
-		GetRenderCommandQueue().SetBlendState(true);
-
-		// Bind VAO and draw
-		s_Data->QuadVA->Bind();
-		GetRenderCommandQueue().DrawIndexed(s_Data->QuadIndexCount);
-
-		// Restore depth defaults (test/write enabled, Less) and disable blending
-		GetRenderCommandQueue().SetDepthState(true, true, SetDepthStateCommand::Less);
-		GetRenderCommandQueue().SetBlendState(false);
-
-		// Stats
-		s_Data->Stats.DrawCalls += 1;
-		s_Data->Stats.QuadCount += s_Data->QuadIndexCount / 6;
-
-		// Reset geometry for next batch, but keep texture slots unless StartNewBatch is called
-		s_Data->QuadIndexCount = 0;
-		s_Data->QuadBufferPtr = s_Data->QuadBuffer;
-	}
-
-	void Renderer2D::StartNewBatch()
-	{
-		if (!s_Data) return;
-		// Reset geometry pointers
-		s_Data->QuadIndexCount = 0;
-		s_Data->QuadBufferPtr = s_Data->QuadBuffer;
-		// Reset texture slots for a fresh batch
-		s_Data->TextureSlotIndex = 1;
-		s_Data->TextureSlots[0] = s_Data->WhiteTexture;
-	}
-
 	// Rotated colored quad (Unity-style Euler angles in degrees)
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec3& rotation, const glm::vec4& color)
 	{
@@ -378,6 +379,204 @@ namespace Vortex
 
 	// Rotated textured quad (TextureAsset)
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec3& rotation, const AssetHandle<TextureAsset>& textureAsset, const glm::vec4& tintColor)
+	{
+		if (!textureAsset.IsValid() || !textureAsset.IsLoaded())
+		{
+			DrawQuad(position, size, rotation, tintColor);
+			return;
+		}
+		const TextureAsset* texAsset = textureAsset.TryGet();
+		if (!texAsset || !texAsset->IsReady() || !texAsset->GetTexture())
+		{
+			DrawQuad(position, size, rotation, tintColor);
+			return;
+		}
+		DrawQuad(position, size, rotation, texAsset->GetTexture(), tintColor);
+	}
+
+	// 3D positioned colored quad
+	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const glm::vec4& color)
+	{
+		if (!s_Data) return;
+		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		{
+			Flush();
+		}
+
+		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, position.z };
+		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, position.z };
+		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, position.z };
+		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, position.z };
+
+		QuadVertex v0{ pos0, color, s_QuadTexCoords[0], 0.0f };
+		QuadVertex v1{ pos1, color, s_QuadTexCoords[1], 0.0f };
+		QuadVertex v2{ pos2, color, s_QuadTexCoords[2], 0.0f };
+		QuadVertex v3{ pos3, color, s_QuadTexCoords[3], 0.0f };
+
+		*s_Data->QuadBufferPtr++ = v0;
+		*s_Data->QuadBufferPtr++ = v1;
+		*s_Data->QuadBufferPtr++ = v2;
+		*s_Data->QuadBufferPtr++ = v3;
+
+		s_Data->QuadIndexCount += 6;
+	}
+
+	// 3D positioned textured quad (Texture2DRef)
+	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const Texture2DRef& texture, const glm::vec4& tintColor)
+	{
+		if (!s_Data) return;
+		if (!texture) { DrawQuad(position, size, tintColor); return; }
+
+		// Find existing texture slot or assign new one
+		float texIndex = 0.0f;
+		for (uint32_t i = 1; i < s_Data->TextureSlotIndex; ++i)
+		{
+			if (s_Data->TextureSlots[i] && s_Data->TextureSlots[i].get() == texture.get())
+			{
+				texIndex = static_cast<float>(i);
+				break;
+			}
+		}
+		if (texIndex == 0.0f)
+		{
+			// Need a new slot
+			if (s_Data->TextureSlotIndex >= MaxTextureSlots)
+			{
+				// Flush current geometry and start a fresh batch (resets texture slots)
+				Flush();
+				StartNewBatch();
+			}
+			texIndex = static_cast<float>(s_Data->TextureSlotIndex);
+			s_Data->TextureSlots[s_Data->TextureSlotIndex] = texture;
+			++s_Data->TextureSlotIndex;
+		}
+
+		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		{
+			Flush();
+		}
+
+		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, position.z };
+		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, position.z };
+		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, position.z };
+		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, position.z };
+
+		QuadVertex v0{ pos0, tintColor, s_QuadTexCoords[0], texIndex };
+		QuadVertex v1{ pos1, tintColor, s_QuadTexCoords[1], texIndex };
+		QuadVertex v2{ pos2, tintColor, s_QuadTexCoords[2], texIndex };
+		QuadVertex v3{ pos3, tintColor, s_QuadTexCoords[3], texIndex };
+
+		*s_Data->QuadBufferPtr++ = v0;
+		*s_Data->QuadBufferPtr++ = v1;
+		*s_Data->QuadBufferPtr++ = v2;
+		*s_Data->QuadBufferPtr++ = v3;
+
+		s_Data->QuadIndexCount += 6;
+	}
+
+	// 3D positioned textured quad (TextureAsset)
+	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const AssetHandle<TextureAsset>& textureAsset, const glm::vec4& tintColor)
+	{
+		if (!textureAsset.IsValid() || !textureAsset.IsLoaded())
+		{
+			DrawQuad(position, size, tintColor);
+			return;
+		}
+		const TextureAsset* texAsset = textureAsset.TryGet();
+		if (!texAsset || !texAsset->IsReady() || !texAsset->GetTexture())
+		{
+			DrawQuad(position, size, tintColor);
+			return;
+		}
+		DrawQuad(position, size, texAsset->GetTexture(), tintColor);
+	}
+
+	// 3D positioned rotated colored quad (Unity-style Euler angles in degrees)
+	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const glm::vec3& rotation, const glm::vec4& color)
+	{
+		if (!s_Data) return;
+		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		{
+			Flush();
+		}
+
+		glm::mat4 model = glm::translate(glm::mat4(1.0f), position)
+			* glm::yawPitchRoll(glm::radians(rotation.y), glm::radians(rotation.x), glm::radians(rotation.z))
+			* glm::scale(glm::mat4(1.0f), glm::vec3(size, 1.0f));
+
+		glm::vec3 pos0 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[0], 1.0f));
+		glm::vec3 pos1 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[1], 1.0f));
+		glm::vec3 pos2 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[2], 1.0f));
+		glm::vec3 pos3 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[3], 1.0f));
+
+		QuadVertex v0{ pos0, color, s_QuadTexCoords[0], 0.0f };
+		QuadVertex v1{ pos1, color, s_QuadTexCoords[1], 0.0f };
+		QuadVertex v2{ pos2, color, s_QuadTexCoords[2], 0.0f };
+		QuadVertex v3{ pos3, color, s_QuadTexCoords[3], 0.0f };
+
+		*s_Data->QuadBufferPtr++ = v0;
+		*s_Data->QuadBufferPtr++ = v1;
+		*s_Data->QuadBufferPtr++ = v2;
+		*s_Data->QuadBufferPtr++ = v3;
+		s_Data->QuadIndexCount += 6;
+	}
+
+	// 3D positioned rotated textured quad (Texture2DRef)
+	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const glm::vec3& rotation, const Texture2DRef& texture, const glm::vec4& tintColor)
+	{
+		if (!s_Data) return;
+		if (!texture) { DrawQuad(position, size, rotation, tintColor); return; }
+
+		// Find texture slot or allocate
+		float texIndex = 0.0f;
+		for (uint32_t i = 1; i < s_Data->TextureSlotIndex; ++i)
+		{
+			if (s_Data->TextureSlots[i] && s_Data->TextureSlots[i].get() == texture.get())
+			{
+				texIndex = static_cast<float>(i);
+				break;
+			}
+		}
+		if (texIndex == 0.0f)
+		{
+			if (s_Data->TextureSlotIndex >= MaxTextureSlots)
+			{
+				Flush();
+				StartNewBatch();
+			}
+			texIndex = static_cast<float>(s_Data->TextureSlotIndex);
+			s_Data->TextureSlots[s_Data->TextureSlotIndex] = texture;
+			++s_Data->TextureSlotIndex;
+		}
+
+		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		{
+			Flush();
+		}
+
+		glm::mat4 model = glm::translate(glm::mat4(1.0f), position)
+			* glm::yawPitchRoll(glm::radians(rotation.y), glm::radians(rotation.x), glm::radians(rotation.z))
+			* glm::scale(glm::mat4(1.0f), glm::vec3(size, 1.0f));
+
+		glm::vec3 pos0 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[0], 1.0f));
+		glm::vec3 pos1 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[1], 1.0f));
+		glm::vec3 pos2 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[2], 1.0f));
+		glm::vec3 pos3 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[3], 1.0f));
+
+		QuadVertex v0{ pos0, tintColor, s_QuadTexCoords[0], texIndex };
+		QuadVertex v1{ pos1, tintColor, s_QuadTexCoords[1], texIndex };
+		QuadVertex v2{ pos2, tintColor, s_QuadTexCoords[2], texIndex };
+		QuadVertex v3{ pos3, tintColor, s_QuadTexCoords[3], texIndex };
+
+		*s_Data->QuadBufferPtr++ = v0;
+		*s_Data->QuadBufferPtr++ = v1;
+		*s_Data->QuadBufferPtr++ = v2;
+		*s_Data->QuadBufferPtr++ = v3;
+		s_Data->QuadIndexCount += 6;
+	}
+
+	// 3D positioned rotated textured quad (TextureAsset)
+	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const glm::vec3& rotation, const AssetHandle<TextureAsset>& textureAsset, const glm::vec4& tintColor)
 	{
 		if (!textureAsset.IsValid() || !textureAsset.IsLoaded())
 		{

@@ -283,6 +283,7 @@ void ExampleGameLayer::OnRender()
 	Renderer2D::DrawQuad(glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 	Renderer2D::DrawQuad(glm::vec2(5.0f, 0.0f), glm::vec2(1.0f, 1.0f), m_TextureHandle, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 	Renderer2D::DrawQuad(glm::vec2(0.0f, 5.0f), glm::vec2(1.0f, 1.0f), {0, 0, -45}, m_TextureHandle, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+	Renderer2D::DrawQuad(glm::vec3(0.0f, 5.0f, -5.0f), glm::vec2(1.0f, 1.0f), {0, 0, -45}, m_TextureHandle, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 
     Renderer2D::EndScene();
 
