@@ -3,12 +3,13 @@
 
 using namespace Vortex;
 
-EditorLayer::EditorLayer() : Layer("EditorLayer", LayerType::UI, LayerPriority::High)
-{
-}
+EditorLayer::EditorLayer() : Layer("EditorLayer", LayerType::UI, LayerPriority::High) {}
 
 void EditorLayer::OnAttach()
 {
+	m_App = Application::GetShared();
+	m_Engine = m_App ? m_App->GetEngineShared() : nullptr;
+
 	EnsureFramebuffer(m_ViewportWidth, m_ViewportHeight);
 
 	// Simple camera UBO (view-projection only for now)
@@ -28,41 +29,29 @@ void EditorLayer::OnDetach()
 
 void EditorLayer::OnUpdate()
 {
-	// Editor camera updates are handled automatically by the CameraSystem
-	// The EditorCamera::OnUpdate() method handles all input processing
-	
-	// Handle camera switching based on engine mode
-	auto* app = Application::Get();
-	if (app && app->GetEngine())
+	auto currentMode = m_Engine->GetRunMode();
+	auto activeCamera = m_CameraSystem->GetActiveCamera();
+
+	if (currentMode == Engine::RunMode::Edit)
 	{
-		auto* cameraSystem = Sys<CameraSystem>();
-		if (cameraSystem)
+		// In Edit mode, ensure EditorCamera is active
+		if (!activeCamera || dynamic_cast<EditorCamera*>(activeCamera.get()) == nullptr)
 		{
-			auto currentMode = app->GetEngine()->GetRunMode();
-			auto activeCamera = cameraSystem->GetActiveCamera();
-			
-			if (currentMode == Engine::RunMode::Edit)
+			m_CameraSystem->SetActiveCamera(m_EditorCamera);
+			VX_INFO("[EditorLayer] Switched to EditorCamera (Edit mode)");
+		}
+	}
+	else if (currentMode == Engine::RunMode::PlayInEditor || currentMode == Engine::RunMode::Production)
+	{
+		// In Play mode, switch to gameplay camera if available
+		auto cameras = m_CameraSystem->GetCameras();
+		for (auto& cam : cameras)
+		{
+			if (dynamic_cast<PerspectiveCamera*>(cam.get()) != nullptr)
 			{
-				// In Edit mode, ensure EditorCamera is active
-				if (!activeCamera || dynamic_cast<EditorCamera*>(activeCamera.get()) == nullptr)
-				{
-					cameraSystem->SetActiveCamera(m_EditorCamera);
-					VX_INFO("[EditorLayer] Switched to EditorCamera (Edit mode)");
-				}
-			}
-			else if (currentMode == Engine::RunMode::PlayInEditor || currentMode == Engine::RunMode::Production)
-			{
-				// In Play mode, switch to gameplay camera if available
-				auto cameras = cameraSystem->GetCameras();
-				for (auto& cam : cameras)
-				{
-					if (dynamic_cast<PerspectiveCamera*>(cam.get()) != nullptr)
-					{
-						cameraSystem->SetActiveCamera(cam);
-						VX_INFO("[EditorLayer] Switched to PerspectiveCamera (Play mode)");
-						break;
-					}
-				}
+				m_CameraSystem->SetActiveCamera(cam);
+				VX_INFO("[EditorLayer] Switched to PerspectiveCamera (Play mode)");
+				break;
 			}
 		}
 	}
@@ -213,9 +202,8 @@ void EditorLayer::SetupEditorCamera()
 {
 	VX_INFO("[EditorLayer] Setting up editor camera...");
 
-	// Get the CameraSystem through the system manager
-	auto* cameraSystem = Sys<CameraSystem>();
-	if (!cameraSystem)
+	m_CameraSystem = SysShared<CameraSystem>();
+	if (!m_CameraSystem)
 	{
 		VX_ERROR("[EditorLayer] CameraSystem not available!");
 		return;
@@ -230,10 +218,10 @@ void EditorLayer::SetupEditorCamera()
 	);
 
 	// Register the editor camera with the system
-	cameraSystem->Register(m_EditorCamera);
+	m_CameraSystem->Register(m_EditorCamera);
 	
 	// Set it as the active camera for editor mode
-	cameraSystem->SetActiveCamera(m_EditorCamera);
+	m_CameraSystem->SetActiveCamera(m_EditorCamera);
 
 	VX_INFO("[EditorLayer] Editor camera created and registered successfully");
 	VX_INFO("[EditorLayer] Camera position: ({:.1f}, {:.1f}, {:.1f})", 

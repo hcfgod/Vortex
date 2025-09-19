@@ -27,8 +27,18 @@ class Application
 		// Static access for layers and other systems
 		static Application* Get() { return s_Instance; }
 		
+		// Shared pointer access for modern C++ usage
+		static std::shared_ptr<Application> GetShared() 
+		{ 
+			return s_Instance ? std::shared_ptr<Application>(s_Instance, [](Application*){}) : std::shared_ptr<Application>(); 
+		}
+		
 		// Public accessors for layers
 		Engine* GetEngine() const { return m_Engine; }
+		std::shared_ptr<Engine> GetEngineShared() const 
+		{ 
+			return m_Engine ? std::shared_ptr<Engine>(m_Engine, [](Engine*){}) : std::shared_ptr<Engine>(); 
+		}
 		Window* GetWindow() const { return m_Window.get(); }
 
 		// Toggle SDL relative mouse mode while interacting in the viewport

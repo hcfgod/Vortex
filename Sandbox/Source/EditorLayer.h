@@ -34,6 +34,9 @@ private:
 	bool m_ViewportHovered = false;
 	bool m_ViewportFocused = false;
 
+	std::shared_ptr<Application> m_App;
+	std::shared_ptr<Engine> m_Engine;
+	std::shared_ptr <CameraSystem> m_CameraSystem;
 	// Editor camera for editor mode
 	std::shared_ptr<EditorCamera> m_EditorCamera;
 };

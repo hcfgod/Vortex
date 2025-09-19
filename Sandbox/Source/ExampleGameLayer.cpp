@@ -70,8 +70,6 @@ void ExampleGameLayer::OnDetach()
 
 void ExampleGameLayer::OnUpdate()
 {
-    // === Input Polling Demonstration ===
-    
     // WASD + Gamepad Left Stick movement (polling)
     static float playerX = 0.0f, playerY = 0.0f;
     const float moveSpeed = 100.0f; // units per second

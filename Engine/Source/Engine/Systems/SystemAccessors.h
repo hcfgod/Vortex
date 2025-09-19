@@ -11,11 +11,19 @@ namespace Vortex
     /// </summary>
     
     inline Application* GetApp() { return Application::Get(); }
+    
+    inline std::shared_ptr<Application> GetAppShared() { return Application::GetShared(); }
 
     inline Engine* GetEngine()
     {
         auto* a = Application::Get();
         return a ? a->GetEngine() : nullptr;
+    }
+    
+    inline std::shared_ptr<Engine> GetEngineShared()
+    {
+        auto app = Application::GetShared();
+        return app ? app->GetEngineShared() : std::shared_ptr<Engine>();
     }
 
     template<typename T>
