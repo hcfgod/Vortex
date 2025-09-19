@@ -16,7 +16,6 @@
 
 #ifdef VX_USE_SDL
 	#include "Platform/SDL/SDL3Manager.h"
-	#include "SDL3/SDL.h"
 #endif
 
 namespace Vortex
@@ -50,23 +49,23 @@ namespace Vortex
 		}
 	}
 
-Application::~Application()
-{
-	// Clear static instance
-	if (s_Instance == this)
-		s_Instance = nullptr;
-	
-	// Clean up event subscriptions before engine shutdown so EventSystem is valid
-	CleanupEventSubscriptions();
-	
-	// Shut down the engine so layers/systems clean up while RenderSystem/queue are alive
-	if (m_Engine)
+	Application::~Application()
 	{
-		auto engShutdown = m_Engine->Shutdown();
-		VX_LOG_ERROR(engShutdown);
-	}
+		// Clear static instance
+		if (s_Instance == this)
+			s_Instance = nullptr;
+	
+		// Clean up event subscriptions before engine shutdown so EventSystem is valid
+		CleanupEventSubscriptions();
+	
+		// Shut down the engine so layers/systems clean up while RenderSystem/queue are alive
+		if (m_Engine)
+		{
+			auto engShutdown = m_Engine->Shutdown();
+			VX_LOG_ERROR(engShutdown);
+		}
 		
-	#ifdef VX_USE_SDL
+		#ifdef VX_USE_SDL
 			// Stop SDL text input if active
 			if (m_Window && m_Window->IsValid())
 			{
@@ -75,7 +74,7 @@ Application::~Application()
 					SDL_StopTextInput(static_cast<SDL_Window*>(m_Window->GetNativeHandle()));
 				}
 			}
-	#endif
+		#endif
 		
 		// Destroy window after engine shutdown
 		m_Window.reset();
@@ -110,11 +109,11 @@ Application::~Application()
 				// Handle SDL events
 				while (SDL_PollEvent(&event))
 				{
-				// Feed raw SDL events to ImGui backend first
-				if (auto* imgui = m_Engine->GetSystemManager().GetSystem<ImGuiSystem>())
-				{
-					imgui->ProcessSDLEvent(event);
-				}
+					// Feed raw SDL events to ImGui backend first
+					if (auto* imgui = m_Engine->GetSystemManager().GetSystem<ImGuiSystem>())
+					{
+						imgui->ProcessSDLEvent(event);
+					}
 
 					// Convert SDL events to Vortex events and dispatch/forward to layers
 					ConvertSDLEventToVortexEvent(event);
@@ -322,31 +321,34 @@ Application::~Application()
 		VX_CORE_INFO("Application event subscriptions cleanup complete");
 	}
 	
-void Application::SetRelativeMouseMode(bool enable)
-{
-#ifdef VX_USE_SDL
-	if (enable == m_RelativeMouseMode)
-		return;
-	m_RelativeMouseMode = enable;
-	m_RelCursorX = 0.0f;
-	m_RelCursorY = 0.0f;
-	if (m_Window && m_Window->IsValid())
+	void Application::SetRelativeMouseMode(bool enable)
 	{
-		SDL_Window* sdlWin = static_cast<SDL_Window*>(m_Window->GetNativeHandle());
-		SDL_SetWindowRelativeMouseMode(sdlWin, enable);
-	}
-	// If no window, ignore request
-#else
-	(void)enable;
-#endif
-}
+		#ifdef VX_USE_SDL
+			if (enable == m_RelativeMouseMode)
+				return;
 
-#ifdef VX_USE_SDL
+			m_RelativeMouseMode = enable;
+			m_RelCursorX = 0.0f;
+			m_RelCursorY = 0.0f;
+
+			if (m_Window && m_Window->IsValid())
+			{
+				SDL_Window* sdlWin = static_cast<SDL_Window*>(m_Window->GetNativeHandle());
+				SDL_SetWindowRelativeMouseMode(sdlWin, enable);
+			}
+			// If no window, ignore request
+		#else
+			(void)enable;
+		#endif
+	}
+
+	#ifdef VX_USE_SDL
 	// Minimal UTF-8 decoder to extract Unicode codepoints from SDL text input
 	static bool DecodeNextUTF8Codepoint(const char* text, size_t& index, uint32_t& outCodepoint)
 	{
 		unsigned char c = static_cast<unsigned char>(text[index]);
 		if (c == 0) return false;
+
 		if (c < 0x80)
 		{
 			outCodepoint = c;
@@ -380,8 +382,10 @@ void Application::SetRelativeMouseMode(bool enable)
 			index += 4;
 			return true;
 		}
+
 		outCodepoint = '?';
 		index += 1;
+
 		return true;
 	}
 
@@ -425,8 +429,8 @@ void Application::SetRelativeMouseMode(bool enable)
 			
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
 			{
-			WindowFocusEvent e;
-			if (!m_Engine->GetLayerStack().OnEvent(e))
+				WindowFocusEvent e;
+				if (!m_Engine->GetLayerStack().OnEvent(e))
 				{
 					VX_DISPATCH_EVENT(e);
 				}
@@ -435,13 +439,15 @@ void Application::SetRelativeMouseMode(bool enable)
 			
             case SDL_EVENT_WINDOW_FOCUS_LOST:
             {
-            WindowLostFocusEvent e;
-            if (!m_Engine->GetLayerStack().OnEvent(e))
+				WindowLostFocusEvent e;
+				if (!m_Engine->GetLayerStack().OnEvent(e))
                 {
                     VX_DISPATCH_EVENT(e);
                 }
+
                 // Ensure we release relative mouse mode when the window loses focus
                 SetRelativeMouseMode(false);
+
                 break;
             }
 			
@@ -461,15 +467,17 @@ void Application::SetRelativeMouseMode(bool enable)
                     // Only forward keyboard to engine when the viewport window owns keyboard focus
                     if (!Vortex::ImGuiViewportInput::HasKeyboardFocus()) break;
                 }
+
                 KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
                 bool isRepeat = sdlEvent.key.repeat != 0;
                 {
-                KeyPressedEvent e(keyCode, isRepeat);
-                if (!m_Engine->GetLayerStack().OnEvent(e))
-                    {
-                        VX_DISPATCH_EVENT(e);
-                    }
+					KeyPressedEvent e(keyCode, isRepeat);
+					if (!m_Engine->GetLayerStack().OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
                 }
+
                 break;
             }
 			
@@ -481,12 +489,13 @@ void Application::SetRelativeMouseMode(bool enable)
                 }
                 KeyCode keyCode = static_cast<KeyCode>(sdlEvent.key.scancode);
                 {
-                KeyReleasedEvent e(keyCode);
-                if (!m_Engine->GetLayerStack().OnEvent(e))
-                    {
-                        VX_DISPATCH_EVENT(e);
-                    }
+					KeyReleasedEvent e(keyCode);
+					if (!m_Engine->GetLayerStack().OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
                 }
+
                 break;
             }
 			
@@ -502,6 +511,7 @@ void Application::SetRelativeMouseMode(bool enable)
                 {
                     if (!Vortex::ImGuiViewportInput::HasKeyboardFocus()) break;
                 }
+
                 const char* text = sdlEvent.text.text;
                 size_t idx = 0;
                 while (text[idx] != '\0')
@@ -509,12 +519,14 @@ void Application::SetRelativeMouseMode(bool enable)
                     uint32_t codepoint = 0;
                     if (!DecodeNextUTF8Codepoint(text, idx, codepoint))
                         break;
+
                     KeyTypedEvent e(codepoint);
                     if (!m_Engine->GetLayerStack().OnEvent(e))
                     {
                         VX_DISPATCH_EVENT(e);
                     }
                 }
+
                 break;
             }
 			
@@ -528,14 +540,16 @@ void Application::SetRelativeMouseMode(bool enable)
                     // Only forward the mouse button to engine if the viewport window is actually hovered
                     if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
+
                 MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
                 {
-                MouseButtonPressedEvent e(button);
-                if (!m_Engine->GetLayerStack().OnEvent(e))
-                    {
-                        VX_DISPATCH_EVENT(e);
-                    }
+					MouseButtonPressedEvent e(button);
+					if (!m_Engine->GetLayerStack().OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
                 }
+
                 break;
             }
             
@@ -546,14 +560,16 @@ void Application::SetRelativeMouseMode(bool enable)
                 {
                     if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
+
                 MouseCode button = static_cast<MouseCode>(sdlEvent.button.button - 1); // SDL buttons are 1-based
                 {
-                MouseButtonReleasedEvent e(button);
-                if (!m_Engine->GetLayerStack().OnEvent(e))
-                    {
-                        VX_DISPATCH_EVENT(e);
-                    }
+					MouseButtonReleasedEvent e(button);
+					if (!m_Engine->GetLayerStack().OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
                 }
+
                 break;
             }
             
@@ -564,6 +580,7 @@ void Application::SetRelativeMouseMode(bool enable)
                 {
                     if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
+
                 float x, y;
                 if (m_RelativeMouseMode)
                 {
@@ -580,13 +597,15 @@ void Application::SetRelativeMouseMode(bool enable)
                     x = static_cast<float>(sdlEvent.motion.x);
                     y = static_cast<float>(sdlEvent.motion.y);
                 }
+
                 {
-                MouseMovedEvent e(x, y);
-                if (!m_Engine->GetLayerStack().OnEvent(e))
-                    {
-                        VX_DISPATCH_EVENT(e);
-                    }
+					MouseMovedEvent e(x, y);
+					if (!m_Engine->GetLayerStack().OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
                 }
+
                 break;
             }
             
@@ -596,15 +615,17 @@ void Application::SetRelativeMouseMode(bool enable)
                 {
                     if (!Vortex::ImGuiViewportInput::IsHovered()) break;
                 }
+
                 float xOffset = sdlEvent.wheel.x;
                 float yOffset = sdlEvent.wheel.y;
                 {
-                MouseScrolledEvent e(xOffset, yOffset);
-                if (!m_Engine->GetLayerStack().OnEvent(e))
-                    {
-                        VX_DISPATCH_EVENT(e);
-                    }
+					MouseScrolledEvent e(xOffset, yOffset);
+					if (!m_Engine->GetLayerStack().OnEvent(e))
+					{
+						VX_DISPATCH_EVENT(e);
+					}
                 }
+
                 break;
             }
 			
@@ -623,13 +644,15 @@ void Application::SetRelativeMouseMode(bool enable)
 				{
 					VX_CORE_WARN("Failed to open gamepad {}: {}", gamepadId, SDL_GetError());
 				}
+
 				{
-				GamepadConnectedEvent e(gamepadId);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
+					GamepadConnectedEvent e(gamepadId);
+					if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
 				}
+
 				break;
 			}
 			
@@ -642,52 +665,60 @@ void Application::SetRelativeMouseMode(bool enable)
 					SDL_CloseGamepad(pad);
 					VX_CORE_INFO("Closed gamepad {}", gamepadId);
 				}
+
 				{
-				GamepadDisconnectedEvent e(gamepadId);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
+					GamepadDisconnectedEvent e(gamepadId);
+					if (!m_Engine->GetLayerStack().OnEvent(e))
 					{
 						VX_DISPATCH_EVENT(e);
 					}
 				}
+
 				break;
 			}
 			
             case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
             {
                 if (!gameplayEnabled) break; // Drop gameplay input in Edit mode entirely
+
                 int gamepadId = sdlEvent.gbutton.which;
                 int button = sdlEvent.gbutton.button;
                 {
-                GamepadButtonPressedEvent e(gamepadId, button);
-                if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+					GamepadButtonPressedEvent e(gamepadId, button);
+					if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
                 }
+
                 break;
             }
 			
             case SDL_EVENT_GAMEPAD_BUTTON_UP:
             {
                 if (!gameplayEnabled) break; // Drop in Edit mode
+
                 int gamepadId = sdlEvent.gbutton.which;
                 int button = sdlEvent.gbutton.button;
                 {
-                GamepadButtonReleasedEvent e(gamepadId, button);
-                if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+					GamepadButtonReleasedEvent e(gamepadId, button);
+					if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
                 }
+
                 break;
             }
 			
             case SDL_EVENT_GAMEPAD_AXIS_MOTION:
             {
                 if (!gameplayEnabled) break; // Drop in Edit mode
+
                 int gamepadId = sdlEvent.gaxis.which;
                 int axis = sdlEvent.gaxis.axis;
                 // SDL3 may report axis values as floats [-1,1] or as int16 depending on backend
                 float raw = static_cast<float>(sdlEvent.gaxis.value);
                 float value = (std::abs(raw) > 1.1f) ? (raw / 32767.0f) : raw; // Robust normalization
                 {
-                GamepadAxisEvent e(gamepadId, axis, value);
-                if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+					GamepadAxisEvent e(gamepadId, axis, value);
+					if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
                 }
+
                 break;
             }
 			
@@ -708,12 +739,15 @@ void Application::SetRelativeMouseMode(bool enable)
 				{
 					VX_CORE_INFO("Opened joystick {} for input events", static_cast<int>(jid));
 				}
+
 				{
 					GamepadConnectedEvent e(static_cast<int>(jid));
 					if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
 				}
+
 				break;
 			}
+
 			case SDL_EVENT_JOYSTICK_REMOVED:
 			{
 				SDL_JoystickID jid = sdlEvent.jdevice.which;
@@ -725,39 +759,50 @@ void Application::SetRelativeMouseMode(bool enable)
 				{
 					SDL_CloseJoystick(js);
 				}
+
 				{
 					GamepadDisconnectedEvent e(static_cast<int>(jid));
 					if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
 				}
+
 				break;
 			}
+
             case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
             {
                 if (!gameplayEnabled) break; // Drop in Edit mode
+
                 int jid = sdlEvent.jbutton.which;
                 int button = sdlEvent.jbutton.button;
                 GamepadButtonPressedEvent e(jid, button);
                 if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+
                 break;
             }
+
             case SDL_EVENT_JOYSTICK_BUTTON_UP:
             {
                 if (!gameplayEnabled) break; // Drop in Edit mode
+
                 int jid = sdlEvent.jbutton.which;
                 int button = sdlEvent.jbutton.button;
                 GamepadButtonReleasedEvent e(jid, button);
                 if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+
                 break;
             }
+
             case SDL_EVENT_JOYSTICK_AXIS_MOTION:
             {
                 if (!gameplayEnabled) break; // Drop in Edit mode
+
                 int jid = sdlEvent.jaxis.which;
                 int axis = sdlEvent.jaxis.axis;
                 float raw = static_cast<float>(sdlEvent.jaxis.value);
                 float value = (std::abs(raw) > 1.1f) ? (raw / 32767.0f) : raw;
                 GamepadAxisEvent e(jid, axis, value);
                 if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+
                 break;
             }
 			default:
