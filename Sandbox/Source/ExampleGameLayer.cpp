@@ -201,32 +201,14 @@ void ExampleGameLayer::OnUpdate()
         lastMoveLogTime = Time::GetTime();
     }
     
-    // === Camera Controls Demo (Only in Play Mode) ===
+    // === Camera Controls Demo (Only in Play Mode) === // TODO: when we add scripting suppport (E.G. NativeScripting, etc) we wont have to check for play mode manually
     auto* app = Application::Get();
     bool isInPlayMode = app && app->GetEngine() && 
                        (app->GetEngine()->GetRunMode() == Engine::RunMode::PlayInEditor || 
                         app->GetEngine()->GetRunMode() == Engine::RunMode::Production);
 
-    // In play mode, enable relative mouse while manipulating (right-drag or Shift+drag)
-    if (isInPlayMode)
-    {
-        bool shift = Input::GetKey(KeyCode::LeftShift) || Input::GetKey(KeyCode::RightShift);
-        bool rightDown  = Input::GetMouseButton(MouseCode::ButtonRight);
-        bool leftDown   = Input::GetMouseButton(MouseCode::ButtonLeft);
-        bool middleDown = Input::GetMouseButton(MouseCode::ButtonMiddle);
-
-        static bool sCaptured = false;
-        bool canStart = ImGuiViewportInput::IsHovered() && (rightDown || (shift && leftDown) || (shift && middleDown));
-        bool shouldContinue = (rightDown || (shift && leftDown) || (shift && middleDown));
-        bool target = sCaptured ? shouldContinue : canStart;
-        if (target != sCaptured)
-        {
-            sCaptured = target;
-            if (auto* appPtr = Application::Get())
-                appPtr->SetRelativeMouseMode(sCaptured);
-        }
-    }
-    
+    // In play mode, the application auto-enables relative mouse on right mouse down over the viewport.
+    // No per-layer code required.
     if (m_MainCamera && !m_IsPaused && isInPlayMode)
     {
         // Simple camera orbit around the origin
