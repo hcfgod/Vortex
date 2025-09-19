@@ -398,8 +398,9 @@ void Application::SetRelativeMouseMode(bool enable)
 		}
 
         // Convert SDL events to Vortex events and dispatch them
-		switch (sdlEvent.type)
-		{
+        bool gameplayEnabled = m_Engine && m_Engine->IsGameplayInputEnabled();
+        switch (sdlEvent.type)
+        {
 			// =============================================================================
 			// WINDOW EVENTS
 			// =============================================================================
@@ -651,50 +652,44 @@ void Application::SetRelativeMouseMode(bool enable)
 				break;
 			}
 			
-			case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
-			{
-				int gamepadId = sdlEvent.gbutton.which;
-				int button = sdlEvent.gbutton.button;
-				{
-				GamepadButtonPressedEvent e(gamepadId, button);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
-					{
-						VX_DISPATCH_EVENT(e);
-					}
-				}
-				break;
-			}
+            case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+            {
+                if (!gameplayEnabled) break; // Drop gameplay input in Edit mode entirely
+                int gamepadId = sdlEvent.gbutton.which;
+                int button = sdlEvent.gbutton.button;
+                {
+                GamepadButtonPressedEvent e(gamepadId, button);
+                if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+                }
+                break;
+            }
 			
-			case SDL_EVENT_GAMEPAD_BUTTON_UP:
-			{
-				int gamepadId = sdlEvent.gbutton.which;
-				int button = sdlEvent.gbutton.button;
-				{
-				GamepadButtonReleasedEvent e(gamepadId, button);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
-					{
-						VX_DISPATCH_EVENT(e);
-					}
-				}
-				break;
-			}
+            case SDL_EVENT_GAMEPAD_BUTTON_UP:
+            {
+                if (!gameplayEnabled) break; // Drop in Edit mode
+                int gamepadId = sdlEvent.gbutton.which;
+                int button = sdlEvent.gbutton.button;
+                {
+                GamepadButtonReleasedEvent e(gamepadId, button);
+                if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+                }
+                break;
+            }
 			
-			case SDL_EVENT_GAMEPAD_AXIS_MOTION:
-			{
-				int gamepadId = sdlEvent.gaxis.which;
-				int axis = sdlEvent.gaxis.axis;
-				// SDL3 may report axis values as floats [-1,1] or as int16 depending on backend
-				float raw = static_cast<float>(sdlEvent.gaxis.value);
-				float value = (std::abs(raw) > 1.1f) ? (raw / 32767.0f) : raw; // Robust normalization
-				{
-				GamepadAxisEvent e(gamepadId, axis, value);
-				if (!m_Engine->GetLayerStack().OnEvent(e))
-					{
-						VX_DISPATCH_EVENT(e);
-					}
-				}
-				break;
-			}
+            case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+            {
+                if (!gameplayEnabled) break; // Drop in Edit mode
+                int gamepadId = sdlEvent.gaxis.which;
+                int axis = sdlEvent.gaxis.axis;
+                // SDL3 may report axis values as floats [-1,1] or as int16 depending on backend
+                float raw = static_cast<float>(sdlEvent.gaxis.value);
+                float value = (std::abs(raw) > 1.1f) ? (raw / 32767.0f) : raw; // Robust normalization
+                {
+                GamepadAxisEvent e(gamepadId, axis, value);
+                if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+                }
+                break;
+            }
 			
 			// =============================================================================
 			// JOYSTICK EVENTS (fallback for controllers not recognized as gamepads)
@@ -736,32 +731,35 @@ void Application::SetRelativeMouseMode(bool enable)
 				}
 				break;
 			}
-			case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
-			{
-				int jid = sdlEvent.jbutton.which;
-				int button = sdlEvent.jbutton.button;
-				GamepadButtonPressedEvent e(jid, button);
-				if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
-				break;
-			}
-			case SDL_EVENT_JOYSTICK_BUTTON_UP:
-			{
-				int jid = sdlEvent.jbutton.which;
-				int button = sdlEvent.jbutton.button;
-				GamepadButtonReleasedEvent e(jid, button);
-				if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
-				break;
-			}
-			case SDL_EVENT_JOYSTICK_AXIS_MOTION:
-			{
-				int jid = sdlEvent.jaxis.which;
-				int axis = sdlEvent.jaxis.axis;
-				float raw = static_cast<float>(sdlEvent.jaxis.value);
-				float value = (std::abs(raw) > 1.1f) ? (raw / 32767.0f) : raw;
-				GamepadAxisEvent e(jid, axis, value);
-				if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
-				break;
-			}
+            case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
+            {
+                if (!gameplayEnabled) break; // Drop in Edit mode
+                int jid = sdlEvent.jbutton.which;
+                int button = sdlEvent.jbutton.button;
+                GamepadButtonPressedEvent e(jid, button);
+                if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+                break;
+            }
+            case SDL_EVENT_JOYSTICK_BUTTON_UP:
+            {
+                if (!gameplayEnabled) break; // Drop in Edit mode
+                int jid = sdlEvent.jbutton.which;
+                int button = sdlEvent.jbutton.button;
+                GamepadButtonReleasedEvent e(jid, button);
+                if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+                break;
+            }
+            case SDL_EVENT_JOYSTICK_AXIS_MOTION:
+            {
+                if (!gameplayEnabled) break; // Drop in Edit mode
+                int jid = sdlEvent.jaxis.which;
+                int axis = sdlEvent.jaxis.axis;
+                float raw = static_cast<float>(sdlEvent.jaxis.value);
+                float value = (std::abs(raw) > 1.1f) ? (raw / 32767.0f) : raw;
+                GamepadAxisEvent e(jid, axis, value);
+                if (!m_Engine->GetLayerStack().OnEvent(e)) { VX_DISPATCH_EVENT(e); }
+                break;
+            }
 			default:
 				break;
 		}

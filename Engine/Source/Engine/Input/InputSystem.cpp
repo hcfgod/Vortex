@@ -3,6 +3,7 @@
 #include "Core/Debug/Log.h"
 #include "Core/Events/EventSystem.h"
 #include "InputActions.h"
+#include "Engine/Systems/EngineSystem.h"
 #include "Engine/Systems/SystemAccessors.h"
 
 namespace Vortex
@@ -119,6 +120,11 @@ namespace Vortex
 
     int InputSystem::GetFirstConnectedGamepadIndex() const
     {
+        if (auto* eng = GetEngine())
+        {
+            if (!eng->IsGameplayInputEnabled())
+                return -1;
+        }
         for (size_t i = 0; i < m_Gamepads.size(); ++i)
         {
             if (m_Gamepads[i].connected)
@@ -129,11 +135,21 @@ namespace Vortex
 
     bool InputSystem::IsGamepadConnected(int index) const
     {
+        if (auto* eng = GetEngine())
+        {
+            if (!eng->IsGameplayInputEnabled())
+                return false;
+        }
         return index >= 0 && static_cast<size_t>(index) < m_Gamepads.size() && m_Gamepads[index].connected;
     }
 
     bool InputSystem::GetGamepadButton(int index, int button) const
     {
+        if (auto* eng = GetEngine())
+        {
+            if (!eng->IsGameplayInputEnabled())
+                return false;
+        }
         if (!IsGamepadConnected(index)) return false;
         const auto& gp = m_Gamepads[index];
         return button >= 0 && button < static_cast<int>(GamepadState::MaxButtons) ? gp.buttons[button].down : false;
@@ -141,6 +157,11 @@ namespace Vortex
 
     bool InputSystem::GetGamepadButtonDown(int index, int button) const
     {
+        if (auto* eng = GetEngine())
+        {
+            if (!eng->IsGameplayInputEnabled())
+                return false;
+        }
         if (!IsGamepadConnected(index)) return false;
         const auto& gp = m_Gamepads[index];
         return button >= 0 && button < static_cast<int>(GamepadState::MaxButtons) ? gp.buttons[button].pressed : false;
@@ -148,6 +169,11 @@ namespace Vortex
 
     bool InputSystem::GetGamepadButtonUp(int index, int button) const
     {
+        if (auto* eng = GetEngine())
+        {
+            if (!eng->IsGameplayInputEnabled())
+                return false;
+        }
         if (!IsGamepadConnected(index)) return false;
         const auto& gp = m_Gamepads[index];
         return button >= 0 && button < static_cast<int>(GamepadState::MaxButtons) ? gp.buttons[button].released : false;
@@ -155,6 +181,11 @@ namespace Vortex
 
     float InputSystem::GetGamepadAxis(int index, int axis) const
     {
+        if (auto* eng = GetEngine())
+        {
+            if (!eng->IsGameplayInputEnabled())
+                return 0.0f;
+        }
         if (!IsGamepadConnected(index)) return 0.0f;
         const auto& gp = m_Gamepads[index];
         return axis >= 0 && axis < static_cast<int>(GamepadState::MaxAxes) ? gp.axes[axis] : 0.0f;
@@ -321,6 +352,11 @@ namespace Vortex
 
     bool InputSystem::OnGamepadButtonDown(const GamepadButtonPressedEvent& e)
     {
+        if (auto* eng = GetEngine())
+        {
+            if (!eng->IsGameplayInputEnabled())
+                return false; // ignore in Edit mode
+        }
         if (auto* gp = GetOrCreateGamepad(e.GetGamepadId()))
         {
             const int btn = e.GetButton();
@@ -336,6 +372,11 @@ namespace Vortex
 
     bool InputSystem::OnGamepadButtonUp(const GamepadButtonReleasedEvent& e)
     {
+        if (auto* eng = GetEngine())
+        {
+            if (!eng->IsGameplayInputEnabled())
+                return false; // ignore in Edit mode
+        }
         if (auto* gp = GetOrCreateGamepad(e.GetGamepadId()))
         {
             const int btn = e.GetButton();
@@ -351,6 +392,11 @@ namespace Vortex
 
     bool InputSystem::OnGamepadAxis(const GamepadAxisEvent& e)
     {
+        if (auto* eng = GetEngine())
+        {
+            if (!eng->IsGameplayInputEnabled())
+                return false; // ignore in Edit mode
+        }
         if (auto* gp = GetOrCreateGamepad(e.GetGamepadId()))
         {
             const int axis = e.GetAxis();
