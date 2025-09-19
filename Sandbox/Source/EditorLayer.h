@@ -38,5 +38,8 @@ private:
 	std::shared_ptr<Engine> m_Engine;
 	std::shared_ptr <CameraSystem> m_CameraSystem;
 	// Editor camera for editor mode
-	std::shared_ptr<EditorCamera> m_EditorCamera;
+    std::shared_ptr<EditorCamera> m_EditorCamera;
+
+    // Warn only once if no main camera is set in play modes
+    bool m_WarnedNoMainCamera = false;
 };

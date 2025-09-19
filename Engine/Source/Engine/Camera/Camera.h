@@ -621,12 +621,17 @@ namespace Vortex
         std::shared_ptr<Camera> GetActiveCamera() const { return m_ActiveCamera; }
         void SetActiveCamera(const std::shared_ptr<Camera>& camera) { m_ActiveCamera = camera; }
 
+        // Main camera designation (for gameplay)
+        void SetMainCamera(const std::shared_ptr<Camera>& camera);
+        std::shared_ptr<Camera> GetMainCamera() const { return m_MainCamera; }
+
         // Window resize handling
         void OnWindowResize(uint32_t width, uint32_t height);
 
     private:
         std::vector<std::shared_ptr<Camera>> m_Cameras;
         std::shared_ptr<Camera> m_ActiveCamera;
+        std::shared_ptr<Camera> m_MainCamera;
     };
 
 } // namespace Vortex 

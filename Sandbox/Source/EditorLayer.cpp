@@ -38,23 +38,28 @@ void EditorLayer::OnUpdate()
 		if (!activeCamera || dynamic_cast<EditorCamera*>(activeCamera.get()) == nullptr)
 		{
 			m_CameraSystem->SetActiveCamera(m_EditorCamera);
-			VX_INFO("[EditorLayer] Switched to EditorCamera (Edit mode)");
 		}
 	}
-	else if (currentMode == Engine::RunMode::PlayInEditor || currentMode == Engine::RunMode::Production)
-	{
-		// In Play mode, switch to gameplay camera if available
-		auto cameras = m_CameraSystem->GetCameras();
-		for (auto& cam : cameras)
-		{
-			if (dynamic_cast<PerspectiveCamera*>(cam.get()) != nullptr)
-			{
-				m_CameraSystem->SetActiveCamera(cam);
-				VX_INFO("[EditorLayer] Switched to PerspectiveCamera (Play mode)");
-				break;
-			}
-		}
-	}
+    else if (currentMode == Engine::RunMode::PlayInEditor || currentMode == Engine::RunMode::Production)
+    {
+        // In Play mode, prefer an explicit Main camera
+        auto mainCam = m_CameraSystem->GetMainCamera();
+        if (mainCam)
+        {
+            if (activeCamera != mainCam)
+                m_CameraSystem->SetActiveCamera(mainCam);
+            m_WarnedNoMainCamera = false;
+        }
+        else
+        {
+            if (!m_WarnedNoMainCamera)
+            {
+                VX_WARN("[Editor] No Main Camera set for gameplay. Assign one via CameraSystem::SetMainCamera().");
+                m_WarnedNoMainCamera = true;
+            }
+            // Do NOT auto-pick a random perspective camera; keep current active camera
+        }
+    }
 }
 
 void EditorLayer::OnRender()

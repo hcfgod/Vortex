@@ -28,6 +28,7 @@ namespace Vortex
         // Clear any existing cameras
         m_Cameras.clear();
         m_ActiveCamera.reset();
+        m_MainCamera.reset();
         
         MarkInitialized();
         VX_CORE_INFO("CameraSystem initialized successfully");
@@ -56,6 +57,7 @@ namespace Vortex
         // Clear all cameras
         m_Cameras.clear();
         m_ActiveCamera.reset();
+        m_MainCamera.reset();
         
         MarkShutdown();
         VX_CORE_INFO("CameraSystem shutdown complete");
@@ -102,6 +104,12 @@ namespace Vortex
                 m_ActiveCamera.reset();
                 VX_CORE_INFO("Active camera unregistered");
             }
+            // If this was the main camera, clear it
+            if (m_MainCamera == camera)
+            {
+                m_MainCamera.reset();
+                VX_CORE_INFO("Main camera unregistered");
+            }
             
             VX_CORE_INFO("Camera unregistered successfully. Total cameras: {}", m_Cameras.size());
         }
@@ -109,6 +117,25 @@ namespace Vortex
         {
             VX_CORE_WARN("Attempted to unregister camera that was not registered");
         }
+    }
+
+    void CameraSystem::SetMainCamera(const std::shared_ptr<Camera>& camera)
+    {
+        if (!camera)
+        {
+            m_MainCamera.reset();
+            VX_CORE_INFO("Main camera cleared");
+            return;
+        }
+        // Ensure camera is registered; register if needed
+        auto it = std::find(m_Cameras.begin(), m_Cameras.end(), camera);
+        if (it == m_Cameras.end())
+        {
+            VX_CORE_WARN("SetMainCamera called with unregistered camera. Registering it now.");
+            Register(camera);
+        }
+        m_MainCamera = camera;
+        VX_CORE_INFO("Main camera set");
     }
 
     void CameraSystem::OnWindowResize(uint32_t width, uint32_t height)

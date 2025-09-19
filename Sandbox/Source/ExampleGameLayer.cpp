@@ -617,6 +617,9 @@ void ExampleGameLayer::SetupGameplayCamera()
     // Register the camera with the system
     cameraSystem->Register(m_MainCamera);
     
+    // Register as the main gameplay camera
+    cameraSystem->SetMainCamera(m_MainCamera);
+
     // Set it as the active camera for gameplay
     cameraSystem->SetActiveCamera(m_MainCamera);
 
