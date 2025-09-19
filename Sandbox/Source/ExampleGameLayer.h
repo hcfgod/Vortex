@@ -32,8 +32,6 @@ private:
     void OnFireAction(InputActionPhase phase);
     void OnBuildAssetsAction(InputActionPhase phase);
     
-
-
 private:
     // Game state
     float m_GameTime = 0.0f;
@@ -54,20 +52,6 @@ private:
     // Asset-system managed handles
     AssetHandle<ShaderAsset> m_ShaderHandle;
     AssetHandle<TextureAsset> m_TextureHandle;
-
-    // Loading indicator state
-    bool m_ShaderLoading = false;
-    float m_ShaderProgress = 0.0f;
-
-    // Resources for demo triangle (VAO/VBO still needed for vertex data)
-    unsigned int m_VBO = 0;
-    unsigned int m_VAO = 0;
-    unsigned int m_EBO = 0;
-
-    // High-level rendering objects
-    std::shared_ptr<VertexArray> m_VertexArray;
-	std::shared_ptr<VertexBuffer> m_VertexBuffer;
-	std::shared_ptr<IndexBuffer> m_IndexBuffer;
 
     // Camera system demo
     std::shared_ptr<PerspectiveCamera> m_MainCamera;

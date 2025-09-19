@@ -15,8 +15,8 @@ namespace Vortex
 	class VertexArray;
 	class VertexBuffer;
 	class IndexBuffer;
-	class Texture;
 	class Shader;
+	class TextureAsset;
 
 	// Batch capacity (quads per draw call). If exceeded we flush and start
 	constexpr uint32_t MaxQuads = 500000;
@@ -48,7 +48,7 @@ namespace Vortex
 		QuadVertex* QuadBuffer = nullptr;          // CPU side begin
 		QuadVertex* QuadBufferPtr = nullptr;       // current write ptr
 
-		std::array<std::shared_ptr<Texture>, MaxTextureSlots> TextureSlots;
+		std::array<Texture2DRef, MaxTextureSlots> TextureSlots;
 		uint32_t TextureSlotIndex = 1; // 0 = white texture reserved
 
 		Texture2DRef WhiteTexture;
@@ -68,6 +68,8 @@ namespace Vortex
 		static void BeginScene(const Camera& camera);
 		static void EndScene();
 		static void DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec4& color);
+		static void DrawQuad(const glm::vec2& position, const glm::vec2& size, const Texture2DRef& texture, const glm::vec4& tintColor = glm::vec4(1.0f));
+		static void DrawQuad(const glm::vec2& position, const glm::vec2& size, const AssetHandle<TextureAsset>& textureAsset, const glm::vec4& tintColor = glm::vec4(1.0f));
 
 		static const Renderer2DStatistics& GetStats();
 		static void ResetStats();
