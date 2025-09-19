@@ -6,8 +6,20 @@
 
 namespace Vortex
 {
+    // Helper ---------------------------------------------------------------
+    static GLenum UsageToGL(BufferUsage usage)
+    {
+        switch (usage)
+        {
+        case BufferUsage::StaticDraw:  return GL_STATIC_DRAW;
+        case BufferUsage::DynamicDraw: return GL_DYNAMIC_DRAW;
+        case BufferUsage::StreamDraw:  return GL_STREAM_DRAW;
+        default:                   return GL_STATIC_DRAW;
+        }
+    }
+
     // ------------------------- OpenGLVertexBuffer -------------------------
-    OpenGLVertexBuffer::OpenGLVertexBuffer(uint32_t size, const void* data)
+    OpenGLVertexBuffer::OpenGLVertexBuffer(uint32_t size, const void* data, BufferUsage usage)
     {
         GetRenderCommandQueue().GenBuffers(1, &m_RendererID, true);
         // Upload data via render command queue (bind to ARRAY_BUFFER)
@@ -15,7 +27,7 @@ namespace Vortex
         if (data && size > 0)
         {
             GetRenderCommandQueue().BufferData(static_cast<uint32_t>(BufferTarget::ArrayBuffer), data, size,
-                static_cast<uint32_t>(BufferUsage::StaticDraw));
+                UsageToGL(usage));
         }
     }
 

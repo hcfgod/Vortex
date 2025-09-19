@@ -1,6 +1,7 @@
 #include "ExampleGameLayer.h"
 #include "EditorLayer.h"
 #include <imgui.h>
+#include "Engine/Renderer/Renderer2D.h"
 
 // Triangle vertices with position, texture coordinates, normal, and tangent
 const float kVertices[] =
@@ -19,6 +20,7 @@ const unsigned int kIndices[] =
 void ExampleGameLayer::OnAttach()
 {
     VX_INFO("ExampleGameLayer attached - Game layer ready!");
+    VX_INFO("ExampleGameLayer attached - Game layer ready!");
     VX_INFO("Controls:");
     VX_INFO("  - SPACE/Square: Pause/Unpause (Action System)");
     VX_INFO("  - R/Triangle: Reset game (Action System)");
@@ -34,11 +36,14 @@ void ExampleGameLayer::OnAttach()
         return;
 	}
     m_AssetSystem->SetWorkingDirectory(std::filesystem::current_path());
+
+    // Initialize Renderer2D after assets root is set so it can find its shaders
+    Vortex::Renderer2D::Initialize();
     
     SetupInputActions();
     
     // Initialize the modern shader system
-    SetupShaderSystem();
+    //SetupShaderSystem();
 
     // Load a texture asset using generic loader (name-based)
     m_TextureHandle = m_AssetSystem->LoadAsset<TextureAsset>("Checker");
@@ -66,6 +71,7 @@ void ExampleGameLayer::OnAttach()
 void ExampleGameLayer::OnDetach()
 {
     VX_INFO("ExampleGameLayer detached - Final Score: {}", m_Score);
+    Vortex::Renderer2D::Shutdown();
 }
 
 void ExampleGameLayer::OnUpdate()
@@ -259,19 +265,20 @@ void ExampleGameLayer::OnUpdate()
 
 void ExampleGameLayer::OnRender()
 {
-    // Bind shader through ShaderManager
-    Result<void> shaderBindResult = GetShaderManager().BindShader(m_ShaderHandle);
-	// Note: You don't have to check if it succeeds but its always good practice so the api is there if needed.
-    if (!shaderBindResult.IsSuccess())
-    {
-        VX_WARN("Shader not ready: {}", shaderBindResult.GetErrorMessage());
-        return;
-    }
+ //   // Bind shader through ShaderManager
+ //   Result<void> shaderBindResult = GetShaderManager().BindShader(m_ShaderHandle);
+	//// Note: You don't have to check if it succeeds but its always good practice so the api is there if needed.
+ //   if (!shaderBindResult.IsSuccess())
+ //   {
+ //       VX_WARN("Shader not ready: {}", shaderBindResult.GetErrorMessage());
+ //       return;
+ //   }
 
     // === Camera System Integration ===
     auto* cameraSystem = Sys<CameraSystem>();
     std::shared_ptr<Camera> activeCamera = cameraSystem ? cameraSystem->GetActiveCamera() : nullptr;
     
+	// Default matrices if no active camera
     glm::mat4 viewProjection = glm::mat4(1.0f);
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 model = glm::mat4(1.0f);
@@ -295,73 +302,81 @@ void ExampleGameLayer::OnRender()
         VX_CORE_WARN("[CameraSystem] No active camera found, using identity matrices");
     }
 
-    // === Matrix uniforms (required by advanced shader) ===
-    GetShaderManager().SetUniform("u_ViewProjection", viewProjection);
-    GetShaderManager().SetUniform("u_View", view);
-    GetShaderManager().SetUniform("u_Model", model);
-    GetShaderManager().SetUniform("u_NormalMatrix", normalMatrix);
-    GetShaderManager().SetUniform("u_CameraPos", cameraPos);
+    Renderer2D::BeginScene(*activeCamera);
 
-    // === Material properties ===
-    // Use albedo texture if loaded, otherwise solid color
-    bool useTexture = m_TextureHandle.IsValid() && m_TextureHandle.IsLoaded();
-    if (useTexture)
-    {
-        const TextureAsset* tex = m_TextureHandle.TryGet();
-        if (tex && tex->IsReady() && tex->GetTexture())
-        {
-            // Bind texture on render thread via command queue, then set sampler uniforms
-            tex->GetTexture()->Bind(0);
-            GetShaderManager().SetTexture("u_AlbedoTexture", tex->GetTexture()->GetRendererID(), 0);
-            GetShaderManager().SetUniform("u_AlbedoTexture", 0);
-            GetShaderManager().SetUniform("u_UseAlbedoTexture", 1);
-        }
-        else
-        {
-            GetShaderManager().SetUniform("u_UseAlbedoTexture", 0);
-        }
-    }
-    else
-    {
-        GetShaderManager().SetUniform("u_UseAlbedoTexture", 0);
-    }
+	Renderer2D::DrawQuad(glm::vec2(-5.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+	Renderer2D::DrawQuad(glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+	Renderer2D::DrawQuad(glm::vec2(5.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
 
-    glm::vec3 albedo(1.0f, 1.0f, 1.0f); // base color when multiplied with texture
-    GetShaderManager().SetUniform("u_Albedo", albedo);
-    GetShaderManager().SetUniform("u_Metallic", 0.2f);
-    GetShaderManager().SetUniform("u_Roughness", 0.4f);
-    GetShaderManager().SetUniform("u_AO", 1.0f);
-    GetShaderManager().SetUniform("u_Alpha", 1.0f);
+    Renderer2D::EndScene();
 
-    // Disable emission for solid color
-    GetShaderManager().SetUniform("u_Emission", glm::vec3(0.0f));
+    //// === Matrix uniforms (required by advanced shader) ===
+    //GetShaderManager().SetUniform("u_ViewProjection", viewProjection);
+    //GetShaderManager().SetUniform("u_View", view);
+    //GetShaderManager().SetUniform("u_Model", model);
+    //GetShaderManager().SetUniform("u_NormalMatrix", normalMatrix);
+    //GetShaderManager().SetUniform("u_CameraPos", cameraPos);
 
-    // === Lighting ===
-    glm::vec3 lightPos(2.0f, 2.0f, 2.0f);
-    glm::vec3 lightColor(1.0f, 1.0f, 0.9f); // Warm white
-    GetShaderManager().SetUniform("u_LightPosition", lightPos);
-    GetShaderManager().SetUniform("u_LightColor", lightColor);
-    GetShaderManager().SetUniform("u_LightIntensity", 10.0f);
+    //// === Material properties ===
+    //// Use albedo texture if loaded, otherwise solid color
+    //bool useTexture = m_TextureHandle.IsValid() && m_TextureHandle.IsLoaded();
+    //if (useTexture)
+    //{
+    //    const TextureAsset* tex = m_TextureHandle.TryGet();
+    //    if (tex && tex->IsReady() && tex->GetTexture())
+    //    {
+    //        // Bind texture on render thread via command queue, then set sampler uniforms
+    //        tex->GetTexture()->Bind(0);
+    //        GetShaderManager().SetTexture("u_AlbedoTexture", tex->GetTexture()->GetRendererID(), 0);
+    //        GetShaderManager().SetUniform("u_AlbedoTexture", 0);
+    //        GetShaderManager().SetUniform("u_UseAlbedoTexture", 1);
+    //    }
+    //    else
+    //    {
+    //        GetShaderManager().SetUniform("u_UseAlbedoTexture", 0);
+    //    }
+    //}
+    //else
+    //{
+    //    GetShaderManager().SetUniform("u_UseAlbedoTexture", 0);
+    //}
 
-    // === Transform uniforms for vertex animation ===
-    glm::vec3 translation(0.0f, 0.0f, 0.0f);
-    glm::vec3 rotation(0.0f, 0.0f, 0.0f); // No rotation animation
-    glm::vec3 scale(1.0f, 1.0f, 1.0f);
-    GetShaderManager().SetUniform("u_Translation", translation);
-    GetShaderManager().SetUniform("u_Rotation", rotation);
-    GetShaderManager().SetUniform("u_Scale", scale);
+    //glm::vec3 albedo(1.0f, 1.0f, 1.0f); // base color when multiplied with texture
+    //GetShaderManager().SetUniform("u_Albedo", albedo);
+    //GetShaderManager().SetUniform("u_Metallic", 0.2f);
+    //GetShaderManager().SetUniform("u_Roughness", 0.4f);
+    //GetShaderManager().SetUniform("u_AO", 1.0f);
+    //GetShaderManager().SetUniform("u_Alpha", 1.0f);
 
-    // === Rim lighting effect ===
-    GetShaderManager().SetUniform("u_RimPower", 2.0f);
-    glm::vec3 rimColor(0.2f, 0.4f, 1.0f); // Blue rim
-    GetShaderManager().SetUniform("u_RimColor", rimColor);
-    GetShaderManager().SetUniform("u_FresnelStrength", 0.3f);
+    //// Disable emission for solid color
+    //GetShaderManager().SetUniform("u_Emission", glm::vec3(0.0f));
 
-    // Bind VAO and draw
-    GetRenderCommandQueue().BindVertexArray(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(nullptr))); // no-op to ensure context
-    m_VertexArray->Bind();
-    GetRenderCommandQueue().DrawIndexed(3, 1, 0, 0, 0, static_cast<uint32_t>(PrimitiveTopology::Triangles));
-    m_VertexArray->Unbind();
+    //// === Lighting ===
+    //glm::vec3 lightPos(2.0f, 2.0f, 2.0f);
+    //glm::vec3 lightColor(1.0f, 1.0f, 0.9f); // Warm white
+    //GetShaderManager().SetUniform("u_LightPosition", lightPos);
+    //GetShaderManager().SetUniform("u_LightColor", lightColor);
+    //GetShaderManager().SetUniform("u_LightIntensity", 10.0f);
+
+    //// === Transform uniforms for vertex animation ===
+    //glm::vec3 translation(0.0f, 0.0f, 0.0f);
+    //glm::vec3 rotation(0.0f, 0.0f, 0.0f); // No rotation animation
+    //glm::vec3 scale(1.0f, 1.0f, 1.0f);
+    //GetShaderManager().SetUniform("u_Translation", translation);
+    //GetShaderManager().SetUniform("u_Rotation", rotation);
+    //GetShaderManager().SetUniform("u_Scale", scale);
+
+    //// === Rim lighting effect ===
+    //GetShaderManager().SetUniform("u_RimPower", 2.0f);
+    //glm::vec3 rimColor(0.2f, 0.4f, 1.0f); // Blue rim
+    //GetShaderManager().SetUniform("u_RimColor", rimColor);
+    //GetShaderManager().SetUniform("u_FresnelStrength", 0.3f);
+
+    //// Bind VAO and draw
+    //GetRenderCommandQueue().BindVertexArray(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(nullptr))); // no-op to ensure context
+    //m_VertexArray->Bind();
+    //GetRenderCommandQueue().DrawIndexed(3, 1, 0, 0, 0, static_cast<uint32_t>(PrimitiveTopology::Triangles));
+    //m_VertexArray->Unbind();
 
     // Unbind shader through ShaderManager
     GetShaderManager().UnbindShader();

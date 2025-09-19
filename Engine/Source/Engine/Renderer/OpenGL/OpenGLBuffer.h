@@ -8,7 +8,7 @@ namespace Vortex
     class OpenGLVertexBuffer : public VertexBuffer
     {
     public:
-        OpenGLVertexBuffer(uint32_t size, const void* data);
+        OpenGLVertexBuffer(uint32_t size, const void* data, BufferUsage usage);
         ~OpenGLVertexBuffer() override;
 
         void Bind() const override;

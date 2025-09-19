@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include "Engine/Renderer/Shader/ShaderTypes.h"
+#include "RenderTypes.h"
 
 namespace Vortex
 {
@@ -106,7 +107,7 @@ namespace Vortex
 
         virtual uint32_t GetRendererID() const = 0;
 
-        static std::shared_ptr<VertexBuffer> Create(uint32_t size, const void* data = nullptr);
+        static std::shared_ptr<VertexBuffer> Create(uint32_t size, const void* data = nullptr, BufferUsage usage = BufferUsage::StaticDraw);
     };
 
     class IndexBuffer

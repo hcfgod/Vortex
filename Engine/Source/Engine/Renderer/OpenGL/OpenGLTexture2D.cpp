@@ -67,7 +67,7 @@ namespace Vortex
         }
     }
 
-    OpenGLTexture2D::OpenGLTexture2D(const CreateInfo& info)
+    OpenGLTexture2D::OpenGLTexture2D(const TextureCreateInfo& info)
     {
         m_Width = info.Width;
         m_Height = info.Height;

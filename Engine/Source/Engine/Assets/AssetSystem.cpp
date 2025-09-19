@@ -833,7 +833,7 @@ namespace Vortex
             setProgress(0.5f);
 
             // Create GPU texture
-            Texture2D::CreateInfo ci{};
+            Texture2D::TextureCreateInfo ci{};
             ci.Width = width;
             ci.Height = height;
             ci.Format = options.Format;
@@ -990,6 +990,7 @@ namespace Vortex
         VX_CORE_INFO("Asset pack written: {}", outputPack.string());
         return Result<fs::path>(outputPack);
     }
+
     Task<void> AssetSystem::CompileShaderTask(UUID id, std::string name, std::string vertexPath, std::string fragmentPath, ShaderCompileOptions options, ProgressCallback progress, bool isReload)
     {
         // Small staged progress model: 0.0-0.1 read, 0.1-0.8 compile, 0.8-1.0 create

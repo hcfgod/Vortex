@@ -7,7 +7,7 @@ namespace Vortex
     class OpenGLTexture2D : public Texture2D
     {
     public:
-        explicit OpenGLTexture2D(const CreateInfo& info);
+        explicit OpenGLTexture2D(const TextureCreateInfo& info);
         ~OpenGLTexture2D() override;
 
         uint32_t GetWidth() const override { return m_Width; }

@@ -6,7 +6,7 @@
 
 namespace Vortex
 {
-    std::shared_ptr<Texture2D> Texture2D::Create(const CreateInfo& info)
+    std::shared_ptr<Texture2D> Texture2D::Create(const TextureCreateInfo& info)
     {
         switch (GetGraphicsAPI())
         {

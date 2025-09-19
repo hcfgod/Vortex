@@ -41,7 +41,7 @@ namespace Vortex
         virtual void Bind(uint32_t slot = 0) const = 0;
         virtual void Unbind(uint32_t slot = 0) const = 0;
 
-        struct CreateInfo
+        struct TextureCreateInfo
         {
             uint32_t Width = 0;
             uint32_t Height = 0;
@@ -55,7 +55,7 @@ namespace Vortex
             uint64_t InitialDataSize = 0;
         };
 
-        static std::shared_ptr<Texture2D> Create(const CreateInfo& info);
+        static std::shared_ptr<Texture2D> Create(const TextureCreateInfo& info);
     };
 
     using Texture2DRef = std::shared_ptr<Texture2D>;

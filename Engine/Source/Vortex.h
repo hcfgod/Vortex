@@ -59,6 +59,7 @@
 #include "Engine/Renderer/UniformBuffer.h"
 #include "Engine/Renderer/FrameBuffer.h"
 #include "Engine/Systems/ImGuiInterop.h"
+#include "Engine/Renderer/Renderer2D.h"
 
 // Camera
 #include "Engine/Camera/Camera.h"

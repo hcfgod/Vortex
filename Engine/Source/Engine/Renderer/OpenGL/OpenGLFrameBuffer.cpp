@@ -36,7 +36,7 @@ namespace Vortex
         m_ColorAttachments.resize(m_Spec.ColorAttachmentCount);
         for (uint32_t i = 0; i < m_Spec.ColorAttachmentCount; ++i)
         {
-            Texture2D::CreateInfo info{};
+            Texture2D::TextureCreateInfo info{};
             info.Width = m_Spec.Width;
             info.Height = m_Spec.Height;
             info.Format = TextureFormat::RGBA8;

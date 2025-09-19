@@ -7,14 +7,14 @@
 
 namespace Vortex
 {
-    std::shared_ptr<VertexBuffer> VertexBuffer::Create(uint32_t size, const void* data)
+    std::shared_ptr<VertexBuffer> VertexBuffer::Create(uint32_t size, const void* data, BufferUsage usage)
     {
         switch (RendererAPIManager::GetInstance().GetCurrentAPI())
         {
             case GraphicsAPI::OpenGL:
             {
             #ifdef VX_OPENGL_SUPPORT
-                return std::make_shared<OpenGLVertexBuffer>(size, data);
+                return std::make_shared<OpenGLVertexBuffer>(size, data, usage);
             #else
                 return nullptr;
             #endif
