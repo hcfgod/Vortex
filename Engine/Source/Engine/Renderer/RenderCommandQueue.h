@@ -287,6 +287,17 @@ namespace Vortex
             return Submit(std::make_unique<VertexAttribPointerCommand>(index, size, type, normalized, stride, pointer), executeImmediate);
         }
 
+        bool VertexAttribIPointer(uint32_t index, int32_t size, uint32_t type,
+                                  uint64_t stride, uint64_t pointer, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<VertexAttribIPointerCommand>(index, size, type, stride, pointer), executeImmediate);
+        }
+
+        bool VertexAttribDivisor(uint32_t index, uint32_t divisor, bool executeImmediate = false)
+        {
+            return Submit(std::make_unique<VertexAttribDivisorCommand>(index, divisor), executeImmediate);
+        }
+
         bool EnableVertexAttribArray(uint32_t index, bool enabled, bool executeImmediate = false)
         {
             return Submit(std::make_unique<EnableVertexAttribArrayCommand>(index, enabled), executeImmediate);

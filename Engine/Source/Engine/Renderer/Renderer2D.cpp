@@ -32,22 +32,15 @@ namespace Vortex
 		}
 	}
 
-	// Base quad positions / texcoords
-	static const glm::vec3 s_QuadVertexPositions[4] = 
+	// Helper to pack RGBA color into uint32 (RGBA8)
+	static inline uint32_t PackColorRGBA8(const glm::vec4& color)
 	{
-		{-0.5f, -0.5f, 0.0f},
-		{ 0.5f, -0.5f, 0.0f},
-		{ 0.5f,  0.5f, 0.0f},
-		{-0.5f,  0.5f, 0.0f}
-	};
-
-	static const glm::vec2 s_QuadTexCoords[4] = 
-	{
-		{0.0f, 0.0f},
-		{1.0f, 0.0f},
-		{1.0f, 1.0f},
-		{0.0f, 1.0f}
-	};
+		uint32_t r = (uint32_t)glm::clamp((int)glm::round(color.r * 255.0f), 0, 255);
+		uint32_t g = (uint32_t)glm::clamp((int)glm::round(color.g * 255.0f), 0, 255);
+		uint32_t b = (uint32_t)glm::clamp((int)glm::round(color.b * 255.0f), 0, 255);
+		uint32_t a = (uint32_t)glm::clamp((int)glm::round(color.a * 255.0f), 0, 255);
+		return (r << 24) | (g << 16) | (b << 8) | a;
+	}
 
 	// Optimized rotation helpers - avoid expensive matrix calculations
 	inline void RotateVertex2D(glm::vec3& vertex, float cosZ, float sinZ, const glm::vec2& center)
@@ -195,35 +188,52 @@ namespace Vortex
 		s_Data = new Renderer2DStorage();
 		s_Data->QuadVA = VertexArray::Create();
 
-		s_Data->QuadVB = VertexBuffer::Create(MaxVertices * sizeof(QuadVertex), nullptr, BufferUsage::StreamDraw);
-		s_Data->QuadVB->SetLayout(
+		// 1) Static per-vertex quad (unit corners and texcoords)
+		struct StaticVertex { glm::vec2 Corner; glm::vec2 UV; };
+		StaticVertex staticVerts[4] = {
+			{ {-1.0f, -1.0f}, {0.0f, 0.0f} },
+			{ { 1.0f, -1.0f}, {1.0f, 0.0f} },
+			{ { 1.0f,  1.0f}, {1.0f, 1.0f} },
+			{ {-1.0f,  1.0f}, {0.0f, 1.0f} },
+		};
+		s_Data->StaticVB = VertexBuffer::Create(sizeof(staticVerts), static_cast<const void*>(staticVerts), BufferUsage::StaticDraw);
 		{
-			{ ShaderDataType::Vec3, "aPos" },
-			{ ShaderDataType::Vec4, "aColor" },
-			{ ShaderDataType::Vec2, "aTexCoord" },
-			{ ShaderDataType::Float, "aTexIndex" }
-		});
-		s_Data->QuadVA->AddVertexBuffer(s_Data->QuadVB);
-
-		// Pre-generate large index buffer
-		std::vector<uint32_t> indices(MaxIndices);
-		uint32_t offset = 0;
-		for (uint32_t i = 0; i < MaxIndices; i += 6)
-		{
-			indices[i + 0] = offset + 0;
-			indices[i + 1] = offset + 1;
-			indices[i + 2] = offset + 2;
-			indices[i + 3] = offset + 2;
-			indices[i + 4] = offset + 3;
-			indices[i + 5] = offset + 0;
-			offset += 4;
+			BufferLayout layout{
+				{ ShaderDataType::Vec2, "aCorner" },
+				{ ShaderDataType::Vec2, "aTexCoord" }
+			};
+			s_Data->StaticVB->SetLayout(layout);
+			s_Data->QuadVA->AddVertexBuffer(s_Data->StaticVB);
 		}
-		s_Data->QuadIB = IndexBuffer::Create(indices.data(), MaxIndices);
+
+		// 2) Per-instance buffer (center, halfSize, color RGBA8, texIndex, rotSinCos, z)
+		s_Data->InstanceVB = VertexBuffer::Create(MaxQuads * sizeof(Renderer2DStorage::QuadInstance), nullptr, BufferUsage::StreamDraw);
+		{
+			BufferLayout ilayout{
+				{ ShaderDataType::Vec2, "iCenter" },
+				{ ShaderDataType::Vec2, "iHalfSize" },
+				{ ShaderDataType::UInt, "iColor" },
+				{ ShaderDataType::UInt, "iTexIndex" },
+				{ ShaderDataType::Vec2, "iRotSinCos" },
+				{ ShaderDataType::Float, "iZ" }
+			};
+			ilayout.SetDivisor(1); // per-instance
+			s_Data->InstanceVB->SetLayout(ilayout);
+			s_Data->QuadVA->AddVertexBuffer(s_Data->InstanceVB);
+		}
+
+		// 3) Small index buffer for the unit quad
+		uint32_t indices[6] = { 0, 1, 2, 2, 3, 0 };
+		s_Data->QuadIB = IndexBuffer::Create(indices, 6);
 		s_Data->QuadVA->SetIndexBuffer(s_Data->QuadIB);
+
+		// CPU-side instance buffer
+		s_Data->InstanceBuffer = new Renderer2DStorage::QuadInstance[MaxQuads];
+		s_Data->InstanceBufferPtr = s_Data->InstanceBuffer;
+		s_Data->InstanceCount = 0;
 
 		// White texture
 		uint32_t whitePixel = 0xFFFFFFFFu;
-		s_Data->QuadBuffer = new QuadVertex[MaxVertices];
 		Texture2D::TextureCreateInfo whiteTextureInfo;
 		whiteTextureInfo.Width = 1;
 		whiteTextureInfo.Height = 1;
@@ -233,11 +243,6 @@ namespace Vortex
 		s_Data->WhiteTexture = Texture2D::Create(whiteTextureInfo);
 		// Reserve slot 0 for white texture
 		s_Data->TextureSlots[0] = s_Data->WhiteTexture;
-
-		// Set texture sampler array [0..15]
-		int samplers[MaxTextureSlots];
-		for (int i = 0; i < static_cast<int>(MaxTextureSlots); ++i)
-			samplers[i] = i;
 
 		// Initialization code for 2D renderer (shaders, buffers, etc.)
 		EnsureShaderLoaded();
@@ -249,12 +254,13 @@ namespace Vortex
 	{
 		if (!s_Data) return;
 
-		delete[] s_Data->QuadBuffer;
+		delete[] s_Data->InstanceBuffer;
 
-		s_Data->QuadBuffer = nullptr;
-		s_Data->QuadBufferPtr = nullptr;
+		s_Data->InstanceBuffer = nullptr;
+		s_Data->InstanceBufferPtr = nullptr;
 		s_Data->QuadVA.reset();
-		s_Data->QuadVB.reset();
+		s_Data->StaticVB.reset();
+		s_Data->InstanceVB.reset();
 		s_Data->QuadIB.reset();
 		s_Data->WhiteTexture.reset();
 		s_Data->QuadShaderHandle = {};
@@ -263,50 +269,50 @@ namespace Vortex
 		s_Data = nullptr;
 	}
 
-void Renderer2D::BeginScene(const Camera& camera)
-{
-	if (!s_Data) return;
-	EnsureShaderLoaded();
-
-	s_Data->CurrentViewProj = camera.GetViewProjectionMatrix();
-
-	// Increment frame counter for rotation cache LRU tracking
-	s_Data->CurrentFrame++;
-
-	// Cache current viewport size (FBO if set, else window)
-	if (auto* rs = Sys<RenderSystem>())
+	void Renderer2D::BeginScene(const Camera& camera)
 	{
-		s_Data->CurrentViewportSize = rs->GetCurrentViewportSize();
+		if (!s_Data) return;
+		EnsureShaderLoaded();
+
+		s_Data->CurrentViewProj = camera.GetViewProjectionMatrix();
+
+		// Increment frame counter for rotation cache LRU tracking
+		s_Data->CurrentFrame++;
+
+		// Cache current viewport size (FBO if set, else window)
+		if (auto* rs = Sys<RenderSystem>())
+		{
+			s_Data->CurrentViewportSize = rs->GetCurrentViewportSize();
+		}
+		else
+		{
+			s_Data->CurrentViewportSize = glm::uvec2(0, 0);
+		}
+
+		StartNewBatch();
 	}
-	else
+
+	void Renderer2D::EndScene()
 	{
-		s_Data->CurrentViewportSize = glm::uvec2(0, 0);
+		Flush();
 	}
 
-	StartNewBatch();
-}
-
-void Renderer2D::EndScene()
-{
-	Flush();
-}
-
-void Renderer2D::SetPixelSnapEnabled(bool enabled)
-{
-	if (!s_Data) return;
-	s_Data->PixelSnapEnabled = enabled;
-}
+	void Renderer2D::SetPixelSnapEnabled(bool enabled)
+	{
+		if (!s_Data) return;
+		s_Data->PixelSnapEnabled = enabled;
+	}
 
 	// Batching utilities
 	void Renderer2D::Flush()
 	{
 		if (!s_Data) return;
-		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data->QuadBufferPtr - (uint8_t*)s_Data->QuadBuffer);
-		if (dataSize == 0 || s_Data->QuadIndexCount == 0)
+		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data->InstanceBufferPtr - (uint8_t*)s_Data->InstanceBuffer);
+		if (dataSize == 0 || s_Data->InstanceCount == 0)
 			return;
 
-		// Upload data
-		s_Data->QuadVB->SetData(s_Data->QuadBuffer, dataSize);
+		// Upload instance data
+		s_Data->InstanceVB->SetData(s_Data->InstanceBuffer, dataSize);
 
 		// Bind shader and set uniforms (only if shader asset is loaded)
 		auto& sm = GetShaderManager();
@@ -334,9 +340,9 @@ void Renderer2D::SetPixelSnapEnabled(bool enabled)
 		GetRenderCommandQueue().SetDepthState(false, false);
 		GetRenderCommandQueue().SetBlendState(true);
 
-		// Bind VAO and draw
+		// Bind VAO and draw instanced (6 indices per quad)
 		s_Data->QuadVA->Bind();
-		GetRenderCommandQueue().DrawIndexed(s_Data->QuadIndexCount);
+		GetRenderCommandQueue().DrawIndexed(6, s_Data->InstanceCount);
 
 		// Restore depth defaults (test/write enabled, Less) and disable blending
 		GetRenderCommandQueue().SetDepthState(true, true, SetDepthStateCommand::Less);
@@ -344,49 +350,42 @@ void Renderer2D::SetPixelSnapEnabled(bool enabled)
 
 		// Stats
 		s_Data->Stats.DrawCalls += 1;
-		s_Data->Stats.QuadCount += s_Data->QuadIndexCount / 6;
+		s_Data->Stats.QuadCount += s_Data->InstanceCount;
 
 		// Reset geometry for next batch, but keep texture slots unless StartNewBatch is called
-		s_Data->QuadIndexCount = 0;
-		s_Data->QuadBufferPtr = s_Data->QuadBuffer;
+		s_Data->InstanceCount = 0;
+		s_Data->InstanceBufferPtr = s_Data->InstanceBuffer;
 	}
 
 	void Renderer2D::StartNewBatch()
-	{
-		if (!s_Data) return;
-		// Reset geometry pointers
-		s_Data->QuadIndexCount = 0;
-		s_Data->QuadBufferPtr = s_Data->QuadBuffer;
-		// Reset texture slots for a fresh batch
-		s_Data->TextureSlotIndex = 1;
-		s_Data->TextureSlots[0] = s_Data->WhiteTexture;
-	}
+{
+	if (!s_Data) return;
+	// Reset instance pointers
+	s_Data->InstanceCount = 0;
+	s_Data->InstanceBufferPtr = s_Data->InstanceBuffer;
+	// Reset texture slots for a fresh batch
+	s_Data->TextureSlotIndex = 1;
+	s_Data->TextureSlots[0] = s_Data->WhiteTexture;
+}
 
 	// DrawQuad implementations
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec4& color)
 	{
 		if (!s_Data) return;
-		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		if (s_Data->InstanceCount >= MaxQuads)
 		{
 			Flush();
+			StartNewBatch();
 		}
 
-		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, 0.0f };
-		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, 0.0f };
-		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, 0.0f };
-		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, 0.0f };
-
-		QuadVertex v0{ pos0, color, s_QuadTexCoords[0], 0.0f };
-		QuadVertex v1{ pos1, color, s_QuadTexCoords[1], 0.0f };
-		QuadVertex v2{ pos2, color, s_QuadTexCoords[2], 0.0f };
-		QuadVertex v3{ pos3, color, s_QuadTexCoords[3], 0.0f };
-
-		*s_Data->QuadBufferPtr++ = v0;
-		*s_Data->QuadBufferPtr++ = v1;
-		*s_Data->QuadBufferPtr++ = v2;
-		*s_Data->QuadBufferPtr++ = v3;
-
-		s_Data->QuadIndexCount += 6;
+		auto& inst = *s_Data->InstanceBufferPtr++;
+		inst.Center = position;
+		inst.HalfSize = size * 0.5f;
+		inst.ColorRGBA = PackColorRGBA8(color);
+		inst.TexIndex = 0u; // white texture
+		inst.RotSinCos = { 1.0f, 0.0f };
+		inst.Z = 0.0f;
+		++s_Data->InstanceCount;
 	}
 
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const Texture2DRef& texture, const glm::vec4& tintColor)
@@ -395,50 +394,41 @@ void Renderer2D::SetPixelSnapEnabled(bool enabled)
 		if (!texture) { DrawQuad(position, size, tintColor); return; }
 
 		// Find existing texture slot or assign new one
-		float texIndex = 0.0f;
+		uint32_t texIndex = 0u;
 		for (uint32_t i = 1; i < s_Data->TextureSlotIndex; ++i)
 		{
 			if (s_Data->TextureSlots[i] && s_Data->TextureSlots[i].get() == texture.get())
 			{
-				texIndex = static_cast<float>(i);
+				texIndex = i;
 				break;
 			}
 		}
-		if (texIndex == 0.0f)
+		if (texIndex == 0u)
 		{
-			// Need a new slot
 			if (s_Data->TextureSlotIndex >= MaxTextureSlots)
 			{
-				// Flush current geometry and start a fresh batch (resets texture slots)
 				Flush();
 				StartNewBatch();
 			}
-			texIndex = static_cast<float>(s_Data->TextureSlotIndex);
 			s_Data->TextureSlots[s_Data->TextureSlotIndex] = texture;
+			texIndex = s_Data->TextureSlotIndex;
 			++s_Data->TextureSlotIndex;
 		}
 
-		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		if (s_Data->InstanceCount >= MaxQuads)
 		{
 			Flush();
+			StartNewBatch();
 		}
 
-		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, 0.0f };
-		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, 0.0f };
-		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, 0.0f };
-		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, 0.0f };
-
-		QuadVertex v0{ pos0, tintColor, s_QuadTexCoords[0], texIndex };
-		QuadVertex v1{ pos1, tintColor, s_QuadTexCoords[1], texIndex };
-		QuadVertex v2{ pos2, tintColor, s_QuadTexCoords[2], texIndex };
-		QuadVertex v3{ pos3, tintColor, s_QuadTexCoords[3], texIndex };
-
-		*s_Data->QuadBufferPtr++ = v0;
-		*s_Data->QuadBufferPtr++ = v1;
-		*s_Data->QuadBufferPtr++ = v2;
-		*s_Data->QuadBufferPtr++ = v3;
-
-		s_Data->QuadIndexCount += 6;
+		auto& inst = *s_Data->InstanceBufferPtr++;
+		inst.Center = position;
+		inst.HalfSize = size * 0.5f;
+		inst.ColorRGBA = PackColorRGBA8(tintColor);
+		inst.TexIndex = texIndex;
+		inst.RotSinCos = { 1.0f, 0.0f };
+		inst.Z = 0.0f;
+		++s_Data->InstanceCount;
 	}
 
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const AssetHandle<TextureAsset>& textureAsset, const glm::vec4& tintColor)
@@ -457,104 +447,72 @@ void Renderer2D::SetPixelSnapEnabled(bool enabled)
 		DrawQuad(position, size, texAsset->GetTexture(), tintColor);
 	}
 
-	// Rotated colored quad (Unity-style Euler angles in degrees)
+		// Rotated colored quad (Unity-style Euler angles in degrees)
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec3& rotation, const glm::vec4& color)
 	{
 		if (!s_Data) return;
-		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		if (s_Data->InstanceCount >= MaxQuads)
 		{
 			Flush();
+			StartNewBatch();
 		}
 
-		// Start with scaled base positions
-		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, 0.0f };
-		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, 0.0f };
-		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, 0.0f };
-		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, 0.0f };
-
-		// Apply rotation if needed using cached system
-		CachedRotation* cached = GetCachedRotation(rotation);
-		if (cached)
-		{
-			glm::vec3 center = glm::vec3(position, 0.0f);
-			RotateVertexCached(pos0, cached, center);
-			RotateVertexCached(pos1, cached, center);
-			RotateVertexCached(pos2, cached, center);
-			RotateVertexCached(pos3, cached, center);
-		}
-
-		QuadVertex v0{ pos0, color, s_QuadTexCoords[0], 0.0f };
-		QuadVertex v1{ pos1, color, s_QuadTexCoords[1], 0.0f };
-		QuadVertex v2{ pos2, color, s_QuadTexCoords[2], 0.0f };
-		QuadVertex v3{ pos3, color, s_QuadTexCoords[3], 0.0f };
-
-		*s_Data->QuadBufferPtr++ = v0;
-		*s_Data->QuadBufferPtr++ = v1;
-		*s_Data->QuadBufferPtr++ = v2;
-		*s_Data->QuadBufferPtr++ = v3;
-		s_Data->QuadIndexCount += 6;
+		float rz = glm::radians(rotation.z);
+		float c = std::cos(rz), s = std::sin(rz);
+		auto& inst = *s_Data->InstanceBufferPtr++;
+		inst.Center = position;
+		inst.HalfSize = size * 0.5f;
+		inst.ColorRGBA = PackColorRGBA8(color);
+		inst.TexIndex = 0u;
+		inst.RotSinCos = { c, s };
+		inst.Z = 0.0f;
+		++s_Data->InstanceCount;
 	}
 
-	// Rotated textured quad (Texture2DRef)
+		// Rotated textured quad (Texture2DRef)
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec3& rotation, const Texture2DRef& texture, const glm::vec4& tintColor)
 	{
 		if (!s_Data) return;
 		if (!texture) { DrawQuad(position, size, rotation, tintColor); return; }
 
 		// Find texture slot or allocate
-		float texIndex = 0.0f;
+		uint32_t texIndex = 0u;
 		for (uint32_t i = 1; i < s_Data->TextureSlotIndex; ++i)
 		{
 			if (s_Data->TextureSlots[i] && s_Data->TextureSlots[i].get() == texture.get())
 			{
-				texIndex = static_cast<float>(i);
+				texIndex = i;
 				break;
 			}
 		}
-		if (texIndex == 0.0f)
+		if (texIndex == 0u)
 		{
 			if (s_Data->TextureSlotIndex >= MaxTextureSlots)
 			{
 				Flush();
 				StartNewBatch();
 			}
-			texIndex = static_cast<float>(s_Data->TextureSlotIndex);
 			s_Data->TextureSlots[s_Data->TextureSlotIndex] = texture;
+			texIndex = s_Data->TextureSlotIndex;
 			++s_Data->TextureSlotIndex;
 		}
 
-		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		if (s_Data->InstanceCount >= MaxQuads)
 		{
 			Flush();
+			StartNewBatch();
 		}
 
-		// Start with scaled base positions
-		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, 0.0f };
-		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, 0.0f };
-		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, 0.0f };
-		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, 0.0f };
-
-		// Apply rotation if needed using cached system
-		CachedRotation* cached = GetCachedRotation(rotation);
-		if (cached)
-		{
-			glm::vec3 center = glm::vec3(position, 0.0f);
-			RotateVertexCached(pos0, cached, center);
-			RotateVertexCached(pos1, cached, center);
-			RotateVertexCached(pos2, cached, center);
-			RotateVertexCached(pos3, cached, center);
-		}
-
-		QuadVertex v0{ pos0, tintColor, s_QuadTexCoords[0], texIndex };
-		QuadVertex v1{ pos1, tintColor, s_QuadTexCoords[1], texIndex };
-		QuadVertex v2{ pos2, tintColor, s_QuadTexCoords[2], texIndex };
-		QuadVertex v3{ pos3, tintColor, s_QuadTexCoords[3], texIndex };
-
-		*s_Data->QuadBufferPtr++ = v0;
-		*s_Data->QuadBufferPtr++ = v1;
-		*s_Data->QuadBufferPtr++ = v2;
-		*s_Data->QuadBufferPtr++ = v3;
-		s_Data->QuadIndexCount += 6;
+		float rz = glm::radians(rotation.z);
+		float c = std::cos(rz), s = std::sin(rz);
+		auto& inst = *s_Data->InstanceBufferPtr++;
+		inst.Center = position;
+		inst.HalfSize = size * 0.5f;
+		inst.ColorRGBA = PackColorRGBA8(tintColor);
+		inst.TexIndex = texIndex;
+		inst.RotSinCos = { c, s };
+		inst.Z = 0.0f;
+		++s_Data->InstanceCount;
 	}
 
 	// Rotated textured quad (TextureAsset)
@@ -578,83 +536,68 @@ void Renderer2D::SetPixelSnapEnabled(bool enabled)
 	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const glm::vec4& color)
 	{
 		if (!s_Data) return;
-		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		if (s_Data->InstanceCount >= MaxQuads)
 		{
 			Flush();
+			StartNewBatch();
 		}
 
-		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, position.z };
-		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, position.z };
-		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, position.z };
-		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, position.z };
-
-		QuadVertex v0{ pos0, color, s_QuadTexCoords[0], 0.0f };
-		QuadVertex v1{ pos1, color, s_QuadTexCoords[1], 0.0f };
-		QuadVertex v2{ pos2, color, s_QuadTexCoords[2], 0.0f };
-		QuadVertex v3{ pos3, color, s_QuadTexCoords[3], 0.0f };
-
-		*s_Data->QuadBufferPtr++ = v0;
-		*s_Data->QuadBufferPtr++ = v1;
-		*s_Data->QuadBufferPtr++ = v2;
-		*s_Data->QuadBufferPtr++ = v3;
-
-		s_Data->QuadIndexCount += 6;
+		auto& inst = *s_Data->InstanceBufferPtr++;
+		inst.Center = { position.x, position.y };
+		inst.HalfSize = size * 0.5f;
+		inst.ColorRGBA = PackColorRGBA8(color);
+		inst.TexIndex = 0u;
+		inst.RotSinCos = { 1.0f, 0.0f };
+		inst.Z = position.z;
+		++s_Data->InstanceCount;
 	}
 
-	// 3D positioned textured quad (Texture2DRef)
+		// 3D positioned textured quad (Texture2DRef)
 	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const Texture2DRef& texture, const glm::vec4& tintColor)
 	{
 		if (!s_Data) return;
 		if (!texture) { DrawQuad(position, size, tintColor); return; }
 
 		// Find existing texture slot or assign new one
-		float texIndex = 0.0f;
+		uint32_t texIndex = 0u;
 		for (uint32_t i = 1; i < s_Data->TextureSlotIndex; ++i)
 		{
 			if (s_Data->TextureSlots[i] && s_Data->TextureSlots[i].get() == texture.get())
 			{
-				texIndex = static_cast<float>(i);
+				texIndex = i;
 				break;
 			}
 		}
-		if (texIndex == 0.0f)
+		if (texIndex == 0u)
 		{
 			// Need a new slot
 			if (s_Data->TextureSlotIndex >= MaxTextureSlots)
 			{
-				// Flush current geometry and start a fresh batch (resets texture slots)
 				Flush();
 				StartNewBatch();
 			}
-			texIndex = static_cast<float>(s_Data->TextureSlotIndex);
 			s_Data->TextureSlots[s_Data->TextureSlotIndex] = texture;
+			texIndex = s_Data->TextureSlotIndex;
 			++s_Data->TextureSlotIndex;
 		}
 
-		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		if (s_Data->InstanceCount >= MaxQuads)
 		{
 			Flush();
+			StartNewBatch();
 		}
 
-		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, position.z };
-		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, position.z };
-		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, position.z };
-		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, position.z };
-
-		QuadVertex v0{ pos0, tintColor, s_QuadTexCoords[0], texIndex };
-		QuadVertex v1{ pos1, tintColor, s_QuadTexCoords[1], texIndex };
-		QuadVertex v2{ pos2, tintColor, s_QuadTexCoords[2], texIndex };
-		QuadVertex v3{ pos3, tintColor, s_QuadTexCoords[3], texIndex };
-
-		*s_Data->QuadBufferPtr++ = v0;
-		*s_Data->QuadBufferPtr++ = v1;
-		*s_Data->QuadBufferPtr++ = v2;
-		*s_Data->QuadBufferPtr++ = v3;
-
-		s_Data->QuadIndexCount += 6;
+		auto& inst = *s_Data->InstanceBufferPtr++;
+		inst.Center = { position.x, position.y };
+		inst.HalfSize = size * 0.5f;
+		inst.ColorRGBA = PackColorRGBA8(tintColor);
+		inst.TexIndex = texIndex;
+		inst.RotSinCos = { 1.0f, 0.0f };
+		inst.Z = position.z;
+		++s_Data->InstanceCount;
 	}
 
-	// 3D positioned textured quad (TextureAsset)
+		// 3D positioned textured quad (TextureAsset)
 	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const AssetHandle<TextureAsset>& textureAsset, const glm::vec4& tintColor)
 	{
 		if (!textureAsset.IsValid() || !textureAsset.IsLoaded())
@@ -671,102 +614,72 @@ void Renderer2D::SetPixelSnapEnabled(bool enabled)
 		DrawQuad(position, size, texAsset->GetTexture(), tintColor);
 	}
 
-	// 3D positioned rotated colored quad (Unity-style Euler angles in degrees)
+		// 3D positioned rotated colored quad (Unity-style Euler angles in degrees)
 	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const glm::vec3& rotation, const glm::vec4& color)
 	{
 		if (!s_Data) return;
-		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		if (s_Data->InstanceCount >= MaxQuads)
 		{
 			Flush();
+			StartNewBatch();
 		}
 
-		// Start with scaled base positions
-		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, position.z };
-		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, position.z };
-		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, position.z };
-		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, position.z };
-
-		// Apply rotation if needed using cached system
-		CachedRotation* cached = GetCachedRotation(rotation);
-		if (cached)
-		{
-			RotateVertexCached(pos0, cached, position);
-			RotateVertexCached(pos1, cached, position);
-			RotateVertexCached(pos2, cached, position);
-			RotateVertexCached(pos3, cached, position);
-		}
-
-		QuadVertex v0{ pos0, color, s_QuadTexCoords[0], 0.0f };
-		QuadVertex v1{ pos1, color, s_QuadTexCoords[1], 0.0f };
-		QuadVertex v2{ pos2, color, s_QuadTexCoords[2], 0.0f };
-		QuadVertex v3{ pos3, color, s_QuadTexCoords[3], 0.0f };
-
-		*s_Data->QuadBufferPtr++ = v0;
-		*s_Data->QuadBufferPtr++ = v1;
-		*s_Data->QuadBufferPtr++ = v2;
-		*s_Data->QuadBufferPtr++ = v3;
-		s_Data->QuadIndexCount += 6;
+		float rz = glm::radians(rotation.z);
+		float c = std::cos(rz), s = std::sin(rz);
+		auto& inst = *s_Data->InstanceBufferPtr++;
+		inst.Center = { position.x, position.y };
+		inst.HalfSize = size * 0.5f;
+		inst.ColorRGBA = PackColorRGBA8(color);
+		inst.TexIndex = 0u;
+		inst.RotSinCos = { c, s };
+		inst.Z = position.z;
+		++s_Data->InstanceCount;
 	}
 
-	// 3D positioned rotated textured quad (Texture2DRef)
+		// 3D positioned rotated textured quad (Texture2DRef)
 	void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size, const glm::vec3& rotation, const Texture2DRef& texture, const glm::vec4& tintColor)
 	{
 		if (!s_Data) return;
 		if (!texture) { DrawQuad(position, size, rotation, tintColor); return; }
 
 		// Find texture slot or allocate
-		float texIndex = 0.0f;
+		uint32_t texIndex = 0u;
 		for (uint32_t i = 1; i < s_Data->TextureSlotIndex; ++i)
 		{
 			if (s_Data->TextureSlots[i] && s_Data->TextureSlots[i].get() == texture.get())
 			{
-				texIndex = static_cast<float>(i);
+				texIndex = i;
 				break;
 			}
 		}
-		if (texIndex == 0.0f)
+		if (texIndex == 0u)
 		{
 			if (s_Data->TextureSlotIndex >= MaxTextureSlots)
 			{
 				Flush();
 				StartNewBatch();
 			}
-			texIndex = static_cast<float>(s_Data->TextureSlotIndex);
 			s_Data->TextureSlots[s_Data->TextureSlotIndex] = texture;
+			texIndex = s_Data->TextureSlotIndex;
 			++s_Data->TextureSlotIndex;
 		}
 
-		if (s_Data->QuadIndexCount + 6 > MaxIndices)
+		if (s_Data->InstanceCount >= MaxQuads)
 		{
 			Flush();
+			StartNewBatch();
 		}
 
-		// Start with scaled base positions
-		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, position.z };
-		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, position.z };
-		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, position.z };
-		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, position.z };
-
-		// Apply rotation if needed using cached system
-		CachedRotation* cached = GetCachedRotation(rotation);
-		if (cached)
-		{
-			RotateVertexCached(pos0, cached, position);
-			RotateVertexCached(pos1, cached, position);
-			RotateVertexCached(pos2, cached, position);
-			RotateVertexCached(pos3, cached, position);
-		}
-
-		QuadVertex v0{ pos0, tintColor, s_QuadTexCoords[0], texIndex };
-		QuadVertex v1{ pos1, tintColor, s_QuadTexCoords[1], texIndex };
-		QuadVertex v2{ pos2, tintColor, s_QuadTexCoords[2], texIndex };
-		QuadVertex v3{ pos3, tintColor, s_QuadTexCoords[3], texIndex };
-
-		*s_Data->QuadBufferPtr++ = v0;
-		*s_Data->QuadBufferPtr++ = v1;
-		*s_Data->QuadBufferPtr++ = v2;
-		*s_Data->QuadBufferPtr++ = v3;
-		s_Data->QuadIndexCount += 6;
+		float rz = glm::radians(rotation.z);
+		float c = std::cos(rz), s = std::sin(rz);
+		auto& inst = *s_Data->InstanceBufferPtr++;
+		inst.Center = { position.x, position.y };
+		inst.HalfSize = size * 0.5f;
+		inst.ColorRGBA = PackColorRGBA8(tintColor);
+		inst.TexIndex = texIndex;
+		inst.RotSinCos = { c, s };
+		inst.Z = position.z;
+		++s_Data->InstanceCount;
 	}
 
 	// 3D positioned rotated textured quad (TextureAsset)

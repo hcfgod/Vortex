@@ -303,6 +303,42 @@ namespace Vortex
         uint64_t m_Pointer;
     };
 
+    // Integer variant (no normalization)
+    class VertexAttribIPointerCommand : public RenderCommand
+    {
+    public:
+        VertexAttribIPointerCommand(uint32_t index, int32_t size, uint32_t type,
+                                    uint64_t stride, uint64_t pointer)
+            : m_Index(index), m_Size(size), m_Type(type), m_Stride(stride), m_Pointer(pointer) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "VertexAttribIPointer"; }
+        float GetEstimatedCost() const override { return 0.01f; }
+
+    private:
+        uint32_t m_Index;
+        int32_t m_Size;
+        uint32_t m_Type;
+        uint64_t m_Stride;
+        uint64_t m_Pointer;
+    };
+
+    // Attribute divisor (instancing)
+    class VertexAttribDivisorCommand : public RenderCommand
+    {
+    public:
+        VertexAttribDivisorCommand(uint32_t index, uint32_t divisor)
+            : m_Index(index), m_Divisor(divisor) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "VertexAttribDivisor"; }
+        float GetEstimatedCost() const override { return 0.005f; }
+
+    private:
+        uint32_t m_Index;
+        uint32_t m_Divisor;
+    };
+
     /**
      * @brief Command to enable/disable vertex attribute array
      */

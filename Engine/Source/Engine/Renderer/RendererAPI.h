@@ -202,6 +202,13 @@ namespace Vortex
         virtual Result<void> VertexAttribPointer(uint32_t index, int32_t size, uint32_t type,
                                                  bool normalized, uint64_t stride, uint64_t pointer) = 0;
 
+        /** Integer vertex attribute pointer (no normalization) */
+        virtual Result<void> VertexAttribIPointer(uint32_t index, int32_t size, uint32_t type,
+                                                  uint64_t stride, uint64_t pointer) = 0;
+
+        /** Vertex attribute divisor for instancing */
+        virtual Result<void> VertexAttribDivisor(uint32_t index, uint32_t divisor) = 0;
+
         /**
          * @brief Enable or disable a generic vertex attribute array
          */

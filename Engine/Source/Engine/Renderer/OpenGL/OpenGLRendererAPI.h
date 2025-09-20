@@ -63,9 +63,12 @@ namespace Vortex
 		Result<void> BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage) override;
 		Result<void> BufferSubData(uint32_t target, uint64_t offset, uint64_t size, const void* data) override;
 		Result<void> BindBufferBase(uint32_t target, uint32_t index, uint32_t buffer) override;
-		Result<void> VertexAttribPointer(uint32_t index, int32_t size, uint32_t type,
-										 bool normalized, uint64_t stride, uint64_t pointer) override;
-		Result<void> EnableVertexAttribArray(uint32_t index, bool enabled) override;
+        Result<void> VertexAttribPointer(uint32_t index, int32_t size, uint32_t type,
+                                         bool normalized, uint64_t stride, uint64_t pointer) override;
+        Result<void> VertexAttribIPointer(uint32_t index, int32_t size, uint32_t type,
+                                          uint64_t stride, uint64_t pointer) override;
+        Result<void> VertexAttribDivisor(uint32_t index, uint32_t divisor) override;
+        Result<void> EnableVertexAttribArray(uint32_t index, bool enabled) override;
 
 		// Object lifetime
 		Result<void> GenBuffers(uint32_t count, uint32_t* outBuffers) override;

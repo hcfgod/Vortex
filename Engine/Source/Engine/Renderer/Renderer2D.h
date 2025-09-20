@@ -49,12 +49,25 @@ namespace Vortex
 	struct Renderer2DStorage
 	{
 		std::shared_ptr<VertexArray>  QuadVA;
-		std::shared_ptr<VertexBuffer> QuadVB;
+		// Static per-vertex quad (unit corners + uv)
+		std::shared_ptr<VertexBuffer> StaticVB;
+		// Per-instance buffer
+		std::shared_ptr<VertexBuffer> InstanceVB;
 		std::shared_ptr<IndexBuffer>  QuadIB;
 
-		uint32_t QuadIndexCount = 0;
-		QuadVertex* QuadBuffer = nullptr;          // CPU side begin
-		QuadVertex* QuadBufferPtr = nullptr;       // current write ptr
+		// CPU-side instance buffer
+		struct QuadInstance
+		{
+			glm::vec2 Center;
+			glm::vec2 HalfSize;
+			uint32_t  ColorRGBA;
+			uint32_t  TexIndex;
+			glm::vec2 RotSinCos; // (cosZ, sinZ)
+			float     Z;
+		};
+		QuadInstance* InstanceBuffer = nullptr;
+		QuadInstance* InstanceBufferPtr = nullptr;
+		uint32_t InstanceCount = 0;
 
 		std::array<Texture2DRef, MaxTextureSlots> TextureSlots;
 		uint32_t TextureSlotIndex = 1; // 0 = white texture reserved

@@ -51,7 +51,7 @@ namespace Vortex
         }
     };
 
-    class BufferLayout
+class BufferLayout
     {
     public:
         BufferLayout() = default;
@@ -65,6 +65,10 @@ namespace Vortex
         inline const std::vector<BufferElement>& GetElements() const { return m_Elements; }
         inline uint32_t GetStride() const { return m_Stride; }
         inline bool Empty() const { return m_Elements.empty(); }
+
+        // Instance divisor control (0 = per-vertex, 1 = per-instance)
+        inline void SetDivisor(uint32_t divisor) { m_Divisor = divisor; }
+        inline uint32_t GetDivisor() const { return m_Divisor; }
 
         std::vector<BufferElement>::iterator begin() { return m_Elements.begin(); }
         std::vector<BufferElement>::iterator end() { return m_Elements.end(); }
@@ -87,6 +91,7 @@ namespace Vortex
     private:
         std::vector<BufferElement> m_Elements;
         uint32_t m_Stride = 0;
+        uint32_t m_Divisor = 0; // 0 = per-vertex, >0 = per-instance
     };
 
     // =====================================================================================

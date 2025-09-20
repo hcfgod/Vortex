@@ -564,7 +564,7 @@ namespace Vortex
             return validateResult;
         }
 
-        glVertexAttribPointer(index, size, ConvertDataType(type), normalized ? GL_TRUE : GL_FALSE,
+glVertexAttribPointer(index, size, static_cast<GLenum>(type), normalized ? GL_TRUE : GL_FALSE,
                               static_cast<GLsizei>(stride), reinterpret_cast<const void*>(static_cast<uintptr_t>(pointer)));
 
         if (!CheckGLError("VertexAttribPointer"))
@@ -572,6 +572,40 @@ namespace Vortex
             return Result<void>(ErrorCode::RendererInitFailed, "Failed to set vertex attrib pointer");
         }
 
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::VertexAttribIPointer(uint32_t index, int32_t size, uint32_t type,
+                                                         uint64_t stride, uint64_t pointer)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+
+glVertexAttribIPointer(index, size, static_cast<GLenum>(type), static_cast<GLsizei>(stride),
+                               reinterpret_cast<const void*>(static_cast<uintptr_t>(pointer)));
+
+        if (!CheckGLError("VertexAttribIPointer"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to set integer vertex attrib pointer");
+        }
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::VertexAttribDivisor(uint32_t index, uint32_t divisor)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glVertexAttribDivisor(index, divisor);
+        if (!CheckGLError("VertexAttribDivisor"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to set vertex attrib divisor");
+        }
         return Result<void>();
     }
 

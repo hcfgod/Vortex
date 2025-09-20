@@ -19,12 +19,35 @@ namespace Vortex
             case ShaderDataType::Mat2:
             case ShaderDataType::Mat3:
             case ShaderDataType::Mat4:    return GL_FLOAT;
+            case ShaderDataType::Double:  return GL_DOUBLE;
             case ShaderDataType::Int:
             case ShaderDataType::IVec2:
             case ShaderDataType::IVec3:
             case ShaderDataType::IVec4:   return GL_INT;
+            case ShaderDataType::UInt:
+            case ShaderDataType::UVec2:
+            case ShaderDataType::UVec3:
+            case ShaderDataType::UVec4:   return GL_UNSIGNED_INT;
             case ShaderDataType::Bool:    return GL_BOOL;
             default:                      return GL_FLOAT;
+        }
+    }
+
+    static bool IsIntegerType(ShaderDataType type)
+    {
+        switch (type)
+        {
+            case ShaderDataType::Int:
+            case ShaderDataType::IVec2:
+            case ShaderDataType::IVec3:
+            case ShaderDataType::IVec4:
+            case ShaderDataType::UInt:
+            case ShaderDataType::UVec2:
+            case ShaderDataType::UVec3:
+            case ShaderDataType::UVec4:
+                return true;
+            default:
+                return false;
         }
     }
 
@@ -70,24 +93,41 @@ namespace Vortex
                 for (uint8_t i = 0; i < count; i++)
                 {
                     GetRenderCommandQueue().EnableVertexAttribArray(m_VertexAttribIndex, true);
+                    // Matrices are always float here
                     GetRenderCommandQueue().VertexAttribPointer(m_VertexAttribIndex,
                         (element.Type == ShaderDataType::Mat2 ? 2 : (element.Type == ShaderDataType::Mat3 ? 3 : 4)),
                         glBaseType,
                         element.Normalized,
                         layout.GetStride(),
                         (element.Offset + sizeof(float) * (element.Type == ShaderDataType::Mat2 ? 2 : (element.Type == ShaderDataType::Mat3 ? 3 : 4)) * i));
+                    // Divisor for instancing
+                    if (layout.GetDivisor() > 0)
+                        GetRenderCommandQueue().VertexAttribDivisor(m_VertexAttribIndex, layout.GetDivisor(), true);
                     m_VertexAttribIndex++;
                 }
             }
             else
             {
                 GetRenderCommandQueue().EnableVertexAttribArray(m_VertexAttribIndex, true);
-                GetRenderCommandQueue().VertexAttribPointer(m_VertexAttribIndex,
-                    element.GetComponentCount(),
-                    glBaseType,
-                    element.Normalized,
-                    layout.GetStride(),
-                    element.Offset);
+                if (IsIntegerType(element.Type))
+                {
+                    GetRenderCommandQueue().VertexAttribIPointer(m_VertexAttribIndex,
+                        element.GetComponentCount(),
+                        glBaseType,
+                        layout.GetStride(),
+                        element.Offset);
+                }
+                else
+                {
+                    GetRenderCommandQueue().VertexAttribPointer(m_VertexAttribIndex,
+                        element.GetComponentCount(),
+                        glBaseType,
+                        element.Normalized,
+                        layout.GetStride(),
+                        element.Offset);
+                }
+                if (layout.GetDivisor() > 0)
+                    GetRenderCommandQueue().VertexAttribDivisor(m_VertexAttribIndex, layout.GetDivisor(), true);
                 m_VertexAttribIndex++;
             }
         }

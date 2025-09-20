@@ -90,6 +90,20 @@ namespace Vortex
         return renderer->VertexAttribPointer(m_Index, m_Size, m_Type, m_Normalized, m_Stride, m_Pointer);
     }
 
+    Result<void> VertexAttribIPointerCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->VertexAttribIPointer(m_Index, m_Size, m_Type, m_Stride, m_Pointer);
+    }
+
+    Result<void> VertexAttribDivisorCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->VertexAttribDivisor(m_Index, m_Divisor);
+    }
+
     // ----------------- EnableVertexAttribArrayCommand --------------------
     Result<void> EnableVertexAttribArrayCommand::Execute(GraphicsContext* /*context*/)
     {
