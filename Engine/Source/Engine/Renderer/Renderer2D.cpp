@@ -49,6 +49,145 @@ namespace Vortex
 		{0.0f, 1.0f}
 	};
 
+	// Optimized rotation helpers - avoid expensive matrix calculations
+	inline void RotateVertex2D(glm::vec3& vertex, float cosZ, float sinZ, const glm::vec2& center)
+	{
+		float x = vertex.x - center.x;
+		float y = vertex.y - center.y;
+		vertex.x = center.x + (x * cosZ - y * sinZ);
+		vertex.y = center.y + (x * sinZ + y * cosZ);
+	}
+
+	// For 3D rotations, we'll handle Z-axis rotation first (most common), then apply X/Y if needed
+	inline void RotateVertex3D(glm::vec3& vertex, const glm::vec3& rotation, const glm::vec3& center)
+	{
+		// Convert to radians once
+		float rx = glm::radians(rotation.x);
+		float ry = glm::radians(rotation.y);
+		float rz = glm::radians(rotation.z);
+
+		// Pre-calculate trig functions
+		float cosX = std::cos(rx);
+		float sinX = std::sin(rx);
+		float cosY = std::cos(ry);
+		float sinY = std::sin(ry);
+		float cosZ = std::cos(rz);
+		float sinZ = std::sin(rz);
+
+		// Translate to origin
+		float x = vertex.x - center.x;
+		float y = vertex.y - center.y;
+		float z = vertex.z - center.z;
+
+		// Apply rotations in order: Y, X, Z (matching glm::yawPitchRoll)
+		// Y-axis rotation (yaw)
+		float tempX = x * cosY + z * sinY;
+		float tempZ = -x * sinY + z * cosY;
+		x = tempX;
+		z = tempZ;
+
+		// X-axis rotation (pitch)
+		float tempY = y * cosX - z * sinX;
+		tempZ = y * sinX + z * cosX;
+		y = tempY;
+		z = tempZ;
+
+		// Z-axis rotation (roll)
+		tempX = x * cosZ - y * sinZ;
+		tempY = x * sinZ + y * cosZ;
+		x = tempX;
+		y = tempY;
+
+		// Translate back
+		vertex.x = center.x + x;
+		vertex.y = center.y + y;
+		vertex.z = center.z + z;
+	}
+
+	// Cached version of RotateVertex3D for better performance
+	inline CachedRotation* GetCachedRotation(const glm::vec3& rotation)
+	{
+		if (!s_Data) return nullptr;
+
+		// Check if rotation is zero (very common case)
+		if (rotation.x == 0.0f && rotation.y == 0.0f && rotation.z == 0.0f)
+			return nullptr;  // No rotation needed
+
+		// Look for existing cached rotation
+		for (auto& cached : s_Data->RotationCache)
+		{
+			if (cached.frameLastUsed > 0 && 
+				std::abs(cached.angles.x - rotation.x) < 0.001f &&
+				std::abs(cached.angles.y - rotation.y) < 0.001f &&
+				std::abs(cached.angles.z - rotation.z) < 0.001f)
+			{
+				cached.frameLastUsed = s_Data->CurrentFrame;
+				return &cached;
+			}
+		}
+
+		// Find LRU slot to replace
+		CachedRotation* lruSlot = &s_Data->RotationCache[0];
+		for (auto& cached : s_Data->RotationCache)
+		{
+			if (cached.frameLastUsed == 0 || cached.frameLastUsed < lruSlot->frameLastUsed)
+				lruSlot = &cached;
+		}
+
+		// Cache new rotation
+		lruSlot->angles = rotation;
+		lruSlot->frameLastUsed = s_Data->CurrentFrame;
+
+		// Pre-calculate trig functions
+		float rx = glm::radians(rotation.x);
+		float ry = glm::radians(rotation.y);
+		float rz = glm::radians(rotation.z);
+
+		lruSlot->cosX = std::cos(rx);
+		lruSlot->sinX = std::sin(rx);
+		lruSlot->cosY = std::cos(ry);
+		lruSlot->sinY = std::sin(ry);
+		lruSlot->cosZ = std::cos(rz);
+		lruSlot->sinZ = std::sin(rz);
+
+		return lruSlot;
+	}
+
+	// Fast cached rotation using pre-computed sin/cos values
+	inline void RotateVertexCached(glm::vec3& vertex, const CachedRotation* cached, const glm::vec3& center)
+	{
+		if (!cached) return;
+
+		// Translate to origin
+		float x = vertex.x - center.x;
+		float y = vertex.y - center.y;
+		float z = vertex.z - center.z;
+
+		// Apply rotations in order: Y, X, Z (matching glm::yawPitchRoll)
+		// Y-axis rotation (yaw)
+		float tempX = x * cached->cosY + z * cached->sinY;
+		float tempZ = -x * cached->sinY + z * cached->cosY;
+		x = tempX;
+		z = tempZ;
+
+		// X-axis rotation (pitch)
+		float tempY = y * cached->cosX - z * cached->sinX;
+		tempZ = y * cached->sinX + z * cached->cosX;
+		y = tempY;
+		z = tempZ;
+
+		// Z-axis rotation (roll)
+		tempX = x * cached->cosZ - y * cached->sinZ;
+		tempY = x * cached->sinZ + y * cached->cosZ;
+		x = tempX;
+		y = tempY;
+
+		// Translate back
+		vertex.x = center.x + x;
+		vertex.y = center.y + y;
+		vertex.z = center.z + z;
+	}
+
 	// Static data for Renderer2D can be defined here if needed
 	void Renderer2D::Initialize()
 	{
@@ -130,6 +269,9 @@ void Renderer2D::BeginScene(const Camera& camera)
 	EnsureShaderLoaded();
 
 	s_Data->CurrentViewProj = camera.GetViewProjectionMatrix();
+
+	// Increment frame counter for rotation cache LRU tracking
+	s_Data->CurrentFrame++;
 
 	// Cache current viewport size (FBO if set, else window)
 	if (auto* rs = Sys<RenderSystem>())
@@ -324,14 +466,22 @@ void Renderer2D::SetPixelSnapEnabled(bool enabled)
 			Flush();
 		}
 
-		glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(position, 0.0f))
-			* glm::yawPitchRoll(glm::radians(rotation.y), glm::radians(rotation.x), glm::radians(rotation.z))
-			* glm::scale(glm::mat4(1.0f), glm::vec3(size, 1.0f));
+		// Start with scaled base positions
+		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, 0.0f };
+		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, 0.0f };
+		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, 0.0f };
+		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, 0.0f };
 
-		glm::vec3 pos0 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[0], 1.0f));
-		glm::vec3 pos1 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[1], 1.0f));
-		glm::vec3 pos2 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[2], 1.0f));
-		glm::vec3 pos3 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[3], 1.0f));
+		// Apply rotation if needed using cached system
+		CachedRotation* cached = GetCachedRotation(rotation);
+		if (cached)
+		{
+			glm::vec3 center = glm::vec3(position, 0.0f);
+			RotateVertexCached(pos0, cached, center);
+			RotateVertexCached(pos1, cached, center);
+			RotateVertexCached(pos2, cached, center);
+			RotateVertexCached(pos3, cached, center);
+		}
 
 		QuadVertex v0{ pos0, color, s_QuadTexCoords[0], 0.0f };
 		QuadVertex v1{ pos1, color, s_QuadTexCoords[1], 0.0f };
@@ -378,14 +528,22 @@ void Renderer2D::SetPixelSnapEnabled(bool enabled)
 			Flush();
 		}
 
-		glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(position, 0.0f))
-			* glm::yawPitchRoll(glm::radians(rotation.y), glm::radians(rotation.x), glm::radians(rotation.z))
-			* glm::scale(glm::mat4(1.0f), glm::vec3(size, 1.0f));
+		// Start with scaled base positions
+		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, 0.0f };
+		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, 0.0f };
+		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, 0.0f };
+		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, 0.0f };
 
-		glm::vec3 pos0 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[0], 1.0f));
-		glm::vec3 pos1 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[1], 1.0f));
-		glm::vec3 pos2 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[2], 1.0f));
-		glm::vec3 pos3 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[3], 1.0f));
+		// Apply rotation if needed using cached system
+		CachedRotation* cached = GetCachedRotation(rotation);
+		if (cached)
+		{
+			glm::vec3 center = glm::vec3(position, 0.0f);
+			RotateVertexCached(pos0, cached, center);
+			RotateVertexCached(pos1, cached, center);
+			RotateVertexCached(pos2, cached, center);
+			RotateVertexCached(pos3, cached, center);
+		}
 
 		QuadVertex v0{ pos0, tintColor, s_QuadTexCoords[0], texIndex };
 		QuadVertex v1{ pos1, tintColor, s_QuadTexCoords[1], texIndex };
@@ -522,14 +680,21 @@ void Renderer2D::SetPixelSnapEnabled(bool enabled)
 			Flush();
 		}
 
-		glm::mat4 model = glm::translate(glm::mat4(1.0f), position)
-			* glm::yawPitchRoll(glm::radians(rotation.y), glm::radians(rotation.x), glm::radians(rotation.z))
-			* glm::scale(glm::mat4(1.0f), glm::vec3(size, 1.0f));
+		// Start with scaled base positions
+		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, position.z };
+		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, position.z };
+		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, position.z };
+		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, position.z };
 
-		glm::vec3 pos0 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[0], 1.0f));
-		glm::vec3 pos1 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[1], 1.0f));
-		glm::vec3 pos2 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[2], 1.0f));
-		glm::vec3 pos3 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[3], 1.0f));
+		// Apply rotation if needed using cached system
+		CachedRotation* cached = GetCachedRotation(rotation);
+		if (cached)
+		{
+			RotateVertexCached(pos0, cached, position);
+			RotateVertexCached(pos1, cached, position);
+			RotateVertexCached(pos2, cached, position);
+			RotateVertexCached(pos3, cached, position);
+		}
 
 		QuadVertex v0{ pos0, color, s_QuadTexCoords[0], 0.0f };
 		QuadVertex v1{ pos1, color, s_QuadTexCoords[1], 0.0f };
@@ -576,14 +741,21 @@ void Renderer2D::SetPixelSnapEnabled(bool enabled)
 			Flush();
 		}
 
-		glm::mat4 model = glm::translate(glm::mat4(1.0f), position)
-			* glm::yawPitchRoll(glm::radians(rotation.y), glm::radians(rotation.x), glm::radians(rotation.z))
-			* glm::scale(glm::mat4(1.0f), glm::vec3(size, 1.0f));
+		// Start with scaled base positions
+		glm::vec3 pos0 = { position.x + s_QuadVertexPositions[0].x * size.x, position.y + s_QuadVertexPositions[0].y * size.y, position.z };
+		glm::vec3 pos1 = { position.x + s_QuadVertexPositions[1].x * size.x, position.y + s_QuadVertexPositions[1].y * size.y, position.z };
+		glm::vec3 pos2 = { position.x + s_QuadVertexPositions[2].x * size.x, position.y + s_QuadVertexPositions[2].y * size.y, position.z };
+		glm::vec3 pos3 = { position.x + s_QuadVertexPositions[3].x * size.x, position.y + s_QuadVertexPositions[3].y * size.y, position.z };
 
-		glm::vec3 pos0 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[0], 1.0f));
-		glm::vec3 pos1 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[1], 1.0f));
-		glm::vec3 pos2 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[2], 1.0f));
-		glm::vec3 pos3 = glm::vec3(model * glm::vec4(s_QuadVertexPositions[3], 1.0f));
+		// Apply rotation if needed using cached system
+		CachedRotation* cached = GetCachedRotation(rotation);
+		if (cached)
+		{
+			RotateVertexCached(pos0, cached, position);
+			RotateVertexCached(pos1, cached, position);
+			RotateVertexCached(pos2, cached, position);
+			RotateVertexCached(pos3, cached, position);
+		}
 
 		QuadVertex v0{ pos0, tintColor, s_QuadTexCoords[0], texIndex };
 		QuadVertex v1{ pos1, tintColor, s_QuadTexCoords[1], texIndex };

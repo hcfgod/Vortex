@@ -38,6 +38,14 @@ namespace Vortex
 		uint32_t QuadCount = 0;
 	};
 
+	// Cached rotation data for frequently used angles
+	struct CachedRotation
+	{
+		glm::vec3 angles = glm::vec3(0.0f);
+		float cosX, sinX, cosY, sinY, cosZ, sinZ;
+		uint32_t frameLastUsed = 0;
+	};
+
 	struct Renderer2DStorage
 	{
 		std::shared_ptr<VertexArray>  QuadVA;
@@ -58,6 +66,10 @@ namespace Vortex
 		glm::mat4 CurrentViewProj = glm::mat4(1.0f);
 		glm::uvec2 CurrentViewportSize = glm::uvec2(0, 0);
 		bool PixelSnapEnabled = false;
+
+		// Rotation cache for performance optimization
+		std::array<CachedRotation, 16> RotationCache;
+		uint32_t CurrentFrame = 0;
 
 		Renderer2DStatistics Stats;
 	};
