@@ -98,10 +98,10 @@ void EditorLayer::OnImGuiRender()
 				rs->SetSceneRenderTarget(m_Framebuffer);
 			}
 
-			// Update editor camera viewport size
-			if (m_EditorCamera)
+			// Update all cameras' viewport sizes so active (Editor or Main) matches the ImGui viewport
+			if (auto* camSys = Sys<CameraSystem>())
 			{
-				m_EditorCamera->SetViewportSize(newW, newH);
+				camSys->OnWindowResize(newW, newH);
 			}
 		}
 
