@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace Vortex
 {
@@ -279,6 +280,49 @@ namespace Vortex
         uint64_t m_Size;
     };
 
+    class BufferStorageCommand : public RenderCommand
+    {
+    public:
+        BufferStorageCommand(uint32_t target, uint64_t size, uint32_t flags)
+            : m_Target(target), m_Size(size), m_Flags(flags) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "BufferStorage"; }
+        float GetEstimatedCost() const override { return static_cast<float>(m_Size) * 1e-9f; }
+    private:
+        uint32_t m_Target;
+        uint64_t m_Size;
+        uint32_t m_Flags;
+    };
+
+    class MapBufferRangeCommand : public RenderCommand
+    {
+    public:
+        MapBufferRangeCommand(uint32_t target, uint64_t offset, uint64_t length, uint32_t access, void** outPtr)
+            : m_Target(target), m_Offset(offset), m_Length(length), m_Access(access), m_OutPtr(outPtr) {}
+
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "MapBufferRange"; }
+        float GetEstimatedCost() const override { return 0.02f; }
+    private:
+        uint32_t m_Target;
+        uint64_t m_Offset;
+        uint64_t m_Length;
+        uint32_t m_Access;
+        void**   m_OutPtr;
+    };
+
+    class UnmapBufferCommand : public RenderCommand
+    {
+    public:
+        UnmapBufferCommand(uint32_t target) : m_Target(target) {}
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "UnmapBuffer"; }
+        float GetEstimatedCost() const override { return 0.01f; }
+    private:
+        uint32_t m_Target;
+    };
+
     /**
      * @brief Command to set vertex attribute pointer
      */
@@ -491,9 +535,44 @@ namespace Vortex
         uint32_t m_Buffer;
     };
 
-    // ============================================================================
-    // STATE COMMANDS
-    // ============================================================================
+    // Sync commands
+    class FenceSyncCommand : public RenderCommand
+    {
+    public:
+        explicit FenceSyncCommand(uint64_t* outHandle) : m_OutHandle(outHandle) {}
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "FenceSync"; }
+        float GetEstimatedCost() const override { return 0.005f; }
+    private:
+        uint64_t* m_OutHandle;
+    };
+
+    class ClientWaitSyncCommand : public RenderCommand
+    {
+    public:
+        ClientWaitSyncCommand(uint64_t handle, uint64_t flags, uint64_t timeoutNs, uint32_t* outStatus)
+            : m_Handle(handle), m_Flags(flags), m_Timeout(timeoutNs), m_OutStatus(outStatus) {}
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "ClientWaitSync"; }
+        float GetEstimatedCost() const override { return 0.005f; }
+    private:
+        uint64_t  m_Handle;
+        uint64_t  m_Flags;
+        uint64_t  m_Timeout;
+        uint32_t* m_OutStatus;
+    };
+
+    class DeleteSyncCommand : public RenderCommand
+    {
+    public:
+        explicit DeleteSyncCommand(uint64_t handle) : m_Handle(handle) {}
+        Result<void> Execute(GraphicsContext* context) override;
+        std::string GetDebugName() const override { return "DeleteSync"; }
+        float GetEstimatedCost() const override { return 0.003f; }
+    private:
+        uint64_t m_Handle;
+    };
+
 
     /**
      * @brief Command to set depth testing state

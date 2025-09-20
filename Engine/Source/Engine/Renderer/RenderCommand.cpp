@@ -82,6 +82,27 @@ namespace Vortex
         return renderer->BufferSubData(m_Target, m_Offset, m_Size, dataPtr);
     }
 
+    Result<void> BufferStorageCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->BufferStorage(m_Target, m_Size, m_Flags);
+    }
+
+    Result<void> MapBufferRangeCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->MapBufferRange(m_Target, m_Offset, m_Length, m_Access, m_OutPtr);
+    }
+
+    Result<void> UnmapBufferCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->UnmapBuffer(m_Target);
+    }
+
     // --------------------- VertexAttribPointerCommand --------------------
     Result<void> VertexAttribPointerCommand::Execute(GraphicsContext* /*context*/)
     {
@@ -138,6 +159,27 @@ namespace Vortex
         auto* renderer = GetRenderer();
         if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
         return renderer->BindBufferBase(m_Target, m_Index, m_Buffer);
+    }
+
+    Result<void> FenceSyncCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->FenceSync(m_OutHandle);
+    }
+
+    Result<void> ClientWaitSyncCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->ClientWaitSync(m_Handle, m_Flags, m_Timeout, m_OutStatus);
+    }
+
+    Result<void> DeleteSyncCommand::Execute(GraphicsContext* /*context*/)
+    {
+        auto* renderer = GetRenderer();
+        if (!renderer) return Result<void>(ErrorCode::InvalidState, "Renderer not initialized");
+        return renderer->DeleteSync(m_Handle);
     }
 
     // ------------------------ SetDepthStateCommand -----------------------

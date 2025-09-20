@@ -59,10 +59,13 @@ namespace Vortex
 		Result<void> GenerateMipmap(uint32_t target) override;
 
 		// Generic buffer and vertex attrib
-		Result<void> BindBuffer(uint32_t target, uint32_t buffer) override;
-		Result<void> BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage) override;
-		Result<void> BufferSubData(uint32_t target, uint64_t offset, uint64_t size, const void* data) override;
-		Result<void> BindBufferBase(uint32_t target, uint32_t index, uint32_t buffer) override;
+        Result<void> BindBuffer(uint32_t target, uint32_t buffer) override;
+        Result<void> BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage) override;
+        Result<void> BufferStorage(uint32_t target, uint64_t size, uint32_t flags) override;
+        Result<void> BufferSubData(uint32_t target, uint64_t offset, uint64_t size, const void* data) override;
+        Result<void> MapBufferRange(uint32_t target, uint64_t offset, uint64_t length, uint32_t access, void** outPtr) override;
+        Result<void> UnmapBuffer(uint32_t target) override;
+        Result<void> BindBufferBase(uint32_t target, uint32_t index, uint32_t buffer) override;
         Result<void> VertexAttribPointer(uint32_t index, int32_t size, uint32_t type,
                                          bool normalized, uint64_t stride, uint64_t pointer) override;
         Result<void> VertexAttribIPointer(uint32_t index, int32_t size, uint32_t type,
@@ -81,10 +84,15 @@ namespace Vortex
 		Result<void> SetBlendState(bool enabled, uint32_t srcFactor, uint32_t dstFactor, uint32_t blendOp) override;
 		Result<void> SetCullState(uint32_t cullMode, uint32_t frontFace) override;
 
-		// Debug and profiling
-		Result<void> PushDebugGroup(const std::string& name) override;
-		Result<void> PopDebugGroup() override;
-		std::string GetDebugInfo() const override;
+        // Sync objects
+        Result<void> FenceSync(uint64_t* outHandle) override;
+        Result<void> ClientWaitSync(uint64_t handle, uint64_t flags, uint64_t timeoutNanoseconds, uint32_t* outStatus) override;
+        Result<void> DeleteSync(uint64_t handle) override;
+
+        // Debug and profiling
+        Result<void> PushDebugGroup(const std::string& name) override;
+        Result<void> PopDebugGroup() override;
+        std::string GetDebugInfo() const override;
 
 		// Framebuffers
 		Result<void> GenFramebuffers(uint32_t count, uint32_t* outFbos) override;

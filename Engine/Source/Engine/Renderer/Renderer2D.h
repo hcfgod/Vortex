@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <memory>
 #include <array>
+#include <vector>
 #include "Engine/Assets/AssetHandle.h"
 #include "Engine/Assets/ShaderAsset.h"
 #include "Engine/Renderer/Texture.h"
@@ -19,7 +20,7 @@ namespace Vortex
 	class TextureAsset;
 
 	// Batch capacity (quads per draw call). If exceeded we flush and start
-	constexpr uint32_t MaxQuads = 500000;
+	constexpr uint32_t MaxQuads = 10000;
 	constexpr uint32_t MaxVertices = MaxQuads * 4;
 	constexpr uint32_t MaxIndices = MaxQuads * 6;
 	constexpr uint32_t MaxTextureSlots = 32;
@@ -49,11 +50,8 @@ namespace Vortex
 	struct Renderer2DStorage
 	{
 		std::shared_ptr<VertexArray>  QuadVA;
-		// Static per-vertex quad (unit corners + uv)
-		std::shared_ptr<VertexBuffer> StaticVB;
-		// Per-instance buffer
+		// Per-instance buffer (persistent-mapped ring)
 		std::shared_ptr<VertexBuffer> InstanceVB;
-		std::shared_ptr<IndexBuffer>  QuadIB;
 
 		// CPU-side instance buffer
 		struct QuadInstance
@@ -65,12 +63,23 @@ namespace Vortex
 			glm::vec2 RotSinCos; // (cosZ, sinZ)
 			float     Z;
 		};
-		QuadInstance* InstanceBuffer = nullptr;
+		QuadInstance* InstanceBuffer = nullptr; // points into mapped GPU memory
 		QuadInstance* InstanceBufferPtr = nullptr;
 		uint32_t InstanceCount = 0;
 
-		std::array<Texture2DRef, MaxTextureSlots> TextureSlots;
-		uint32_t TextureSlotIndex = 1; // 0 = white texture reserved
+		// Persistent mapping state
+		uint8_t* InstanceMappedBase = nullptr;
+		uint64_t InstanceRingSizeBytes = 0;
+		uint32_t FramesInFlight = 3;
+		uint64_t FrameChunkSizeBytes = 0;
+        uint32_t CurrentFrameChunkIndex = 0;
+        std::vector<uint64_t> FrameFences; // size = FramesInFlight; 0 if none
+
+        // Tracks how many instances have been submitted from this frame chunk
+        uint32_t FrameInstanceOffset = 0;
+
+        std::array<Texture2DRef, MaxTextureSlots> TextureSlots;
+        uint32_t TextureSlotIndex = 1; // 0 = white texture reserved
 
 		Texture2DRef WhiteTexture;
 		AssetHandle<ShaderAsset> QuadShaderHandle;

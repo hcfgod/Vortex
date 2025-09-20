@@ -8,7 +8,7 @@
 
 namespace Vortex
 {
-    static GLenum ShaderDataTypeToOpenGLBaseType(ShaderDataType type)
+    static uint32_t ShaderDataTypeToDataTypeEnum(ShaderDataType type)
     {
         switch (type)
         {
@@ -18,18 +18,18 @@ namespace Vortex
             case ShaderDataType::Vec4:
             case ShaderDataType::Mat2:
             case ShaderDataType::Mat3:
-            case ShaderDataType::Mat4:    return GL_FLOAT;
-            case ShaderDataType::Double:  return GL_DOUBLE;
+            case ShaderDataType::Mat4:    return static_cast<uint32_t>(DataType::Float);
+            case ShaderDataType::Double:  return static_cast<uint32_t>(DataType::DoubleType);
             case ShaderDataType::Int:
             case ShaderDataType::IVec2:
             case ShaderDataType::IVec3:
-            case ShaderDataType::IVec4:   return GL_INT;
+            case ShaderDataType::IVec4:   return static_cast<uint32_t>(DataType::Int);
             case ShaderDataType::UInt:
             case ShaderDataType::UVec2:
             case ShaderDataType::UVec3:
-            case ShaderDataType::UVec4:   return GL_UNSIGNED_INT;
-            case ShaderDataType::Bool:    return GL_BOOL;
-            default:                      return GL_FLOAT;
+            case ShaderDataType::UVec4:   return static_cast<uint32_t>(DataType::UnsignedInt);
+            case ShaderDataType::Bool:    return static_cast<uint32_t>(DataType::Int);
+            default:                      return static_cast<uint32_t>(DataType::Float);
         }
     }
 
@@ -85,7 +85,7 @@ namespace Vortex
         const auto& layout = vertexBuffer->GetLayout();
         for (const auto& element : layout)
         {
-            GLenum glBaseType = ShaderDataTypeToOpenGLBaseType(element.Type);
+            uint32_t baseTypeEnum = ShaderDataTypeToDataTypeEnum(element.Type);
 
             if (element.Type == ShaderDataType::Mat2 || element.Type == ShaderDataType::Mat3 || element.Type == ShaderDataType::Mat4)
             {
@@ -96,7 +96,7 @@ namespace Vortex
                     // Matrices are always float here
                     GetRenderCommandQueue().VertexAttribPointer(m_VertexAttribIndex,
                         (element.Type == ShaderDataType::Mat2 ? 2 : (element.Type == ShaderDataType::Mat3 ? 3 : 4)),
-                        glBaseType,
+                        baseTypeEnum,
                         element.Normalized,
                         layout.GetStride(),
                         (element.Offset + sizeof(float) * (element.Type == ShaderDataType::Mat2 ? 2 : (element.Type == ShaderDataType::Mat3 ? 3 : 4)) * i));
@@ -113,7 +113,7 @@ namespace Vortex
                 {
                     GetRenderCommandQueue().VertexAttribIPointer(m_VertexAttribIndex,
                         element.GetComponentCount(),
-                        glBaseType,
+                        baseTypeEnum,
                         layout.GetStride(),
                         element.Offset);
                 }
@@ -121,7 +121,7 @@ namespace Vortex
                 {
                     GetRenderCommandQueue().VertexAttribPointer(m_VertexAttribIndex,
                         element.GetComponentCount(),
-                        glBaseType,
+                        baseTypeEnum,
                         element.Normalized,
                         layout.GetStride(),
                         element.Offset);

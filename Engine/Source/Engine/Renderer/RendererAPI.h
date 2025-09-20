@@ -155,9 +155,20 @@ namespace Vortex
         virtual Result<void> BufferData(uint32_t target, const void* data, uint64_t size, uint32_t usage) = 0;
 
         /**
+         * @brief Immutable buffer storage allocation (persistent mapping)
+         */
+        virtual Result<void> BufferStorage(uint32_t target, uint64_t size, uint32_t flags) = 0;
+
+        /**
          * @brief Update a sub-range of the currently bound buffer
          */
         virtual Result<void> BufferSubData(uint32_t target, uint64_t offset, uint64_t size, const void* data) = 0;
+
+        /** Map a range of the currently bound buffer */
+        virtual Result<void> MapBufferRange(uint32_t target, uint64_t offset, uint64_t length, uint32_t access, void** outPtr) = 0;
+
+        /** Unmap the currently bound buffer */
+        virtual Result<void> UnmapBuffer(uint32_t target) = 0;
 
         /**
          * @brief Bind a buffer object to an indexed binding point (e.g., UBO)
@@ -341,6 +352,17 @@ namespace Vortex
          * @return Success/failure result
          */
         virtual Result<void> SetCullState(uint32_t cullMode, uint32_t frontFace) = 0;
+
+        // ============================================================================
+        // SYNCHRONIZATION (optional)
+        // ============================================================================
+
+        /** Create a fence sync object. outHandle receives an API-specific pointer value cast to uint64 */
+        virtual Result<void> FenceSync(uint64_t* outHandle) = 0;
+        /** Wait on a fence sync object on CPU */
+        virtual Result<void> ClientWaitSync(uint64_t handle, uint64_t flags, uint64_t timeoutNanoseconds, uint32_t* outStatus) = 0;
+        /** Delete a fence sync object */
+        virtual Result<void> DeleteSync(uint64_t handle) = 0;
 
         // ============================================================================
         // DEBUG AND PROFILING

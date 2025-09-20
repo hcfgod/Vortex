@@ -7,6 +7,8 @@
 #include <functional>
 #include <exception>
 #include <stdexcept>
+#include <cstdint>
+#include <type_traits>
 
 #include <string>
 #include <sstream>
@@ -20,5 +22,12 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #ifdef VX_PLATFORM_WINDOWS
-	#include <Windows.h>
+    // Reduce Windows.h bloat and avoid macro collisions
+    #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
+    #include <Windows.h>
 #endif

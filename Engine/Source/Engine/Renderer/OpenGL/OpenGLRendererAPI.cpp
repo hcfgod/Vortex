@@ -353,8 +353,20 @@ namespace Vortex
         }
         else
         {
-            glDrawArraysInstanced(glMode, static_cast<GLint>(firstVertex), 
-                                 static_cast<GLsizei>(vertexCount), static_cast<GLsizei>(instanceCount));
+            // Use baseInstance variant when available and requested
+            if (baseInstance != 0 && (GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_base_instance))
+            {
+                glDrawArraysInstancedBaseInstance(glMode,
+                                                  static_cast<GLint>(firstVertex),
+                                                  static_cast<GLsizei>(vertexCount),
+                                                  static_cast<GLsizei>(instanceCount),
+                                                  static_cast<GLuint>(baseInstance));
+            }
+            else
+            {
+                glDrawArraysInstanced(glMode, static_cast<GLint>(firstVertex),
+                                      static_cast<GLsizei>(vertexCount), static_cast<GLsizei>(instanceCount));
+            }
         }
 
         if (!CheckGLError("DrawArrays"))
@@ -447,6 +459,21 @@ namespace Vortex
         return Result<void>();
     }
 
+    Result<void> OpenGLRendererAPI::BufferStorage(uint32_t target, uint64_t size, uint32_t flags)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        glBufferStorage(ConvertBufferTarget(target), static_cast<GLsizeiptr>(size), nullptr, static_cast<GLbitfield>(flags));
+        if (!CheckGLError("BufferStorage"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to allocate buffer storage");
+        }
+        return Result<void>();
+    }
+
     Result<void> OpenGLRendererAPI::BufferSubData(uint32_t target, uint64_t offset, uint64_t size, const void* data)
     {
         auto validateResult = ValidateContext();
@@ -462,6 +489,37 @@ namespace Vortex
             return Result<void>(ErrorCode::RendererInitFailed, "Failed to update buffer sub data");
         }
 
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::MapBufferRange(uint32_t target, uint64_t offset, uint64_t length, uint32_t access, void** outPtr)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        void* ptr = glMapBufferRange(ConvertBufferTarget(target), static_cast<GLintptr>(offset), static_cast<GLsizeiptr>(length), static_cast<GLbitfield>(access));
+        if (!CheckGLError("MapBufferRange") || !ptr)
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to map buffer range");
+        }
+        if (outPtr) *outPtr = ptr;
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::UnmapBuffer(uint32_t target)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        GLboolean ok = glUnmapBuffer(ConvertBufferTarget(target));
+        if (!CheckGLError("UnmapBuffer") || ok != GL_TRUE)
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to unmap buffer");
+        }
         return Result<void>();
     }
 
@@ -564,7 +622,7 @@ namespace Vortex
             return validateResult;
         }
 
-glVertexAttribPointer(index, size, static_cast<GLenum>(type), normalized ? GL_TRUE : GL_FALSE,
+glVertexAttribPointer(index, size, ConvertDataType(type), normalized ? GL_TRUE : GL_FALSE,
                               static_cast<GLsizei>(stride), reinterpret_cast<const void*>(static_cast<uintptr_t>(pointer)));
 
         if (!CheckGLError("VertexAttribPointer"))
@@ -584,7 +642,7 @@ glVertexAttribPointer(index, size, static_cast<GLenum>(type), normalized ? GL_TR
             return validateResult;
         }
 
-glVertexAttribIPointer(index, size, static_cast<GLenum>(type), static_cast<GLsizei>(stride),
+glVertexAttribIPointer(index, size, ConvertDataType(type), static_cast<GLsizei>(stride),
                                reinterpret_cast<const void*>(static_cast<uintptr_t>(pointer)));
 
         if (!CheckGLError("VertexAttribIPointer"))
@@ -789,6 +847,62 @@ glVertexAttribIPointer(index, size, static_cast<GLenum>(type), static_cast<GLsiz
         if (!CheckGLError("GenerateMipmap"))
         {
             return Result<void>(ErrorCode::RendererInitFailed, "Failed to generate mipmaps");
+        }
+        return Result<void>();
+    }
+
+    // ============================================================================
+    // Sync Objects
+    // ============================================================================
+
+    Result<void> OpenGLRendererAPI::FenceSync(uint64_t* outHandle)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        GLsync sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        if (!sync || !CheckGLError("FenceSync"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to create fence sync");
+        }
+        if (outHandle) *outHandle = reinterpret_cast<uint64_t>(sync);
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::ClientWaitSync(uint64_t handle, uint64_t flags, uint64_t timeoutNanoseconds, uint32_t* outStatus)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        GLsync sync = reinterpret_cast<GLsync>(handle);
+        GLenum status = glClientWaitSync(sync, static_cast<GLbitfield>(flags), static_cast<GLuint64>(timeoutNanoseconds));
+        if (!CheckGLError("ClientWaitSync"))
+        {
+            return Result<void>(ErrorCode::RendererInitFailed, "Failed to wait on fence sync");
+        }
+        if (outStatus) *outStatus = status;
+        return Result<void>();
+    }
+
+    Result<void> OpenGLRendererAPI::DeleteSync(uint64_t handle)
+    {
+        auto validateResult = ValidateContext();
+        if (!validateResult.IsSuccess())
+        {
+            return validateResult;
+        }
+        GLsync sync = reinterpret_cast<GLsync>(handle);
+        if (sync)
+        {
+            glDeleteSync(sync);
+            if (!CheckGLError("DeleteSync"))
+            {
+                return Result<void>(ErrorCode::RendererInitFailed, "Failed to delete fence sync");
+            }
         }
         return Result<void>();
     }

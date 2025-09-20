@@ -276,6 +276,21 @@ namespace Vortex
             return Submit(std::make_unique<BufferSubDataCommand>(target, offset, std::move(payload)), executeImmediate);
         }
 
+        bool BufferStorage(uint32_t target, uint64_t size, uint32_t flags, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<BufferStorageCommand>(target, size, flags), executeImmediate);
+        }
+
+        bool MapBufferRange(uint32_t target, uint64_t offset, uint64_t length, uint32_t access, void** outPtr, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<MapBufferRangeCommand>(target, offset, length, access, outPtr), executeImmediate);
+        }
+
+        bool UnmapBuffer(uint32_t target, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<UnmapBufferCommand>(target), executeImmediate);
+        }
+
         bool BindTexture(uint32_t slot, uint32_t texture, uint32_t sampler = 0, bool executeImmediate = false)
         {
             return Submit(std::make_unique<BindTextureCommand>(slot, texture, sampler), executeImmediate);
@@ -449,6 +464,22 @@ namespace Vortex
         bool BindBufferBase(BufferTarget target, uint32_t index, uint32_t buffer, bool executeImmediate = false)
         {
             return Submit(std::make_unique<BindBufferBaseCommand>(static_cast<uint32_t>(target), index, buffer), executeImmediate);
+        }
+
+        // Sync helpers
+        bool FenceSync(uint64_t* outHandle, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<FenceSyncCommand>(outHandle), executeImmediate);
+        }
+
+        bool ClientWaitSync(uint64_t handle, uint64_t flags, uint64_t timeoutNs, uint32_t* outStatus, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<ClientWaitSyncCommand>(handle, flags, timeoutNs, outStatus), executeImmediate);
+        }
+
+        bool DeleteSync(uint64_t handle, bool executeImmediate = true)
+        {
+            return Submit(std::make_unique<DeleteSyncCommand>(handle), executeImmediate);
         }
 
         /**
