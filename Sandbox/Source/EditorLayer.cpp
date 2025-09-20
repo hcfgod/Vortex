@@ -32,6 +32,16 @@ void EditorLayer::OnUpdate()
 	auto currentMode = m_Engine->GetRunMode();
 	auto activeCamera = m_CameraSystem->GetActiveCamera();
 
+    // Ensure the render system uses our scene framebuffer BEFORE PreRender
+    // so all layers (including game) render into the same target and viewport for this frame.
+    if (m_Framebuffer)
+    {
+        if (auto* rs = Sys<RenderSystem>())
+        {
+            rs->SetSceneRenderTarget(m_Framebuffer);
+        }
+    }
+
 	if (currentMode == Engine::RunMode::Edit)
 	{
 		// In Edit mode, ensure EditorCamera is active

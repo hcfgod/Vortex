@@ -55,6 +55,9 @@ namespace Vortex
         GraphicsContext* GetGraphicsContext() { return m_GraphicsContext.get(); }
         const GraphicsContext* GetGraphicsContext() const { return m_GraphicsContext.get(); }
 
+        // Current scene viewport size (FBO if set, else window backbuffer)
+        glm::uvec2 GetCurrentViewportSize() const;
+
     private:
         Result<void> InitializeRendering();
         Result<void> HandleResize(uint32_t width, uint32_t height);

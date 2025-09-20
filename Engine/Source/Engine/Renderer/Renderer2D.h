@@ -56,6 +56,8 @@ namespace Vortex
 		std::shared_ptr<Shader>  QuadShader;
 
 		glm::mat4 CurrentViewProj = glm::mat4(1.0f);
+		glm::uvec2 CurrentViewportSize = glm::uvec2(0, 0);
+		bool PixelSnapEnabled = false;
 
 		Renderer2DStatistics Stats;
 	};
@@ -67,6 +69,9 @@ namespace Vortex
 		static void Shutdown();
 		static void BeginScene(const Camera& camera);
 		static void EndScene();
+
+		// Configuration
+		static void SetPixelSnapEnabled(bool enabled);
 
 		// Mid-scene batching controls
 		static void Flush();          // Submit current batch without ending the scene

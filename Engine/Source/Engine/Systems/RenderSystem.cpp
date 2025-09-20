@@ -329,6 +329,22 @@ namespace Vortex
         return Result<void>();
     }
 
+    glm::uvec2 RenderSystem::GetCurrentViewportSize() const
+    {
+        if (m_SceneTarget)
+        {
+            const auto& spec = m_SceneTarget->GetSpec();
+            return { spec.Width, spec.Height };
+        }
+        if (m_Window)
+        {
+            const auto& props = m_Window->GetProperties();
+            return { static_cast<uint32_t>(props.Width), static_cast<uint32_t>(props.Height) };
+        }
+        // Fallback
+        return { 0u, 0u };
+    }
+
     Result<void> RenderSystem::Shutdown()
     {
         // Idempotent: if nothing is initialized and no renderer/context remains, skip

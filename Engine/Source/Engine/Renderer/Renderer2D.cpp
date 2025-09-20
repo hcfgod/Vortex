@@ -9,6 +9,7 @@
 #include "Engine/Renderer/RenderCommandQueue.h"
 #include "Engine/Assets/AssetSystem.h"
 #include "Engine/Assets/TextureAsset.h"
+#include "Engine/Systems/RenderSystem.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/euler_angles.hpp>
 
@@ -123,19 +124,36 @@ namespace Vortex
 		s_Data = nullptr;
 	}
 
-	void Renderer2D::BeginScene(const Camera& camera)
-	{
-		if (!s_Data) return;
-		EnsureShaderLoaded();
+void Renderer2D::BeginScene(const Camera& camera)
+{
+	if (!s_Data) return;
+	EnsureShaderLoaded();
 
-		s_Data->CurrentViewProj = camera.GetViewProjectionMatrix();
-		StartNewBatch();
+	s_Data->CurrentViewProj = camera.GetViewProjectionMatrix();
+
+	// Cache current viewport size (FBO if set, else window)
+	if (auto* rs = Sys<RenderSystem>())
+	{
+		s_Data->CurrentViewportSize = rs->GetCurrentViewportSize();
+	}
+	else
+	{
+		s_Data->CurrentViewportSize = glm::uvec2(0, 0);
 	}
 
-	void Renderer2D::EndScene()
-	{
-		Flush();
-	}
+	StartNewBatch();
+}
+
+void Renderer2D::EndScene()
+{
+	Flush();
+}
+
+void Renderer2D::SetPixelSnapEnabled(bool enabled)
+{
+	if (!s_Data) return;
+	s_Data->PixelSnapEnabled = enabled;
+}
 
 	// Batching utilities
 	void Renderer2D::Flush()
@@ -154,6 +172,10 @@ namespace Vortex
 			return;
 		sm.BindShader(s_Data->QuadShaderHandle);
 		sm.SetUniform("u_ViewProjection", s_Data->CurrentViewProj);
+		// Pixel snapping uniforms (engine-level)
+		glm::vec2 vpSize = glm::vec2((float)s_Data->CurrentViewportSize.x, (float)s_Data->CurrentViewportSize.y);
+		sm.SetUniform("u_ViewportSize", vpSize);
+		sm.SetUniform("u_PixelSnap", s_Data->PixelSnapEnabled ? 1 : 0);
 
 		// Bind all textures used in this batch to their slots
 		for (uint32_t i = 0; i < s_Data->TextureSlotIndex; ++i)

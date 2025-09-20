@@ -25,6 +25,8 @@ void ExampleGameLayer::OnAttach()
 
     // Initialize Renderer2D after assets root is set so it can find its shaders
     Vortex::Renderer2D::Initialize();
+    // Enable pixel snapping for 2D batching tests
+    Vortex::Renderer2D::SetPixelSnapEnabled(m_PixelSnapEnabled);
     
     SetupInputActions();
     
@@ -339,6 +341,12 @@ void ExampleGameLayer::OnImGuiRender()
         ImGui::Checkbox("Use Random Colors", &m_GridConfig.useRandomColors);
         
         ImGui::SliderFloat3("Grid Offset", &m_GridConfig.gridOffset.x, -50.0f, 50.0f);
+
+        // Renderer2D options
+        if (ImGui::Checkbox("Pixel Snap (Renderer2D)", &m_PixelSnapEnabled))
+        {
+            Vortex::Renderer2D::SetPixelSnapEnabled(m_PixelSnapEnabled);
+        }
         
         int totalQuads = m_GridConfig.gridWidth * m_GridConfig.gridHeight;
         ImGui::Text("Total Quads: %d", totalQuads);
@@ -580,9 +588,9 @@ void ExampleGameLayer::RenderBatchingTestGrid()
         return glm::vec4(r, g, b, 1.0f);
     };
     
-    // Grid center offset to center the grid around origin
-    float centerOffsetX = -(m_GridConfig.gridWidth * m_GridConfig.spacing) * 0.5f;
-    float centerOffsetY = -(m_GridConfig.gridHeight * m_GridConfig.spacing) * 0.5f;
+    // Grid center offset to center the grid around origin (use (count-1) to center cell positions)
+    float centerOffsetX = -((m_GridConfig.gridWidth - 1) * m_GridConfig.spacing) * 0.5f;
+    float centerOffsetY = -((m_GridConfig.gridHeight - 1) * m_GridConfig.spacing) * 0.5f;
     
     // Render the grid
     for (int x = 0; x < m_GridConfig.gridWidth; ++x)

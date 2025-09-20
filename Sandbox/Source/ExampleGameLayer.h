@@ -44,8 +44,8 @@ private:
     
     // Grid testing for batching
     struct GridTestConfig {
-        int gridWidth = 50;
-        int gridHeight = 50;
+        int gridWidth = 20;
+        int gridHeight = 20;
         float quadSize = 1.0f;
         float spacing = 1.2f;
         bool useTextures = true;
@@ -59,6 +59,9 @@ private:
     // Renderer2D lifetime stats (accumulate across frames)
     uint64_t m_LifetimeDrawCalls = 0;
     uint64_t m_LifetimeQuadCount = 0;
+
+    // Renderer2D options
+    bool m_PixelSnapEnabled = true;
 
     void RenderBatchingTestGrid();
 
