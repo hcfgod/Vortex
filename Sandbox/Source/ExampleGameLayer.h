@@ -41,6 +41,22 @@ private:
     // Simple animation
     float m_AnimationTime = 0.0f;
     float m_RotationAngle = 0.0f;
+    
+    // Grid testing for batching
+    struct GridTestConfig {
+        int gridWidth = 50;
+        int gridHeight = 50;
+        float quadSize = 1.0f;
+        float spacing = 1.2f;
+        bool useTextures = true;
+        bool useRotation = false;
+        bool use3DPositioning = false;
+        bool useRandomColors = true;
+        float animationSpeed = 1.0f;
+        glm::vec3 gridOffset = glm::vec3(0.0f, 0.0f, 0.0f);
+    } m_GridConfig;
+    
+    void RenderBatchingTestGrid();
 
 	// Cache engine systems for optimal access
 	std::shared_ptr<AssetSystem> m_AssetSystem;

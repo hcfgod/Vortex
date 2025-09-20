@@ -3,20 +3,6 @@
 #include <imgui.h>
 #include "Engine/Renderer/Renderer2D.h"
 
-// Triangle vertices with position, texture coordinates, normal, and tangent
-const float kVertices[] =
-{
-    // Position (x, y, z)    // TexCoord (u, v)  // Normal (x, y, z)     // Tangent (x, y, z)
-    -0.8f, -0.8f, 0.0f,     0.0f, 0.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, // Bottom-left
-     0.8f, -0.8f, 0.0f,     1.0f, 0.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, // Bottom-right
-     0.0f,  0.8f, 0.0f,     0.5f, 1.0f,         0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f  // Top-center
-};
-
-const unsigned int kIndices[] =
-{
-    0, 1, 2 // Single triangle
-};
-
 void ExampleGameLayer::OnAttach()
 {
     VX_INFO("ExampleGameLayer attached - Game layer ready!");
@@ -197,30 +183,8 @@ void ExampleGameLayer::OnUpdate()
                        (app->GetEngine()->GetRunMode() == Engine::RunMode::PlayInEditor || 
                         app->GetEngine()->GetRunMode() == Engine::RunMode::Production);
 
-    // In play mode, the application auto-enables relative mouse on right mouse down over the viewport.
-    // No per-layer code required.
-    if (m_MainCamera && !m_IsPaused && isInPlayMode)
-    {
-        // Simple camera orbit around the origin
-        static float orbitAngle = 0.0f;
-        orbitAngle += 30.0f * deltaTime; // 30 degrees per second
-        
-        if (orbitAngle > 360.0f)
-            orbitAngle -= 360.0f;
-            
-        // Orbit camera around the triangle
-        float radius = 5.0f;
-        glm::vec3 orbitPos(
-            std::cos(glm::radians(orbitAngle)) * radius,
-            0.0f,
-            std::sin(glm::radians(orbitAngle)) * radius
-        );
-        
-        m_MainCamera->SetPosition(orbitPos);
-        
-        // Look at the center
-        m_MainCamera->LookAt(glm::vec3(0.0f, 0.0f, 0.0f));
-    }
+    // Camera orbiting disabled for batching test - use editor camera controls instead
+    // (Camera position can be controlled via ImGui or editor camera in edit mode)
 
     // === Game Logic ===
     
@@ -253,37 +217,16 @@ void ExampleGameLayer::OnRender()
     auto* cameraSystem = Sys<CameraSystem>();
     std::shared_ptr<Camera> activeCamera = cameraSystem ? cameraSystem->GetActiveCamera() : nullptr;
     
-	// Default matrices if no active camera
-    glm::mat4 viewProjection = glm::mat4(1.0f);
-    glm::mat4 view = glm::mat4(1.0f);
-    glm::mat4 model = glm::mat4(1.0f);
-    glm::mat3 normalMatrix = glm::mat3(1.0f);
-    glm::vec3 cameraPos(0.0f, 0.0f, 5.0f);
-
-    if (activeCamera)
+    if (!activeCamera)
     {
-        // Use camera matrices from the camera system
-        viewProjection = activeCamera->GetViewProjectionMatrix();
-        view = activeCamera->GetViewMatrix();
-        
-        // Get camera position from perspective camera
-        if (auto* perspCam = dynamic_cast<PerspectiveCamera*>(activeCamera.get()))
-        {
-            cameraPos = perspCam->GetPosition();
-        }
-    }
-    else
-    {
-        VX_CORE_WARN("[CameraSystem] No active camera found, using identity matrices");
+        VX_CORE_WARN("[CameraSystem] No active camera found, skipping render");
+        return;
     }
 
     Renderer2D::BeginScene(*activeCamera);
-
-	Renderer2D::DrawQuad(glm::vec2(-5.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
-	Renderer2D::DrawQuad(glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	Renderer2D::DrawQuad(glm::vec2(5.0f, 0.0f), glm::vec2(1.0f, 1.0f), m_TextureHandle, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	Renderer2D::DrawQuad(glm::vec2(0.0f, 5.0f), glm::vec2(1.0f, 1.0f), {0, 0, -45}, m_TextureHandle, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-	Renderer2D::DrawQuad(glm::vec3(0.0f, 5.0f, -5.0f), glm::vec2(1.0f, 1.0f), {0, 0, -45}, m_TextureHandle, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    
+    // Render the grid test instead of the simple quads
+    RenderBatchingTestGrid();
 
     Renderer2D::EndScene();
 
@@ -369,6 +312,65 @@ void ExampleGameLayer::OnImGuiRender()
         else
         {
             ImGui::Text("CameraSystem: Not Available");
+        }
+        
+        ImGui::Separator();
+        ImGui::Text("=== Renderer2D Batching Test ===");
+        
+        // Grid configuration controls
+        ImGui::SliderInt("Grid Width", &m_GridConfig.gridWidth, 1, 200);
+        ImGui::SliderInt("Grid Height", &m_GridConfig.gridHeight, 1, 200);
+        ImGui::SliderFloat("Quad Size", &m_GridConfig.quadSize, 0.1f, 5.0f);
+        ImGui::SliderFloat("Spacing", &m_GridConfig.spacing, 0.5f, 5.0f);
+        ImGui::SliderFloat("Animation Speed", &m_GridConfig.animationSpeed, 0.0f, 5.0f);
+        
+        ImGui::Checkbox("Use Textures", &m_GridConfig.useTextures);
+        ImGui::Checkbox("Use Rotation", &m_GridConfig.useRotation);
+        ImGui::Checkbox("Use 3D Positioning", &m_GridConfig.use3DPositioning);
+        ImGui::Checkbox("Use Random Colors", &m_GridConfig.useRandomColors);
+        
+        ImGui::SliderFloat3("Grid Offset", &m_GridConfig.gridOffset.x, -50.0f, 50.0f);
+        
+        int totalQuads = m_GridConfig.gridWidth * m_GridConfig.gridHeight;
+        ImGui::Text("Total Quads: %d", totalQuads);
+        
+        // Renderer stats
+        auto stats = Renderer2D::GetStats();
+        ImGui::Text("Draw Calls: %u", stats.DrawCalls);
+        ImGui::Text("Rendered Quads: %u", stats.QuadCount);
+        if (stats.DrawCalls > 0)
+        {
+            ImGui::Text("Avg Quads/Call: %.1f", (float)stats.QuadCount / stats.DrawCalls);
+        }
+        
+        if (ImGui::Button("Reset Renderer Stats"))
+        {
+            Renderer2D::ResetStats();
+        }
+        
+        // Preset buttons
+        if (ImGui::Button("Small Grid (10x10)"))
+        {
+            m_GridConfig.gridWidth = 10;
+            m_GridConfig.gridHeight = 10;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Medium Grid (50x50)"))
+        {
+            m_GridConfig.gridWidth = 50;
+            m_GridConfig.gridHeight = 50;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Large Grid (100x100)"))
+        {
+            m_GridConfig.gridWidth = 100;
+            m_GridConfig.gridHeight = 100;
+        }
+        
+        if (ImGui::Button("Stress Test (200x200)"))
+        {
+            m_GridConfig.gridWidth = 200;
+            m_GridConfig.gridHeight = 200;
         }
     }
     ImGui::End();
@@ -467,9 +469,10 @@ void ExampleGameLayer::OnResetAction(InputActionPhase phase)
     // Reset game
     m_GameTime = 0.0f;
     m_Score = 0;
+    m_IsPaused = false;
     m_AnimationTime = 0.0f;
     m_RotationAngle = 0.0f;
-    m_IsPaused = false;
+
     VX_INFO("[Action] Game RESET (via Input Action)");
 }
 
@@ -529,8 +532,8 @@ void ExampleGameLayer::SetupGameplayCamera()
         1000.0f   // Far clip
     );
     
-    // Set initial camera position
-    m_MainCamera->SetPosition(glm::vec3(0.0f, 0.0f, 5.0f));
+    // Set initial camera position for better grid viewing
+    m_MainCamera->SetPosition(glm::vec3(0.0f, 0.0f, 80.0f));
     m_MainCamera->SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
 
     // Register the camera with the system
@@ -545,4 +548,118 @@ void ExampleGameLayer::SetupGameplayCamera()
     VX_INFO("[CameraSystem] Gameplay camera created and registered successfully");
     VX_INFO("[CameraSystem] Camera position: ({:.1f}, {:.1f}, {:.1f})", 
            m_MainCamera->GetPosition().x, m_MainCamera->GetPosition().y, m_MainCamera->GetPosition().z);
+}
+
+void ExampleGameLayer::RenderBatchingTestGrid()
+{
+    // Get renderer stats before rendering
+    auto statsBefore = Renderer2D::GetStats();
+    
+    // Calculate total quads to render
+    int totalQuads = m_GridConfig.gridWidth * m_GridConfig.gridHeight;
+    
+    // Use a hash-based approach for consistent "randomness" per quad position
+    auto getRandomColor = [](int x, int y) -> glm::vec4 {
+        // Simple hash function for consistent colors per position
+        uint32_t hash = (x * 73856093) ^ (y * 19349663);
+        float r = ((hash >> 16) & 0xFF) / 255.0f;
+        float g = ((hash >> 8) & 0xFF) / 255.0f;
+        float b = (hash & 0xFF) / 255.0f;
+        return glm::vec4(r, g, b, 1.0f);
+    };
+    
+    // Grid center offset to center the grid around origin
+    float centerOffsetX = -(m_GridConfig.gridWidth * m_GridConfig.spacing) * 0.5f;
+    float centerOffsetY = -(m_GridConfig.gridHeight * m_GridConfig.spacing) * 0.5f;
+    
+    // Render the grid
+    for (int x = 0; x < m_GridConfig.gridWidth; ++x)
+    {
+        for (int y = 0; y < m_GridConfig.gridHeight; ++y)
+        {
+            // Calculate position
+            float posX = centerOffsetX + x * m_GridConfig.spacing + m_GridConfig.gridOffset.x;
+            float posY = centerOffsetY + y * m_GridConfig.spacing + m_GridConfig.gridOffset.y;
+            float posZ = m_GridConfig.gridOffset.z;
+            
+            // Calculate color
+            glm::vec4 color = m_GridConfig.useRandomColors ? 
+                getRandomColor(x, y) : 
+                glm::vec4(0.8f, 0.6f, 0.2f, 1.0f); // Default golden color
+            
+            // Add subtle animation to colors if enabled
+            if (m_GridConfig.animationSpeed > 0.0f)
+            {
+                float time = m_AnimationTime * m_GridConfig.animationSpeed;
+                float wave = std::sin(time + x * 0.1f + y * 0.1f) * 0.2f + 0.8f;
+                color.x *= wave;
+                color.y *= wave;
+                color.z *= wave;
+            }
+            glm::vec3 rotation(0.0f);
+            if (m_GridConfig.useRotation)
+            {
+                float time = m_AnimationTime * m_GridConfig.animationSpeed;
+                rotation.z = std::sin(time + x * 0.2f + y * 0.3f) * 45.0f; // Rotate up to ±45 degrees
+            }
+            
+            // Choose rendering method based on configuration
+            glm::vec2 size(m_GridConfig.quadSize);
+            
+            if (m_GridConfig.use3DPositioning)
+            {
+                glm::vec3 position3D(posX, posY, posZ);
+                
+                if (m_GridConfig.useTextures && m_TextureHandle.IsValid())
+                {
+                    if (m_GridConfig.useRotation)
+                        Renderer2D::DrawQuad(position3D, size, rotation, m_TextureHandle, color);
+                    else
+                        Renderer2D::DrawQuad(position3D, size, m_TextureHandle, color);
+                }
+                else
+                {
+                    if (m_GridConfig.useRotation)
+                        Renderer2D::DrawQuad(position3D, size, rotation, color);
+                    else
+                        Renderer2D::DrawQuad(position3D, size, color);
+                }
+            }
+            else
+            {
+                glm::vec2 position2D(posX, posY);
+                
+                if (m_GridConfig.useTextures && m_TextureHandle.IsValid())
+                {
+                    if (m_GridConfig.useRotation)
+                        Renderer2D::DrawQuad(position2D, size, rotation, m_TextureHandle, color);
+                    else
+                        Renderer2D::DrawQuad(position2D, size, m_TextureHandle, color);
+                }
+                else
+                {
+                    if (m_GridConfig.useRotation)
+                        Renderer2D::DrawQuad(position2D, size, rotation, color);
+                    else
+                        Renderer2D::DrawQuad(position2D, size, color);
+                }
+            }
+        }
+    }
+    
+    // Log stats periodically
+    static float lastStatsTime = 0.0f;
+    if (m_GameTime - lastStatsTime >= 3.0f)
+    {
+        auto statsAfter = Renderer2D::GetStats();
+        uint32_t drawCalls = statsAfter.DrawCalls - statsBefore.DrawCalls;
+        uint32_t renderedQuads = statsAfter.QuadCount - statsBefore.QuadCount;
+        
+        VX_INFO("[BatchingTest] Rendered {} quads in {} draw calls (avg {:.1f} quads/call)",
+               renderedQuads, drawCalls, drawCalls > 0 ? (float)renderedQuads / drawCalls : 0.0f);
+        VX_INFO("[BatchingTest] Grid config: {}x{} = {} total quads", 
+               m_GridConfig.gridWidth, m_GridConfig.gridHeight, totalQuads);
+        
+        lastStatsTime = m_GameTime;
+    }
 }
