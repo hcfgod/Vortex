@@ -56,6 +56,10 @@ private:
         glm::vec3 gridOffset = glm::vec3(0.0f, 0.0f, 0.0f);
     } m_GridConfig;
     
+    // Renderer2D lifetime stats (accumulate across frames)
+    uint64_t m_LifetimeDrawCalls = 0;
+    uint64_t m_LifetimeQuadCount = 0;
+
     void RenderBatchingTestGrid();
 
 	// Cache engine systems for optimal access

@@ -223,12 +223,21 @@ void ExampleGameLayer::OnRender()
         return;
     }
 
+    // Reset per-frame stats so GetStats() reports this frame only
+    Renderer2D::ResetStats();
     Renderer2D::BeginScene(*activeCamera);
     
     // Render the grid test instead of the simple quads
     RenderBatchingTestGrid();
 
     Renderer2D::EndScene();
+
+    // Accumulate lifetime totals from this frame's stats
+    {
+        auto frameStats = Renderer2D::GetStats();
+        m_LifetimeDrawCalls += frameStats.DrawCalls;
+        m_LifetimeQuadCount += frameStats.QuadCount;
+    }
 
     // Unbind shader through ShaderManager
     GetShaderManager().UnbindShader();
@@ -335,15 +344,18 @@ void ExampleGameLayer::OnImGuiRender()
         ImGui::Text("Total Quads: %d", totalQuads);
         
         // Renderer stats
-        auto stats = Renderer2D::GetStats();
-        ImGui::Text("Draw Calls: %u", stats.DrawCalls);
-        ImGui::Text("Rendered Quads: %u", stats.QuadCount);
-        if (stats.DrawCalls > 0)
+        auto frameStats = Renderer2D::GetStats();
+        ImGui::Text("Per-frame Draw Calls: %u", frameStats.DrawCalls);
+        ImGui::Text("Per-frame Quads: %u", frameStats.QuadCount);
+        if (frameStats.DrawCalls > 0)
         {
-            ImGui::Text("Avg Quads/Call: %.1f", (float)stats.QuadCount / stats.DrawCalls);
+            ImGui::Text("Avg Quads/Call (frame): %.1f", (float)frameStats.QuadCount / frameStats.DrawCalls);
         }
         
-        if (ImGui::Button("Reset Renderer Stats"))
+        ImGui::Text("Lifetime Draw Calls: %llu", (unsigned long long)m_LifetimeDrawCalls);
+        ImGui::Text("Lifetime Quads: %llu", (unsigned long long)m_LifetimeQuadCount);
+        
+        if (ImGui::Button("Reset Renderer Stats (this frame)"))
         {
             Renderer2D::ResetStats();
         }
