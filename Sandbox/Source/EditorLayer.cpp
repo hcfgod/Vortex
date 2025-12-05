@@ -1,4 +1,6 @@
 #include "EditorLayer.h"
+#include "Engine/Renderer/RenderGraph.h"
+#include "Engine/Renderer/RenderPass.h"
 #include <imgui.h>
 
 using namespace Vortex;
@@ -19,6 +21,13 @@ void EditorLayer::OnAttach()
 
 	// Setup editor camera
 	SetupEditorCamera();
+
+	// Get AssetSystem for building assets
+	m_AssetSystem = SysShared<AssetSystem>();
+	if (!m_AssetSystem)
+	{
+		VX_ERROR("[EditorLayer] AssetSystem not available!");
+	}
 }
 
 void EditorLayer::OnDetach()
@@ -86,6 +95,36 @@ void EditorLayer::OnRender()
 
 void EditorLayer::OnImGuiRender()
 {
+	// Render main menu bar
+	if (ImGui::BeginMainMenuBar())
+	{
+		if (ImGui::BeginMenu("Assets"))
+		{
+			if (ImGui::MenuItem("Build Assets Pack", nullptr, false, m_AssetSystem != nullptr))
+			{
+				if (m_AssetSystem)
+				{
+					// Build assets with default options
+					AssetSystem::BuildAssetsOptions options;
+					options.PrecompileShaders = true;
+					options.IncludeShaderSources = false;
+					
+					auto result = m_AssetSystem->BuildAssetsPack(options);
+					if (result.IsSuccess())
+					{
+						VX_INFO("[Editor] Assets pack built successfully: {}", result.GetValue().string());
+					}
+					else
+					{
+						VX_ERROR("[Editor] Failed to build assets pack: {}", result.GetErrorMessage());
+					}
+				}
+			}
+			ImGui::EndMenu();
+		}
+		ImGui::EndMainMenuBar();
+	}
+
 	ImGui::SetNextWindowSize(ImVec2((float)m_ViewportWidth, (float)m_ViewportHeight), ImGuiCond_FirstUseEver);
     // Match ImGui window background to engine clear color
     if (auto* rs = Sys<RenderSystem>())

@@ -7,6 +7,8 @@
 #include "Engine/Renderer/Shader/Shader.h"
 #include "Engine/Renderer/Shader/ShaderManager.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
+#include "Engine/Renderer/RenderPass.h"
+#include "Engine/Renderer/RenderGraph.h"
 #include "Engine/Assets/AssetSystem.h"
 #include "Engine/Assets/TextureAsset.h"
 #include "Engine/Systems/RenderSystem.h"
@@ -223,42 +225,42 @@ static void RebindInstanceAttribs(uint64_t baseOffset)
 	{
 		if (s_Data) return;
 		s_Data = new Renderer2DStorage();
-	s_Data->QuadVA = VertexArray::Create();
+		s_Data->QuadVA = VertexArray::Create();
 
-	// Per-instance buffer (persistent-mapped ring): center, halfSize, color RGBA8, texIndex, rotSinCos, z
-	s_Data->FramesInFlight = 3;
-	s_Data->FrameChunkSizeBytes = sizeof(Renderer2DStorage::QuadInstance) * MaxQuads;
-	s_Data->InstanceRingSizeBytes = s_Data->FrameChunkSizeBytes * s_Data->FramesInFlight;
-	s_Data->FrameFences.assign(s_Data->FramesInFlight, 0ull);
+		// Per-instance buffer (persistent-mapped ring): center, halfSize, color RGBA8, texIndex, rotSinCos, z
+		s_Data->FramesInFlight = 3;
+		s_Data->FrameChunkSizeBytes = sizeof(Renderer2DStorage::QuadInstance) * MaxQuads;
+		s_Data->InstanceRingSizeBytes = s_Data->FrameChunkSizeBytes * s_Data->FramesInFlight;
+		s_Data->FrameFences.assign(s_Data->FramesInFlight, 0ull);
 
-	// Create buffer object
-	s_Data->InstanceVB = VertexBuffer::Create(static_cast<uint32_t>(s_Data->InstanceRingSizeBytes), nullptr, BufferUsage::StreamDraw);
-	{
-		BufferLayout ilayout{
-			{ ShaderDataType::Vec2, "iCenter" },
-			{ ShaderDataType::Vec2, "iHalfSize" },
-			{ ShaderDataType::UInt, "iColor" },
-			{ ShaderDataType::UInt, "iTexIndex" },
-			{ ShaderDataType::Vec2, "iRotSinCos" },
-			{ ShaderDataType::Float, "iZ" }
-		};
-		ilayout.SetDivisor(1); // per-instance
-		s_Data->InstanceVB->SetLayout(ilayout);
-		s_Data->QuadVA->AddVertexBuffer(s_Data->InstanceVB);
-	}
+		// Create buffer object
+		s_Data->InstanceVB = VertexBuffer::Create(static_cast<uint32_t>(s_Data->InstanceRingSizeBytes), nullptr, BufferUsage::StreamDraw);
+		{
+			BufferLayout ilayout{
+				{ ShaderDataType::Vec2, "iCenter" },
+				{ ShaderDataType::Vec2, "iHalfSize" },
+				{ ShaderDataType::UInt, "iColor" },
+				{ ShaderDataType::UInt, "iTexIndex" },
+				{ ShaderDataType::Vec2, "iRotSinCos" },
+				{ ShaderDataType::Float, "iZ" }
+			};
+			ilayout.SetDivisor(1); // per-instance
+			s_Data->InstanceVB->SetLayout(ilayout);
+			s_Data->QuadVA->AddVertexBuffer(s_Data->InstanceVB);
+		}
 
-	// Allocate persistent storage and map once
-	GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), s_Data->InstanceVB->GetRendererID());
-	uint32_t storageFlags = ToFlags(BufferStorageFlags::MapWriteBit | BufferStorageFlags::MapPersistentBit | BufferStorageFlags::MapCoherentBit | BufferStorageFlags::DynamicStorageBit);
-	GetRenderCommandQueue().BufferStorage(static_cast<uint32_t>(BufferTarget::ArrayBuffer), s_Data->InstanceRingSizeBytes, storageFlags);
-	void* mappedPtr = nullptr;
-	uint32_t mapAccess = ToFlags(MapBufferAccess::MapWriteBit | MapBufferAccess::MapPersistentBit | MapBufferAccess::MapCoherentBit);
-	GetRenderCommandQueue().MapBufferRange(static_cast<uint32_t>(BufferTarget::ArrayBuffer), 0, s_Data->InstanceRingSizeBytes, mapAccess, &mappedPtr);
-	s_Data->InstanceMappedBase = reinterpret_cast<uint8_t*>(mappedPtr);
+		// Allocate persistent storage and map once
+		GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), s_Data->InstanceVB->GetRendererID());
+		uint32_t storageFlags = ToFlags(BufferStorageFlags::MapWriteBit | BufferStorageFlags::MapPersistentBit | BufferStorageFlags::MapCoherentBit | BufferStorageFlags::DynamicStorageBit);
+		GetRenderCommandQueue().BufferStorage(static_cast<uint32_t>(BufferTarget::ArrayBuffer), s_Data->InstanceRingSizeBytes, storageFlags);
+		void* mappedPtr = nullptr;
+		uint32_t mapAccess = ToFlags(MapBufferAccess::MapWriteBit | MapBufferAccess::MapPersistentBit | MapBufferAccess::MapCoherentBit);
+		GetRenderCommandQueue().MapBufferRange(static_cast<uint32_t>(BufferTarget::ArrayBuffer), 0, s_Data->InstanceRingSizeBytes, mapAccess, &mappedPtr);
+		s_Data->InstanceMappedBase = reinterpret_cast<uint8_t*>(mappedPtr);
 
-	s_Data->InstanceBuffer = nullptr; // we write directly into mapped GPU memory
-	s_Data->InstanceBufferPtr = nullptr;
-	s_Data->InstanceCount = 0;
+		s_Data->InstanceBuffer = nullptr; // we write directly into mapped GPU memory
+		s_Data->InstanceBufferPtr = nullptr;
+		s_Data->InstanceCount = 0;
 
 		// White texture
 		uint32_t whitePixel = 0xFFFFFFFFu;
@@ -282,16 +284,16 @@ static void RebindInstanceAttribs(uint64_t baseOffset)
 	{
 		if (!s_Data) return;
 
-	// Optionally unmap (not strictly required for persistent mapping during app lifetime)
-	GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), s_Data->InstanceVB ? s_Data->InstanceVB->GetRendererID() : 0);
-	GetRenderCommandQueue().UnmapBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer));
+		// Optionally unmap (not strictly required for persistent mapping during app lifetime)
+		GetRenderCommandQueue().BindBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer), s_Data->InstanceVB ? s_Data->InstanceVB->GetRendererID() : 0);
+		GetRenderCommandQueue().UnmapBuffer(static_cast<uint32_t>(BufferTarget::ArrayBuffer));
 
-	s_Data->InstanceBuffer = nullptr;
-	s_Data->InstanceBufferPtr = nullptr;
-	s_Data->QuadVA.reset();
-	s_Data->InstanceVB.reset();
-	s_Data->WhiteTexture.reset();
-	s_Data->QuadShaderHandle = {};
+		s_Data->InstanceBuffer = nullptr;
+		s_Data->InstanceBufferPtr = nullptr;
+		s_Data->QuadVA.reset();
+		s_Data->InstanceVB.reset();
+		s_Data->WhiteTexture.reset();
+		s_Data->QuadShaderHandle = {};
 
 		delete s_Data;
 		s_Data = nullptr;
@@ -299,8 +301,30 @@ static void RebindInstanceAttribs(uint64_t baseOffset)
 
 	void Renderer2D::BeginScene(const Camera& camera)
 	{
+		// Check if there's an active render pass in the global graph
+		RenderPass* activePass = nullptr;
+		if (HasRenderGraph())
+		{
+			activePass = GetRenderGraph().GetCurrentPass();
+		}
+		BeginScene(camera, activePass);
+	}
+
+	void Renderer2D::BeginScene(const Camera& camera, RenderPass* pass)
+	{
 		if (!s_Data) return;
 		EnsureShaderLoaded();
+
+		// Store the render pass context
+		s_Data->CurrentRenderPass = pass;
+		if (pass)
+		{
+			s_Data->CurrentDomain = pass->GetDomain();
+		}
+		else
+		{
+			s_Data->CurrentDomain = RenderDomain::World2D;  // Default domain
+		}
 
 		s_Data->CurrentViewProj = camera.GetViewProjectionMatrix();
 
@@ -308,7 +332,12 @@ static void RebindInstanceAttribs(uint64_t baseOffset)
 	s_Data->CurrentFrame++;
 
 	// Cache current viewport size (FBO if set, else window)
-	if (auto* rs = Sys<RenderSystem>())
+	if (pass && pass->GetTarget())
+	{
+		// Use the render pass target's size
+		s_Data->CurrentViewportSize = pass->GetViewportSize();
+	}
+	else if (auto* rs = Sys<RenderSystem>())
 	{
 		s_Data->CurrentViewportSize = rs->GetCurrentViewportSize();
 	}
@@ -343,9 +372,22 @@ s_Data->InstanceCount = 0;
 s_Data->FrameInstanceOffset = 0;
 	}
 
+	RenderDomain Renderer2D::GetCurrentDomain()
+	{
+		if (!s_Data) return RenderDomain::World2D;
+		return s_Data->CurrentDomain;
+	}
+
 	void Renderer2D::EndScene()
 	{
 		Flush();
+
+		// Clear render pass context
+		if (s_Data)
+		{
+			s_Data->CurrentRenderPass = nullptr;
+			s_Data->CurrentDomain = RenderDomain::World2D;
+		}
 	}
 
 	void Renderer2D::SetPixelSnapEnabled(bool enabled)
@@ -355,114 +397,114 @@ s_Data->FrameInstanceOffset = 0;
 	}
 
 	// Batching utilities
-void Renderer2D::Flush()
-{
-    if (!s_Data) return;
-    if (s_Data->InstanceCount == 0)
-        return;
+	void Renderer2D::Flush()
+	{
+		if (!s_Data) return;
+		if (s_Data->InstanceCount == 0)
+			return;
 
-    // Bind shader and set uniforms (only if shader asset is loaded)
-    auto& sm = GetShaderManager();
-    if (!s_Data->QuadShaderHandle.IsValid() || !s_Data->QuadShaderHandle.IsLoaded())
-        return;
-    sm.BindShader(s_Data->QuadShaderHandle);
-    sm.SetUniform("u_ViewProjection", s_Data->CurrentViewProj);
-    // Pixel snapping uniforms (engine-level)
-    glm::vec2 vpSize = glm::vec2((float)s_Data->CurrentViewportSize.x, (float)s_Data->CurrentViewportSize.y);
-    sm.SetUniform("u_ViewportSize", vpSize);
-    sm.SetUniform("u_PixelSnap", s_Data->PixelSnapEnabled ? 1 : 0);
+		// Bind shader and set uniforms (only if shader asset is loaded)
+		auto& sm = GetShaderManager();
+		if (!s_Data->QuadShaderHandle.IsValid() || !s_Data->QuadShaderHandle.IsLoaded())
+			return;
+		sm.BindShader(s_Data->QuadShaderHandle);
+		sm.SetUniform("u_ViewProjection", s_Data->CurrentViewProj);
+		// Pixel snapping uniforms (engine-level)
+		glm::vec2 vpSize = glm::vec2((float)s_Data->CurrentViewportSize.x, (float)s_Data->CurrentViewportSize.y);
+		sm.SetUniform("u_ViewportSize", vpSize);
+		sm.SetUniform("u_PixelSnap", s_Data->PixelSnapEnabled ? 1 : 0);
 
-    // Bind all textures used in this batch to their slots
-    for (uint32_t i = 0; i < s_Data->TextureSlotIndex; ++i)
-    {
-        const auto& tex = s_Data->TextureSlots[i];
-        if (tex)
-        {
-            std::string uniformName = "u_Textures[" + std::to_string(i) + "]";
-            sm.SetTexture(uniformName, tex->GetRendererID(), i);
-        }
-    }
+		// Bind all textures used in this batch to their slots
+		for (uint32_t i = 0; i < s_Data->TextureSlotIndex; ++i)
+		{
+			const auto& tex = s_Data->TextureSlots[i];
+			if (tex)
+			{
+				std::string uniformName = "u_Textures[" + std::to_string(i) + "]";
+				sm.SetTexture(uniformName, tex->GetRendererID(), i);
+			}
+		}
 
-    // 2D overlay: disable depth test for draw, then restore default
-    GetRenderCommandQueue().SetDepthState(false, false);
-    GetRenderCommandQueue().SetBlendState(true);
+		// 2D overlay: disable depth test for draw, then restore default
+		GetRenderCommandQueue().SetDepthState(false, false);
+		GetRenderCommandQueue().SetBlendState(true);
 
-    // Bind VAO and draw instanced (triangle strip with 4 verts)
-    s_Data->QuadVA->Bind();
-    // Draw starting at FrameInstanceOffset within this frame chunk
-    GetRenderCommandQueue().DrawArrays(4, s_Data->InstanceCount, 0, s_Data->FrameInstanceOffset, static_cast<uint32_t>(PrimitiveTopology::TriangleStrip));
+		// Bind VAO and draw instanced (triangle strip with 4 verts)
+		s_Data->QuadVA->Bind();
+		// Draw starting at FrameInstanceOffset within this frame chunk
+		GetRenderCommandQueue().DrawArrays(4, s_Data->InstanceCount, 0, s_Data->FrameInstanceOffset, static_cast<uint32_t>(PrimitiveTopology::TriangleStrip));
 
-    // Restore depth defaults (test/write enabled, Less) and disable blending
-    GetRenderCommandQueue().SetDepthState(true, true, SetDepthStateCommand::Less);
-    GetRenderCommandQueue().SetBlendState(false);
+		// Restore depth defaults (test/write enabled, Less) and disable blending
+		GetRenderCommandQueue().SetDepthState(true, true, SetDepthStateCommand::Less);
+		GetRenderCommandQueue().SetBlendState(false);
 
-    // Update per-frame offset to account for the submitted instances
-    s_Data->FrameInstanceOffset += s_Data->InstanceCount;
+		// Update per-frame offset to account for the submitted instances
+		s_Data->FrameInstanceOffset += s_Data->InstanceCount;
 
-    // Replace any existing fence for this frame chunk (avoid leaking GLsyncs when flushing multiple times per frame)
-    if (s_Data->FrameFences[s_Data->CurrentFrameChunkIndex] != 0ull)
-    {
-        GetRenderCommandQueue().DeleteSync(s_Data->FrameFences[s_Data->CurrentFrameChunkIndex]);
-        s_Data->FrameFences[s_Data->CurrentFrameChunkIndex] = 0ull;
-    }
-    uint64_t fenceHandle = 0ull;
-    GetRenderCommandQueue().FenceSync(&fenceHandle);
-    s_Data->FrameFences[s_Data->CurrentFrameChunkIndex] = fenceHandle;
+		// Replace any existing fence for this frame chunk (avoid leaking GLsyncs when flushing multiple times per frame)
+		if (s_Data->FrameFences[s_Data->CurrentFrameChunkIndex] != 0ull)
+		{
+			GetRenderCommandQueue().DeleteSync(s_Data->FrameFences[s_Data->CurrentFrameChunkIndex]);
+			s_Data->FrameFences[s_Data->CurrentFrameChunkIndex] = 0ull;
+		}
+		uint64_t fenceHandle = 0ull;
+		GetRenderCommandQueue().FenceSync(&fenceHandle);
+		s_Data->FrameFences[s_Data->CurrentFrameChunkIndex] = fenceHandle;
 
-    // Stats
-    s_Data->Stats.DrawCalls += 1;
-    s_Data->Stats.QuadCount += s_Data->InstanceCount;
+		// Stats
+		s_Data->Stats.DrawCalls += 1;
+		s_Data->Stats.QuadCount += s_Data->InstanceCount;
 
-    // Reset geometry for next batch; keep texture slots unless caller resets them
-    s_Data->InstanceCount = 0;
-    s_Data->InstanceBufferPtr = s_Data->InstanceBuffer + s_Data->FrameInstanceOffset;
-}
+		// Reset geometry for next batch; keep texture slots unless caller resets them
+		s_Data->InstanceCount = 0;
+		s_Data->InstanceBufferPtr = s_Data->InstanceBuffer + s_Data->FrameInstanceOffset;
+	}
 
-void Renderer2D::StartNewBatch()
-{
-    if (!s_Data) return;
+	void Renderer2D::StartNewBatch()
+	{
+		if (!s_Data) return;
 
-    // If we've exhausted this frame chunk, rotate to the next one (with sync)
-    if (s_Data->FrameInstanceOffset >= MaxQuads)
-    {
-        const uint32_t next = (s_Data->CurrentFrameChunkIndex + 1) % s_Data->FramesInFlight;
-        uint64_t& nextFence = s_Data->FrameFences[next];
-        if (nextFence != 0ull)
-        {
-            uint32_t status = 0;
-            GetRenderCommandQueue().ClientWaitSync(nextFence, 0ull, ~0ull, &status);
-            GetRenderCommandQueue().DeleteSync(nextFence);
-            nextFence = 0ull;
-        }
-        s_Data->CurrentFrameChunkIndex = next;
-        const uint64_t newBase = static_cast<uint64_t>(s_Data->CurrentFrameChunkIndex) * s_Data->FrameChunkSizeBytes;
-        RebindInstanceAttribs(newBase);
-        s_Data->InstanceBuffer = reinterpret_cast<Renderer2DStorage::QuadInstance*>(s_Data->InstanceMappedBase + newBase);
-        s_Data->FrameInstanceOffset = 0;
-    }
+		// If we've exhausted this frame chunk, rotate to the next one (with sync)
+		if (s_Data->FrameInstanceOffset >= MaxQuads)
+		{
+			const uint32_t next = (s_Data->CurrentFrameChunkIndex + 1) % s_Data->FramesInFlight;
+			uint64_t& nextFence = s_Data->FrameFences[next];
+			if (nextFence != 0ull)
+			{
+				uint32_t status = 0;
+				GetRenderCommandQueue().ClientWaitSync(nextFence, 0ull, ~0ull, &status);
+				GetRenderCommandQueue().DeleteSync(nextFence);
+				nextFence = 0ull;
+			}
+			s_Data->CurrentFrameChunkIndex = next;
+			const uint64_t newBase = static_cast<uint64_t>(s_Data->CurrentFrameChunkIndex) * s_Data->FrameChunkSizeBytes;
+			RebindInstanceAttribs(newBase);
+			s_Data->InstanceBuffer = reinterpret_cast<Renderer2DStorage::QuadInstance*>(s_Data->InstanceMappedBase + newBase);
+			s_Data->FrameInstanceOffset = 0;
+		}
 
-    // Reset instance counters and pointer to next free slot within this frame chunk
-    s_Data->InstanceCount = 0;
-    s_Data->InstanceBufferPtr = s_Data->InstanceBuffer + s_Data->FrameInstanceOffset;
+		// Reset instance counters and pointer to next free slot within this frame chunk
+		s_Data->InstanceCount = 0;
+		s_Data->InstanceBufferPtr = s_Data->InstanceBuffer + s_Data->FrameInstanceOffset;
 
-    // Reset texture slots for a fresh batch
-    s_Data->TextureSlotIndex = 1;
-    s_Data->TextureSlots[0] = s_Data->WhiteTexture;
-}
+		// Reset texture slots for a fresh batch
+		s_Data->TextureSlotIndex = 1;
+		s_Data->TextureSlots[0] = s_Data->WhiteTexture;
+	}
 
 	// DrawQuad implementations
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec4& color)
 	{
 		if (!s_Data) return;
-// Ensure capacity; split batches and rotate chunks as needed
-if (s_Data->FrameInstanceOffset + s_Data->InstanceCount >= MaxQuads)
-{
-    Flush();
-    StartNewBatch();
-}
+		// Ensure capacity; split batches and rotate chunks as needed
+		if (s_Data->FrameInstanceOffset + s_Data->InstanceCount >= MaxQuads)
+		{
+			Flush();
+			StartNewBatch();
+		}
 
-auto& inst = *s_Data->InstanceBufferPtr++;
-inst.Center = position;
+		auto& inst = *s_Data->InstanceBufferPtr++;
+		inst.Center = position;
 		inst.HalfSize = size * 0.5f;
 		inst.ColorRGBA = PackColorRGBA8(color);
 		inst.TexIndex = 0u; // white texture
@@ -498,14 +540,14 @@ inst.Center = position;
 			++s_Data->TextureSlotIndex;
 		}
 
-if (s_Data->FrameInstanceOffset + s_Data->InstanceCount >= MaxQuads)
-{
-    Flush();
-    StartNewBatch();
-}
+		if (s_Data->FrameInstanceOffset + s_Data->InstanceCount >= MaxQuads)
+		{
+			Flush();
+			StartNewBatch();
+		}
 
-auto& inst = *s_Data->InstanceBufferPtr++;
-inst.Center = position;
+		auto& inst = *s_Data->InstanceBufferPtr++;
+		inst.Center = position;
 		inst.HalfSize = size * 0.5f;
 		inst.ColorRGBA = PackColorRGBA8(tintColor);
 		inst.TexIndex = texIndex;
@@ -534,13 +576,13 @@ inst.Center = position;
 	void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size, const glm::vec3& rotation, const glm::vec4& color)
 	{
 		if (!s_Data) return;
-if (s_Data->FrameInstanceOffset + s_Data->InstanceCount >= MaxQuads)
-{
-    Flush();
-    StartNewBatch();
-}
+		if (s_Data->FrameInstanceOffset + s_Data->InstanceCount >= MaxQuads)
+		{
+			Flush();
+			StartNewBatch();
+		}
 
-float rz = glm::radians(rotation.z);
+		float rz = glm::radians(rotation.z);
 		float c = std::cos(rz), s = std::sin(rz);
 		auto& inst = *s_Data->InstanceBufferPtr++;
 		inst.Center = position;

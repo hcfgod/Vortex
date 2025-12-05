@@ -1,7 +1,10 @@
 #include "ExampleGameLayer.h"
 #include "EditorLayer.h"
 #include <imgui.h>
+#include <algorithm>
 #include "Engine/Renderer/Renderer2D.h"
+#include "Engine/Renderer/RenderGraph.h"
+#include "Engine/Renderer/RenderPass.h"
 
 void ExampleGameLayer::OnAttach()
 {
@@ -225,14 +228,26 @@ void ExampleGameLayer::OnRender()
         return;
     }
 
+    // Get the render graph
+    auto& renderGraph = GetRenderGraph();
+
+    // Begin the World2D pass for game content
+    // This pass can have lighting effects applied to it
+    renderGraph.BeginPass("World2D");
+
     // Reset per-frame stats so GetStats() reports this frame only
     Renderer2D::ResetStats();
+    
+    // The render pass context is automatically picked up by Renderer2D
     Renderer2D::BeginScene(*activeCamera);
     
-    // Render the grid test instead of the simple quads
+    // Render the grid test - this is game content that could have lighting
     RenderBatchingTestGrid();
 
     Renderer2D::EndScene();
+
+    // End the World2D pass
+    renderGraph.EndPass();
 
     // Accumulate lifetime totals from this frame's stats
     {
@@ -323,6 +338,82 @@ void ExampleGameLayer::OnImGuiRender()
         else
         {
             ImGui::Text("CameraSystem: Not Available");
+        }
+        
+        ImGui::Separator();
+        ImGui::Text("=== Render Pass System ===");
+        
+        // Show render graph info
+        if (HasRenderGraph())
+        {
+            auto& graph = GetRenderGraph();
+            const auto& stats = graph.GetLastFrameStats();
+            
+            // Header stats
+            ImGui::Text("Frame: %u | Passes Used: %u", stats.FrameNumber, stats.PassesExecuted);
+            ImGui::Text("Graph Time: %.3f ms", stats.TotalFrameTimeMs);
+            
+            // Debug mode toggle
+            static bool debugEnabled = graph.IsDebugEnabled();
+            if (ImGui::Checkbox("Debug Logging", &debugEnabled))
+            {
+                graph.SetDebugEnabled(debugEnabled);
+            }
+            
+            ImGui::Separator();
+            
+            // Pass list with timings
+            if (ImGui::TreeNode("Render Passes"))
+            {
+                for (const auto& pass : graph.GetPasses())
+                {
+                    const std::string& passName = pass->GetName();
+                    
+                    // Check if this pass was executed last frame
+                    bool wasExecuted = std::find(stats.ExecutedPassNames.begin(), 
+                                                  stats.ExecutedPassNames.end(), 
+                                                  passName) != stats.ExecutedPassNames.end();
+                    
+                    // Get timing if available
+                    float passTime = 0.0f;
+                    auto timingIt = stats.PassTimingsMs.find(passName);
+                    if (timingIt != stats.PassTimingsMs.end())
+                    {
+                        passTime = timingIt->second;
+                    }
+                    
+                    // Color based on execution status
+                    if (wasExecuted)
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+                    }
+                    else
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+                    }
+                    
+                    // Check if pass has its own framebuffer
+                    bool hasFBO = graph.GetPassFramebuffer(passName) != nullptr;
+                    
+                    ImGui::BulletText("%s (%s)%s%s %.3fms", 
+                        passName.c_str(),
+                        RenderDomainToString(pass->GetDomain()),
+                        wasExecuted ? " [USED]" : "",
+                        hasFBO ? " [FBO]" : "",
+                        passTime);
+                    
+                    ImGui::PopStyleColor();
+                }
+                ImGui::TreePop();
+            }
+            
+            // Show current domain for Renderer2D
+            ImGui::Text("Current Renderer2D Domain: %s", 
+                       RenderDomainToString(Renderer2D::GetCurrentDomain()));
+        }
+        else
+        {
+            ImGui::Text("No RenderGraph available");
         }
         
         ImGui::Separator();

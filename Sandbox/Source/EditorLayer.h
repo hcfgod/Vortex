@@ -42,4 +42,7 @@ private:
 
     // Warn only once if no main camera is set in play modes
     bool m_WarnedNoMainCamera = false;
+
+	// Asset system for building assets
+	std::shared_ptr<AssetSystem> m_AssetSystem;
 };

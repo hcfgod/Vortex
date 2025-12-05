@@ -114,4 +114,120 @@ namespace Vortex
         Stencil = 101,
         DepthStencil = 102
     };
+
+    // ============================================================================
+    // RENDER PASS SYSTEM ENUMS
+    // ============================================================================
+
+    /**
+     * @brief High-level render domain categories for organizing render passes
+     * 
+     * Render domains define the semantic purpose of rendering content, allowing
+     * the engine to apply appropriate effects (like lighting) only to relevant
+     * content (e.g., World2D/World3D) while leaving UI unaffected.
+     */
+    enum class RenderDomain : uint8_t
+    {
+        Background = 0,   // Skybox, far backgrounds - rendered first
+        World3D,          // 3D geometry, meshes, terrain
+        World2D,          // 2D sprites, tilemaps, game content
+        Effects,          // Particles, post-process targets
+        UI,               // User interface elements - no lighting
+        Overlay           // Debug overlays, always rendered on top
+    };
+
+    /**
+     * @brief Convert RenderDomain to string for debugging
+     */
+    inline const char* RenderDomainToString(RenderDomain domain)
+    {
+        switch (domain)
+        {
+            case RenderDomain::Background: return "Background";
+            case RenderDomain::World3D:    return "World3D";
+            case RenderDomain::World2D:    return "World2D";
+            case RenderDomain::Effects:    return "Effects";
+            case RenderDomain::UI:         return "UI";
+            case RenderDomain::Overlay:    return "Overlay";
+            default:                       return "Unknown";
+        }
+    }
+
+    /**
+     * @brief Sort mode for render pass draw ordering
+     * 
+     * Controls how draw calls within a render pass are ordered before submission.
+     */
+    enum class RenderSortMode : uint8_t
+    {
+        None = 0,           // No sorting - draw in submission order
+        FrontToBack,        // Sort by depth, closest first (opaque optimization)
+        BackToFront,        // Sort by depth, farthest first (transparency)
+        ByMaterial,         // Group by material/shader to minimize state changes
+        ByTexture           // Group by texture to minimize texture binds
+    };
+
+    /**
+     * @brief Convert RenderSortMode to string for debugging
+     */
+    inline const char* RenderSortModeToString(RenderSortMode mode)
+    {
+        switch (mode)
+        {
+            case RenderSortMode::None:        return "None";
+            case RenderSortMode::FrontToBack: return "FrontToBack";
+            case RenderSortMode::BackToFront: return "BackToFront";
+            case RenderSortMode::ByMaterial:  return "ByMaterial";
+            case RenderSortMode::ByTexture:   return "ByTexture";
+            default:                          return "Unknown";
+        }
+    }
+
+    /**
+     * @brief Depth compare function for render state
+     */
+    enum class DepthCompareFunc : uint8_t
+    {
+        Never = 0,
+        Less,
+        Equal,
+        LessEqual,
+        Greater,
+        NotEqual,
+        GreaterEqual,
+        Always
+    };
+
+    /**
+     * @brief Blend factors for render state
+     */
+    enum class BlendFactor : uint8_t
+    {
+        Zero = 0,
+        One,
+        SrcColor,
+        OneMinusSrcColor,
+        DstColor,
+        OneMinusDstColor,
+        SrcAlpha,
+        OneMinusSrcAlpha,
+        DstAlpha,
+        OneMinusDstAlpha,
+        ConstantColor,
+        OneMinusConstantColor,
+        ConstantAlpha,
+        OneMinusConstantAlpha
+    };
+
+    /**
+     * @brief Blend operation for render state
+     */
+    enum class BlendOp : uint8_t
+    {
+        Add = 0,
+        Subtract,
+        ReverseSubtract,
+        Min,
+        Max
+    };
 }

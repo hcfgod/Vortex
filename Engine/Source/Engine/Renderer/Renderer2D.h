@@ -7,6 +7,7 @@
 #include "Engine/Assets/AssetHandle.h"
 #include "Engine/Assets/ShaderAsset.h"
 #include "Engine/Renderer/Texture.h"
+#include "Engine/Renderer/RenderTypes.h"
 
 namespace Vortex
 {
@@ -18,6 +19,7 @@ namespace Vortex
 	class IndexBuffer;
 	class Shader;
 	class TextureAsset;
+	class RenderPass;
 
 	// Batch capacity (quads per draw call). If exceeded we flush and start
 	constexpr uint32_t MaxQuads = 10000;
@@ -93,6 +95,10 @@ namespace Vortex
 		std::array<CachedRotation, 16> RotationCache;
 		uint32_t CurrentFrame = 0;
 
+		// Current render pass context (nullptr for default)
+		RenderPass* CurrentRenderPass = nullptr;
+		RenderDomain CurrentDomain = RenderDomain::World2D;
+
 		Renderer2DStatistics Stats;
 	};
 
@@ -101,8 +107,33 @@ namespace Vortex
 	public:
 		static void Initialize();
 		static void Shutdown();
+
+		/**
+		 * @brief Begin a 2D rendering scene with the given camera
+		 * @param camera The camera to use for view/projection
+		 * 
+		 * Uses the current active render pass from the RenderGraph if one is active,
+		 * otherwise uses default 2D rendering settings.
+		 */
 		static void BeginScene(const Camera& camera);
+
+		/**
+		 * @brief Begin a 2D rendering scene with explicit render pass
+		 * @param camera The camera to use for view/projection
+		 * @param pass The render pass context (nullptr to use default settings)
+		 * 
+		 * This overload allows explicit control over the render pass, enabling
+		 * different render configurations for game content vs UI.
+		 */
+		static void BeginScene(const Camera& camera, RenderPass* pass);
+
 		static void EndScene();
+
+		/**
+		 * @brief Get the current render domain
+		 * @return The render domain of the current pass, or World2D if none
+		 */
+		static RenderDomain GetCurrentDomain();
 
 		// Configuration
 		static void SetPixelSnapEnabled(bool enabled);

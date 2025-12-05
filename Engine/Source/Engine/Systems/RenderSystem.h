@@ -6,6 +6,7 @@
 #include "Engine/Renderer/RenderCommandQueue.h"
 #include "Engine/Renderer/Shader/ShaderManager.h"
 #include "Engine/Renderer/FrameBuffer.h"
+#include "Engine/Renderer/RenderGraph.h"
 #include "Core/Window.h"
 #include "Core/Debug/ErrorCodes.h"
 
@@ -51,6 +52,27 @@ namespace Vortex
         // Notify the renderer of window size changes
         Result<void> OnWindowResized(uint32_t width, uint32_t height) { return HandleResize(width, height); }
 
+        // ============================================================================
+        // RENDER GRAPH
+        // ============================================================================
+
+        /**
+         * @brief Get the render graph for this render system
+         * @return Reference to the render graph
+         */
+        RenderGraph& GetRenderGraph();
+
+        /**
+         * @brief Set a custom render graph
+         * @param graph The render graph to use
+         */
+        void SetRenderGraph(RenderGraphRef graph);
+
+        /**
+         * @brief Create and set the default render graph
+         */
+        void CreateDefaultRenderGraph();
+
         // Graphics context access (non-owning)
         GraphicsContext* GetGraphicsContext() { return m_GraphicsContext.get(); }
         const GraphicsContext* GetGraphicsContext() const { return m_GraphicsContext.get(); }
@@ -73,5 +95,8 @@ namespace Vortex
 
         // Optional external framebuffer for scene rendering (editor viewport)
         FrameBufferRef m_SceneTarget;
+
+        // Render graph for orchestrating render passes
+        RenderGraphRef m_RenderGraph;
     };
 }

@@ -5,6 +5,7 @@
 #include "Engine/Renderer/GraphicsContext.h"
 #include "Engine/Renderer/RendererAPI.h"
 #include "Engine/Renderer/RenderCommandQueue.h"
+#include "Engine/Renderer/RenderGraph.h"
 #include "Core/Window.h"
 #include "ImGuiSystem.h"
 #include "SystemAccessors.h"
@@ -202,6 +203,9 @@ namespace Vortex
                         VX_CORE_INFO("ShaderManager initialized successfully");
                     }
 
+                    // Initialize the default render graph
+                    CreateDefaultRenderGraph();
+
                     m_Ready = true;
                     VX_CORE_INFO("RenderSystem rendering initialized (API: {})", GraphicsAPIToString(api));
                     return Result<void>();
@@ -224,6 +228,13 @@ namespace Vortex
             return r;
 
         GetRenderCommandQueue().SetViewport(0, 0, width, height, true);
+
+        // Resize the render graph's internal buffers
+        if (m_RenderGraph)
+        {
+            m_RenderGraph->Resize(width, height);
+        }
+
         return Result<void>();
     }
 
@@ -278,6 +289,12 @@ namespace Vortex
             imgui->BeginFrame();
         }
 
+        // Begin render graph frame - prepares for pass execution
+        if (m_RenderGraph)
+        {
+            m_RenderGraph->Begin();
+        }
+
         return Result<void>();
     }
 
@@ -307,6 +324,12 @@ namespace Vortex
 
     Result<void> RenderSystem::PostRender()
     {
+        // Execute render graph - finalizes all passes and composites
+        if (m_RenderGraph)
+        {
+            m_RenderGraph->Execute();
+        }
+
         // If we redirected to an external scene target this frame, unbind back to default before ImGui render
         if (m_SceneTarget)
         {
@@ -345,6 +368,53 @@ namespace Vortex
         return { 0u, 0u };
     }
 
+    // ============================================================================
+    // RENDER GRAPH
+    // ============================================================================
+
+    RenderGraph& RenderSystem::GetRenderGraph()
+    {
+        if (!m_RenderGraph)
+        {
+            VX_CORE_WARN("RenderSystem::GetRenderGraph() called with no graph, creating default");
+            CreateDefaultRenderGraph();
+        }
+        return *m_RenderGraph;
+    }
+
+    void RenderSystem::SetRenderGraph(RenderGraphRef graph)
+    {
+        m_RenderGraph = std::move(graph);
+        
+        // Also set as the global render graph for convenience
+        if (m_RenderGraph)
+        {
+            Vortex::SetRenderGraph(m_RenderGraph);
+            VX_CORE_INFO("RenderSystem: Custom render graph set");
+        }
+    }
+
+    void RenderSystem::CreateDefaultRenderGraph()
+    {
+        m_RenderGraph = RenderGraph::CreateDefault();
+        
+        // Set as the global render graph
+        Vortex::SetRenderGraph(m_RenderGraph);
+        
+        // Configure the graph to use our scene target if one is set
+        if (m_SceneTarget)
+        {
+            m_RenderGraph->SetOutputTarget(m_SceneTarget);
+        }
+        
+        // Set the viewport size
+        auto viewportSize = GetCurrentViewportSize();
+        m_RenderGraph->Resize(viewportSize.x, viewportSize.y);
+        
+        VX_CORE_INFO("RenderSystem: Default render graph created with {} passes", 
+                     m_RenderGraph->GetPassCount());
+    }
+
     Result<void> RenderSystem::Shutdown()
     {
         // Idempotent: if nothing is initialized and no renderer/context remains, skip
@@ -353,6 +423,10 @@ namespace Vortex
             VX_CORE_TRACE("RenderSystem already shutdown");
             return Result<void>();
         }
+
+        // Clear global render graph
+        Vortex::SetRenderGraph(nullptr);
+        m_RenderGraph.reset();
 
         // Release any external scene render targets BEFORE flushing/shutting down the queue
         // so their GPU deletes can be executed safely while the queue is still alive.
