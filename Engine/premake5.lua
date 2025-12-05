@@ -57,6 +57,11 @@ project "Engine"
         disablewarnings { "4005" } -- silence benign macro redefinitions inside vendor
     filter {}
 
+    -- Disable PCH for stb source files (vendor files should not include engine PCH)
+    filter "files:Vendor/stb/**.cpp"
+        flags { "NoPCH" }
+    filter {}
+
     defines
     {
         "_CRT_SECURE_NO_WARNINGS",
